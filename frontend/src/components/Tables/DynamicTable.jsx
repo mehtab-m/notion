@@ -1,0 +1,450 @@
+import React, { useState, useRef } from 'react';
+import {
+  Plus, Trash2, MoreHorizontal, X, Check, Type, Hash,
+  Calendar, ChevronDown, Image, CheckSquare, Link, Pencil
+} from 'lucide-react';
+import toast from 'react-hot-toast';
+import { addRow, updateRow, deleteRow, addColumn, updateColumn, deleteColumn } from '../../utils/api';
+import './DynamicTable.css';
+
+const TYPE_ICONS = {
+  text: Type,
+  number: Hash,
+  date: Calendar,
+  dropdown: ChevronDown,
+  image: Image,
+  checkbox: CheckSquare,
+  url: Link,
+};
+
+const COLUMN_TYPES = ['text', 'number', 'date', 'dropdown', 'image', 'checkbox', 'url'];
+
+function AddColumnPanel({ tableId, onAdded, onClose }) {
+  const [name, setName] = useState('');
+  const [type, setType] = useState('text');
+  const [options, setOptions] = useState([]);
+  const [optInput, setOptInput] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const addOpt = () => {
+    if (!optInput.trim()) return;
+    setOptions((p) => [...p, optInput.trim()]);
+    setOptInput('');
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) { toast.error('Column name required'); return; }
+    setLoading(true);
+    try {
+      const col = await addColumn(tableId, { name: name.trim(), type, options });
+      toast.success('Column added');
+      onAdded(col);
+      onClose();
+    } catch (err) {
+      toast.error('Failed to add column');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="add-col-panel">
+      <div className="add-col-panel-header">
+        <span>Add Column</span>
+        <button onClick={onClose}><X size={14} /></button>
+      </div>
+      <form onSubmit={handleSubmit}>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Column name..."
+          autoFocus
+          className="add-col-input"
+        />
+        <select value={type} onChange={(e) => setType(e.target.value)} className="add-col-select">
+          {COLUMN_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        {type === 'dropdown' && (
+          <div className="add-col-options">
+            <div className="add-col-opt-row">
+              <input
+                value={optInput}
+                onChange={(e) => setOptInput(e.target.value)}
+                placeholder="Add option..."
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addOpt(); } }}
+                className="add-col-input"
+              />
+              <button type="button" className="btn btn-secondary btn-sm" onClick={addOpt}>+</button>
+            </div>
+            <div className="dropdown-opts-preview">
+              {options.map((o, i) => (
+                <span key={i} className="dropdown-option-tag">
+                  {o}
+                  <button type="button" onClick={() => setOptions((p) => p.filter((_, ii) => ii !== i))}><X size={10} /></button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="add-col-actions">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>Cancel</button>
+          <button type="submit" className="btn btn-primary btn-sm" disabled={loading}>
+            {loading ? '...' : 'Add'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function ColMenu({ col, tableId, onUpdated, onDeleted, onClose }) {
+  const [renaming, setRenaming] = useState(false);
+  const [newName, setNewName] = useState(col.name);
+  const [loading, setLoading] = useState(false);
+
+  const handleRename = async () => {
+    if (!newName.trim()) return;
+    setLoading(true);
+    try {
+      await updateColumn(tableId, col.id, { name: newName.trim() });
+      onUpdated({ ...col, name: newName.trim() });
+      toast.success('Column renamed');
+      onClose();
+    } catch {
+      toast.error('Failed to rename');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete column "${col.name}"? This will remove all data in this column.`)) return;
+    setLoading(true);
+    try {
+      await deleteColumn(tableId, col.id);
+      onDeleted(col.id);
+      toast.success('Column deleted');
+      onClose();
+    } catch {
+      toast.error('Failed to delete column');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="col-menu">
+      {renaming ? (
+        <div className="col-menu-rename">
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            autoFocus
+            onKeyDown={(e) => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') onClose(); }}
+            className="col-menu-input"
+          />
+          <button className="btn btn-primary btn-sm" onClick={handleRename} disabled={loading}>
+            <Check size={12} />
+          </button>
+        </div>
+      ) : (
+        <>
+          <button className="col-menu-item" onClick={() => setRenaming(true)}>
+            <Pencil size={13} /> Rename
+          </button>
+          <button className="col-menu-item danger" onClick={handleDelete}>
+            <Trash2 size={13} /> Delete Column
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Cell({ col, value, tableId, rowId, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [localVal, setLocalVal] = useState(value ?? (col.type === 'checkbox' ? false : ''));
+  const inputRef = useRef(null);
+
+  const save = async (val) => {
+    if (val === value) { setEditing(false); return; }
+    try {
+      await onSave(col.id, val);
+    } catch {
+      toast.error('Failed to save');
+    }
+    setEditing(false);
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const b64 = reader.result;
+      setLocalVal(b64);
+      onSave(col.id, b64).catch(() => toast.error('Failed to save image'));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  if (col.type === 'checkbox') {
+    return (
+      <td className="dt-cell dt-cell-checkbox">
+        <input
+          type="checkbox"
+          checked={!!localVal}
+          onChange={(e) => {
+            const v = e.target.checked;
+            setLocalVal(v);
+            onSave(col.id, v);
+          }}
+        />
+      </td>
+    );
+  }
+
+  if (col.type === 'image') {
+    return (
+      <td className="dt-cell dt-cell-image">
+        {localVal ? (
+          <div className="cell-image-wrap">
+            <img src={localVal} alt="" className="cell-thumbnail" />
+            <label className="cell-image-replace">
+              <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+              Replace
+            </label>
+          </div>
+        ) : (
+          <label className="cell-image-upload">
+            <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+            <Plus size={14} /> Upload
+          </label>
+        )}
+      </td>
+    );
+  }
+
+  if (col.type === 'url' && !editing) {
+    return (
+      <td className="dt-cell" onClick={() => setEditing(true)}>
+        {localVal ? (
+          <a href={localVal} target="_blank" rel="noopener noreferrer" className="cell-link" onClick={(e) => e.stopPropagation()}>
+            {localVal}
+          </a>
+        ) : (
+          <span className="cell-empty">—</span>
+        )}
+      </td>
+    );
+  }
+
+  if (col.type === 'dropdown') {
+    return (
+      <td className="dt-cell dt-cell-dropdown">
+        <select
+          value={localVal || ''}
+          onChange={(e) => {
+            setLocalVal(e.target.value);
+            onSave(col.id, e.target.value);
+          }}
+          className="cell-select"
+        >
+          <option value="">—</option>
+          {(col.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+      </td>
+    );
+  }
+
+  if (!editing) {
+    return (
+      <td className="dt-cell" onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.focus(), 50); }}>
+        {localVal !== '' && localVal != null ? (
+          <span className="cell-value">{col.type === 'date' && localVal ? new Date(localVal).toLocaleDateString() : String(localVal)}</span>
+        ) : (
+          <span className="cell-empty">—</span>
+        )}
+      </td>
+    );
+  }
+
+  return (
+    <td className="dt-cell dt-cell-editing">
+      <input
+        ref={inputRef}
+        type={col.type === 'number' ? 'number' : col.type === 'date' ? 'date' : 'text'}
+        value={localVal}
+        onChange={(e) => setLocalVal(e.target.value)}
+        onBlur={() => save(col.type === 'number' ? Number(localVal) : localVal)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') save(col.type === 'number' ? Number(localVal) : localVal);
+          if (e.key === 'Escape') { setLocalVal(value ?? ''); setEditing(false); }
+        }}
+        className="cell-input"
+        autoFocus
+      />
+    </td>
+  );
+}
+
+export default function DynamicTable({ table, onTableChange }) {
+  const [columns, setColumns] = useState(table.columns || []);
+  const [rows, setRows] = useState(table.rows || []);
+  const [showAddCol, setShowAddCol] = useState(false);
+  const [openMenu, setOpenMenu] = useState(null);
+  const [addingRow, setAddingRow] = useState(false);
+
+  const handleAddRow = async () => {
+    setAddingRow(true);
+    try {
+      const newRow = await addRow(table._id, {});
+      setRows((prev) => [...prev, newRow]);
+    } catch {
+      toast.error('Failed to add row');
+    } finally {
+      setAddingRow(false);
+    }
+  };
+
+  const handleDeleteRow = async (rowId) => {
+    if (!window.confirm('Delete this row?')) return;
+    try {
+      await deleteRow(table._id, rowId);
+      setRows((prev) => prev.filter((r) => r.id !== rowId));
+      toast.success('Row deleted');
+    } catch {
+      toast.error('Failed to delete row');
+    }
+  };
+
+  const handleCellSave = async (rowId, colId, value) => {
+    const row = rows.find((r) => r.id === rowId);
+    if (!row) return;
+    const newData = { ...row.data, [colId]: value };
+    await updateRow(table._id, rowId, newData);
+    setRows((prev) => prev.map((r) => r.id === rowId ? { ...r, data: newData } : r));
+  };
+
+  const handleColAdded = (col) => {
+    setColumns((prev) => [...prev, col]);
+    if (onTableChange) onTableChange();
+  };
+
+  const handleColUpdated = (updatedCol) => {
+    setColumns((prev) => prev.map((c) => c.id === updatedCol.id ? updatedCol : c));
+  };
+
+  const handleColDeleted = (colId) => {
+    setColumns((prev) => prev.filter((c) => c.id !== colId));
+    setRows((prev) => prev.map((r) => {
+      const newData = { ...r.data };
+      delete newData[colId];
+      return { ...r, data: newData };
+    }));
+  };
+
+  return (
+    <div className="dynamic-table-wrap">
+      <div className="dt-toolbar">
+        <span className="dt-table-name">{table.name}</span>
+        <div className="dt-toolbar-actions">
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowAddCol((v) => !v)}>
+            <Plus size={14} /> Add Column
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={handleAddRow} disabled={addingRow}>
+            <Plus size={14} /> Add Row
+          </button>
+        </div>
+      </div>
+
+      {showAddCol && (
+        <div className="add-col-panel-wrap">
+          <AddColumnPanel
+            tableId={table._id}
+            onAdded={handleColAdded}
+            onClose={() => setShowAddCol(false)}
+          />
+        </div>
+      )}
+
+      {columns.length === 0 ? (
+        <div className="empty-state" style={{ minHeight: 200 }}>
+          <p>No columns yet. Add a column to get started.</p>
+        </div>
+      ) : (
+        <div className="dt-scroll">
+          <table className="dt-table">
+            <thead>
+              <tr>
+                <th className="dt-row-actions-th" />
+                {columns.map((col) => {
+                  const Icon = TYPE_ICONS[col.type] || Type;
+                  return (
+                    <th key={col.id} className="dt-th">
+                      <div className="dt-th-inner">
+                        <Icon size={13} />
+                        <span>{col.name}</span>
+                        <button
+                          className="col-menu-trigger"
+                          onClick={() => setOpenMenu(openMenu === col.id ? null : col.id)}
+                        >
+                          <MoreHorizontal size={13} />
+                        </button>
+                      </div>
+                      {openMenu === col.id && (
+                        <div className="col-menu-wrap">
+                          <ColMenu
+                            col={col}
+                            tableId={table._id}
+                            onUpdated={handleColUpdated}
+                            onDeleted={handleColDeleted}
+                            onClose={() => setOpenMenu(null)}
+                          />
+                        </div>
+                      )}
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length + 1} className="dt-empty-row">
+                    No rows yet. Click "+ Add Row" to start.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((row) => (
+                  <tr key={row.id} className="dt-row">
+                    <td className="dt-row-delete-cell">
+                      <button
+                        className="dt-row-delete"
+                        onClick={() => handleDeleteRow(row.id)}
+                        title="Delete row"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </td>
+                    {columns.map((col) => (
+                      <Cell
+                        key={col.id}
+                        col={col}
+                        value={row.data?.[col.id]}
+                        tableId={table._id}
+                        rowId={row.id}
+                        onSave={(colId, val) => handleCellSave(row.id, colId, val)}
+                      />
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
