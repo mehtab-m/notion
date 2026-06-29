@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pencil, Trash2, Calendar, Tag } from 'lucide-react';
+import { Pencil, Trash2, Calendar, Tag, CheckSquare, Link, User } from 'lucide-react';
 import { format } from 'date-fns';
 import './ProjectCard.css';
 
@@ -18,9 +18,12 @@ const priorityClass = {
 
 export default function ProjectCard({ project, onEdit, onDelete }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const doneTasks = (project.tasks || []).filter((t) => t.done).length;
+  const totalTasks = (project.tasks || []).length;
+  const accentColor = project.color || 'var(--border)';
 
   return (
-    <div className="project-card">
+    <div className="project-card" style={{ borderTopColor: accentColor }}>
       <div className="project-card-header">
         <div className="project-card-badges">
           <span className={`badge ${statusClass[project.status] || ''}`}>{project.status}</span>
@@ -44,9 +47,7 @@ export default function ProjectCard({ project, onEdit, onDelete }) {
       </div>
 
       <h3 className="project-card-title">{project.title}</h3>
-      {project.description && (
-        <p className="project-card-desc">{project.description}</p>
-      )}
+      {project.description && <p className="project-card-desc">{project.description}</p>}
 
       <div className="project-card-progress">
         <div className="project-progress-label">
@@ -68,16 +69,42 @@ export default function ProjectCard({ project, onEdit, onDelete }) {
         </div>
       </div>
 
-      {project.dueDate && (
-        <div className="project-card-meta">
-          <Calendar size={12} />
-          <span>Due {format(new Date(project.dueDate), 'MMM d, yyyy')}</span>
-        </div>
-      )}
+      <div className="project-card-footer">
+        {project.dueDate && (
+          <div className="project-card-meta-item">
+            <Calendar size={12} />
+            <span>{format(new Date(project.dueDate), 'MMM d')}</span>
+          </div>
+        )}
+        {totalTasks > 0 && (
+          <div className="project-card-meta-item">
+            <CheckSquare size={12} />
+            <span>{doneTasks}/{totalTasks}</span>
+          </div>
+        )}
+        {(project.links || []).length > 0 && (
+          <div className="project-card-meta-item">
+            <Link size={12} />
+            <span>{project.links.length}</span>
+          </div>
+        )}
+        {(project.assignees || []).length > 0 && (
+          <div className="project-assignees">
+            {project.assignees.slice(0, 3).map((a, i) => (
+              <span key={i} className="assignee-avatar" title={a}>
+                {a.charAt(0).toUpperCase()}
+              </span>
+            ))}
+            {project.assignees.length > 3 && (
+              <span className="assignee-avatar">+{project.assignees.length - 3}</span>
+            )}
+          </div>
+        )}
+      </div>
 
       {project.tags && project.tags.length > 0 && (
         <div className="project-card-tags">
-          <Tag size={12} color="var(--text-muted)" />
+          <Tag size={11} color="var(--text-muted)" />
           {project.tags.slice(0, 3).map((tag) => (
             <span key={tag} className="project-tag">{tag}</span>
           ))}

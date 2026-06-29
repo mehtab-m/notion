@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FolderKanban, BookOpen, Tv, Table } from 'lucide-react';
-import { getProjects, getBooks, getShows, getTables } from '../utils/api';
+import { getProjects, getBooks, getShows, getTables, getDashboardStats, getApiBase } from '../utils/api';
 import StatsCard from '../components/Dashboard/StatsCard';
 import ProgressRing from '../components/Dashboard/ProgressRing';
 import RecentActivity from '../components/Dashboard/RecentActivity';
 import QuickAdd from '../components/Dashboard/QuickAdd';
+import DashboardCharts from '../components/Dashboard/DashboardCharts';
 import './Dashboard.css';
 
-const BACKEND = 'http://localhost:5000';
+const BACKEND = getApiBase();
 
 function priorityColor(priority) {
   if (priority === 'high') return 'var(--accent-red)';
@@ -17,18 +18,21 @@ function priorityColor(priority) {
 
 export default function Dashboard() {
   const [data, setData] = useState({ projects: [], books: [], shows: [], tables: [] });
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [projects, books, shows, tables] = await Promise.all([
+      const [projects, books, shows, tables, dashStats] = await Promise.all([
         getProjects(),
         getBooks(),
         getShows(),
         getTables(),
+        getDashboardStats(),
       ]);
       setData({ projects, books, shows, tables });
+      setStats(dashStats);
     } catch (err) {
       console.error('Dashboard fetch error', err);
     } finally {
@@ -63,7 +67,6 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard">
-      {/* Stats Row */}
       <div className="dashboard-stats">
         <StatsCard
           icon={FolderKanban}
@@ -95,14 +98,14 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Quick Add */}
       <div className="dashboard-section">
         <QuickAdd onAdded={fetchAll} />
       </div>
 
+      <DashboardCharts stats={stats} />
+
       <div className="dashboard-grid">
         <div className="dashboard-left">
-          {/* In Progress - Books */}
           {readingBooks.length > 0 && (
             <div className="dashboard-section">
               <h2 className="section-title">Currently Reading</h2>
@@ -133,7 +136,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* In Progress - Shows */}
           {watchingShows.length > 0 && (
             <div className="dashboard-section">
               <h2 className="section-title">Currently Watching</h2>
@@ -158,7 +160,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Projects Overview */}
           {activeProjects.length > 0 && (
             <div className="dashboard-section">
               <h2 className="section-title">Active Projects</h2>
@@ -192,7 +193,6 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Recent Activity */}
         <div className="dashboard-right">
           <div className="dashboard-section">
             <h2 className="section-title">Recent Activity</h2>

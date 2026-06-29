@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useApi from '../hooks/useApi';
-import { getBooks, deleteBook } from '../utils/api';
+import { getBooks, deleteBook, incrementBookPage, addLearningLine } from '../utils/api';
 import BookCard from '../components/Books/BookCard';
 import BookModal from '../components/Books/BookModal';
 
@@ -19,8 +19,28 @@ export default function BooksPage() {
       await deleteBook(id);
       toast.success('Book deleted');
       refetch();
-    } catch (err) {
+    } catch {
       toast.error('Failed to delete book');
+    }
+  };
+
+  const handleIncrementPage = async (id) => {
+    try {
+      await incrementBookPage(id, 1);
+      toast.success('Page updated!');
+      refetch();
+    } catch {
+      toast.error('Failed to update page');
+    }
+  };
+
+  const handleLearningLine = async (bookId, text) => {
+    try {
+      await addLearningLine(bookId, text);
+      toast.success('Learning line saved to notebook!');
+    } catch {
+      toast.error('Failed to save learning line');
+      throw new Error('failed');
     }
   };
 
@@ -75,7 +95,14 @@ export default function BooksPage() {
       ) : (
         <div className="card-grid">
           {filtered.map((book) => (
-            <BookCard key={book._id} book={book} onEdit={handleEdit} onDelete={handleDelete} />
+            <BookCard
+              key={book._id}
+              book={book}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onIncrementPage={handleIncrementPage}
+              onLearningLine={handleLearningLine}
+            />
           ))}
         </div>
       )}

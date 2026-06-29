@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Sun, Moon } from 'lucide-react';
+import { Search, Sun, Moon, Menu } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import './Navbar.css';
 
@@ -10,12 +10,15 @@ function getGreeting() {
   return 'Good evening';
 }
 
-export default function Navbar({ title }) {
+export default function Navbar({ title, onMenuClick }) {
   const [searchVal, setSearchVal] = useState('');
   const { theme, toggleTheme } = useTheme();
 
   return (
     <header className="navbar">
+      <button className="navbar-menu-btn" onClick={onMenuClick} aria-label="Open menu">
+        <Menu size={20} />
+      </button>
       <h1 className="navbar-title">{title}</h1>
 
       <div className="navbar-search">

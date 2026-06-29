@@ -101,6 +101,7 @@ function AddColumnPanel({ tableId, onAdded, onClose }) {
 function ColMenu({ col, tableId, onUpdated, onDeleted, onClose }) {
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState(col.name);
+  const [confirmDel, setConfirmDel] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleRename = async () => {
@@ -119,7 +120,6 @@ function ColMenu({ col, tableId, onUpdated, onDeleted, onClose }) {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm(`Delete column "${col.name}"? This will remove all data in this column.`)) return;
     setLoading(true);
     try {
       await deleteColumn(tableId, col.id);
@@ -148,12 +148,22 @@ function ColMenu({ col, tableId, onUpdated, onDeleted, onClose }) {
             <Check size={12} />
           </button>
         </div>
+      ) : confirmDel ? (
+        <div className="col-menu-confirm">
+          <span>Delete "{col.name}"?</span>
+          <div className="col-menu-confirm-btns">
+            <button className="btn btn-danger btn-sm" onClick={handleDelete} disabled={loading}>
+              {loading ? '...' : 'Delete'}
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={() => setConfirmDel(false)}>Cancel</button>
+          </div>
+        </div>
       ) : (
         <>
           <button className="col-menu-item" onClick={() => setRenaming(true)}>
             <Pencil size={13} /> Rename
           </button>
-          <button className="col-menu-item danger" onClick={handleDelete}>
+          <button className="col-menu-item danger" onClick={() => setConfirmDel(true)}>
             <Trash2 size={13} /> Delete Column
           </button>
         </>

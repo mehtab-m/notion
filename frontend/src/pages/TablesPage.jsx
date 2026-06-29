@@ -1,13 +1,65 @@
 import React, { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Table, Trash2, Columns } from 'lucide-react';
+import { Plus, Table, Trash2, Columns, Zap } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import useApi from '../hooks/useApi';
-import { getTables, deleteTable } from '../utils/api';
+import { getTables, deleteTable, createTable } from '../utils/api';
 import TableModal from '../components/Tables/TableModal';
 import TableView from '../components/Tables/TableView';
 import './TablesPage.css';
+
+const TEMPLATES = [
+  {
+    name: 'Subscription Tracker',
+    columns: [
+      { name: 'Service', type: 'text' },
+      { name: 'Cost / Month', type: 'number' },
+      { name: 'Billing Cycle', type: 'dropdown', options: ['Monthly', 'Yearly', 'Weekly'] },
+      { name: 'Category', type: 'dropdown', options: ['Entertainment', 'SaaS', 'Cloud', 'Fitness', 'Food', 'Other'] },
+      { name: 'Renewal Date', type: 'date' },
+      { name: 'Status', type: 'dropdown', options: ['Active', 'Paused', 'Cancelled'] },
+      { name: 'Website', type: 'url' },
+      { name: 'Notes', type: 'text' },
+    ],
+  },
+  {
+    name: 'Weekly Tasks',
+    columns: [
+      { name: 'Task', type: 'text' },
+      { name: 'Priority', type: 'dropdown', options: ['High', 'Medium', 'Low'] },
+      { name: 'Status', type: 'dropdown', options: ['To Do', 'In Progress', 'Done', 'Blocked'] },
+      { name: 'Due Date', type: 'date' },
+      { name: 'Assignee', type: 'text' },
+      { name: 'Done', type: 'checkbox' },
+      { name: 'Notes', type: 'text' },
+    ],
+  },
+  {
+    name: 'Budget Tracker',
+    columns: [
+      { name: 'Item', type: 'text' },
+      { name: 'Amount', type: 'number' },
+      { name: 'Category', type: 'dropdown', options: ['Food', 'Rent', 'Transport', 'Health', 'Entertainment', 'Other'] },
+      { name: 'Type', type: 'dropdown', options: ['Income', 'Expense'] },
+      { name: 'Date', type: 'date' },
+      { name: 'Recurring', type: 'checkbox' },
+      { name: 'Notes', type: 'text' },
+    ],
+  },
+  {
+    name: 'Contact List',
+    columns: [
+      { name: 'Name', type: 'text' },
+      { name: 'Email', type: 'url' },
+      { name: 'Phone', type: 'text' },
+      { name: 'Company', type: 'text' },
+      { name: 'Role', type: 'text' },
+      { name: 'Last Contact', type: 'date' },
+      { name: 'Notes', type: 'text' },
+    ],
+  },
+];
 
 export default function TablesPage() {
   const { id } = useParams();
@@ -24,6 +76,7 @@ function TableList() {
   const { data: tables, loading, refetch } = useApi(getTables);
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmId, setConfirmId] = useState(null);
+  const [creatingTemplate, setCreatingTemplate] = useState(false);
 
   const handleDelete = async (tableId) => {
     try {
@@ -36,6 +89,21 @@ function TableList() {
     setConfirmId(null);
   };
 
+  const handleTemplate = async (tpl) => {
+    setCreatingTemplate(true);
+    try {
+      const cols = tpl.columns.map((c) => ({ id: crypto.randomUUID(), ...c, options: c.options || [] }));
+      const created = await createTable({ name: tpl.name, columns: cols });
+      toast.success(`"${tpl.name}" table created!`);
+      refetch();
+      navigate(`/tables/${created._id}`);
+    } catch {
+      toast.error('Failed to create template');
+    } finally {
+      setCreatingTemplate(false);
+    }
+  };
+
   const handleClose = useCallback(() => setModalOpen(false), []);
 
   return (
@@ -45,6 +113,21 @@ function TableList() {
         <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
           <Plus size={16} /> New Table
         </button>
+      </div>
+
+      {/* Templates */}
+      <div className="table-templates">
+        <span className="table-templates-label"><Zap size={13} /> Quick Templates:</span>
+        {TEMPLATES.map((tpl) => (
+          <button
+            key={tpl.name}
+            className="table-template-btn"
+            onClick={() => handleTemplate(tpl)}
+            disabled={creatingTemplate}
+          >
+            {tpl.name}
+          </button>
+        ))}
       </div>
 
       {loading ? (

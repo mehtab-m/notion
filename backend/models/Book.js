@@ -14,6 +14,7 @@ const BookSchema = new mongoose.Schema({
   genre: { type: String },
   notes: { type: String },
   coverImage: { type: String },
+  notebookId: { type: mongoose.Schema.Types.ObjectId, ref: 'Note', default: null },
   startedAt: { type: Date },
   finishedAt: { type: Date },
   createdAt: { type: Date, default: Date.now },

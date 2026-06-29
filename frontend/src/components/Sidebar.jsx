@@ -1,38 +1,86 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FolderKanban, BookOpen, Tv, Table, Grid2x2 } from 'lucide-react';
+import {
+  LayoutDashboard, FolderKanban, BookOpen, Tv, Table,
+  Grid2x2, PenLine, StickyNote, Target, Flame, ChevronDown, ChevronRight, X,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import './Sidebar.css';
 
-const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/projects', icon: FolderKanban, label: 'Projects' },
-  { to: '/books', icon: BookOpen, label: 'Books' },
-  { to: '/shows', icon: Tv, label: 'Shows' },
-  { to: '/tables', icon: Table, label: 'Tables' },
+const NAV_GROUPS = [
+  {
+    label: 'WORKSPACE',
+    items: [
+      { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
+      { to: '/notes', icon: PenLine, label: 'Notebook' },
+      { to: '/stickynotes', icon: StickyNote, label: 'Sticky Notes' },
+    ],
+  },
+  {
+    label: 'PRODUCTIVITY',
+    items: [
+      { to: '/projects', icon: FolderKanban, label: 'Projects' },
+      { to: '/goals', icon: Target, label: 'Goals' },
+      { to: '/habits', icon: Flame, label: 'Habits' },
+    ],
+  },
+  {
+    label: 'LIBRARY',
+    items: [
+      { to: '/books', icon: BookOpen, label: 'Books' },
+      { to: '/shows', icon: Tv, label: 'Shows' },
+    ],
+  },
+  {
+    label: 'DATA',
+    items: [
+      { to: '/tables', icon: Table, label: 'Tables' },
+    ],
+  },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ open, onClose }) {
   const today = format(new Date(), 'EEE, MMM d yyyy');
+  const [collapsed, setCollapsed] = useState({});
+
+  const toggleGroup = (label) =>
+    setCollapsed((prev) => ({ ...prev, [label]: !prev[label] }));
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${open ? 'sidebar--open' : ''}`}>
       <div className="sidebar-logo">
         <Grid2x2 size={22} color="var(--accent)" />
         <span className="sidebar-logo-text">My Notion</span>
+        <button className="sidebar-close" onClick={onClose} aria-label="Close menu">
+          <X size={18} />
+        </button>
       </div>
 
       <nav className="sidebar-nav">
-        {navItems.map(({ to, icon: Icon, label, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-          >
-            <Icon size={18} />
-            <span>{label}</span>
-          </NavLink>
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label} className="sidebar-group">
+            <button
+              className="sidebar-group-label"
+              onClick={() => toggleGroup(group.label)}
+            >
+              <span>{group.label}</span>
+              {collapsed[group.label]
+                ? <ChevronRight size={12} />
+                : <ChevronDown size={12} />}
+            </button>
+            {!collapsed[group.label] && group.items.map(({ to, icon: Icon, label, end }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+                onClick={onClose}
+              >
+                <Icon size={17} />
+                <span>{label}</span>
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
 
