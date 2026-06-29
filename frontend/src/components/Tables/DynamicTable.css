@@ -12,6 +12,8 @@
   padding: 14px 18px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-secondary);
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .dt-table-name {
@@ -23,6 +25,7 @@
 .dt-toolbar-actions {
   display: flex;
   gap: 8px;
+  margin-left: auto;
 }
 
 .add-col-panel-wrap {
@@ -117,9 +120,11 @@
 
 /* Table */
 .dt-scroll {
-  overflow-x: auto;
-  overflow-y: auto;
-  max-height: calc(100vh - 220px);
+  overflow: auto;
+  max-height: min(70vh, 600px);
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .dt-table {

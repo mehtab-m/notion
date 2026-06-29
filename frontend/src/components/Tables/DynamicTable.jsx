@@ -1,10 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Plus, Trash2, MoreHorizontal, X, Check, Type, Hash,
   Calendar, ChevronDown, Image, CheckSquare, Link, Pencil
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { addRow, updateRow, deleteRow, addColumn, updateColumn, deleteColumn } from '../../utils/api';
+import {
+  addRow, updateRow, deleteRow, addColumn, updateColumn, deleteColumn,
+} from '../../utils/api';
 import './DynamicTable.css';
 
 const TYPE_ICONS = {
@@ -19,7 +21,16 @@ const TYPE_ICONS = {
 
 const COLUMN_TYPES = ['text', 'number', 'date', 'dropdown', 'image', 'checkbox', 'url'];
 
-function AddColumnPanel({ tableId, onAdded, onClose }) {
+const defaultTableApi = {
+  addRow: (tableId, data) => addRow(tableId, data),
+  updateRow: (tableId, rowId, data) => updateRow(tableId, rowId, data),
+  deleteRow: (tableId, rowId) => deleteRow(tableId, rowId),
+  addColumn: (tableId, col) => addColumn(tableId, col),
+  updateColumn: (tableId, colId, data) => updateColumn(tableId, colId, data),
+  deleteColumn: (tableId, colId) => deleteColumn(tableId, colId),
+};
+
+function AddColumnPanel({ tableId, tableApi, onAdded, onClose }) {
   const [name, setName] = useState('');
   const [type, setType] = useState('text');
   const [options, setOptions] = useState([]);
@@ -37,7 +48,7 @@ function AddColumnPanel({ tableId, onAdded, onClose }) {
     if (!name.trim()) { toast.error('Column name required'); return; }
     setLoading(true);
     try {
-      const col = await addColumn(tableId, { name: name.trim(), type, options });
+      const col = await tableApi.addColumn(tableId, { name: name.trim(), type, options });
       toast.success('Column added');
       onAdded(col);
       onClose();
@@ -98,7 +109,7 @@ function AddColumnPanel({ tableId, onAdded, onClose }) {
   );
 }
 
-function ColMenu({ col, tableId, onUpdated, onDeleted, onClose }) {
+function ColMenu({ col, tableId, tableApi, onUpdated, onDeleted, onClose }) {
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState(col.name);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -108,7 +119,7 @@ function ColMenu({ col, tableId, onUpdated, onDeleted, onClose }) {
     if (!newName.trim()) return;
     setLoading(true);
     try {
-      await updateColumn(tableId, col.id, { name: newName.trim() });
+      await tableApi.updateColumn(tableId, col.id, { name: newName.trim() });
       onUpdated({ ...col, name: newName.trim() });
       toast.success('Column renamed');
       onClose();
@@ -122,7 +133,7 @@ function ColMenu({ col, tableId, onUpdated, onDeleted, onClose }) {
   const handleDelete = async () => {
     setLoading(true);
     try {
-      await deleteColumn(tableId, col.id);
+      await tableApi.deleteColumn(tableId, col.id);
       onDeleted(col.id);
       toast.success('Column deleted');
       onClose();
@@ -299,18 +310,25 @@ function Cell({ col, value, tableId, rowId, onSave }) {
   );
 }
 
-export default function DynamicTable({ table, onTableChange }) {
+export default function DynamicTable({ table, onTableChange, tableApi = defaultTableApi, hideName }) {
+  const tableId = table._id || table.id;
   const [columns, setColumns] = useState(table.columns || []);
   const [rows, setRows] = useState(table.rows || []);
   const [showAddCol, setShowAddCol] = useState(false);
   const [openMenu, setOpenMenu] = useState(null);
   const [addingRow, setAddingRow] = useState(false);
 
+  useEffect(() => {
+    setColumns(table.columns || []);
+    setRows(table.rows || []);
+  }, [table]);
+
   const handleAddRow = async () => {
     setAddingRow(true);
     try {
-      const newRow = await addRow(table._id, {});
+      const newRow = await tableApi.addRow(tableId, {});
       setRows((prev) => [...prev, newRow]);
+      onTableChange?.();
     } catch {
       toast.error('Failed to add row');
     } finally {
@@ -321,9 +339,10 @@ export default function DynamicTable({ table, onTableChange }) {
   const handleDeleteRow = async (rowId) => {
     if (!window.confirm('Delete this row?')) return;
     try {
-      await deleteRow(table._id, rowId);
+      await tableApi.deleteRow(tableId, rowId);
       setRows((prev) => prev.filter((r) => r.id !== rowId));
       toast.success('Row deleted');
+      onTableChange?.();
     } catch {
       toast.error('Failed to delete row');
     }
@@ -333,7 +352,7 @@ export default function DynamicTable({ table, onTableChange }) {
     const row = rows.find((r) => r.id === rowId);
     if (!row) return;
     const newData = { ...row.data, [colId]: value };
-    await updateRow(table._id, rowId, newData);
+    await tableApi.updateRow(tableId, rowId, newData);
     setRows((prev) => prev.map((r) => r.id === rowId ? { ...r, data: newData } : r));
   };
 
@@ -358,7 +377,7 @@ export default function DynamicTable({ table, onTableChange }) {
   return (
     <div className="dynamic-table-wrap">
       <div className="dt-toolbar">
-        <span className="dt-table-name">{table.name}</span>
+        {!hideName && <span className="dt-table-name">{table.name}</span>}
         <div className="dt-toolbar-actions">
           <button className="btn btn-secondary btn-sm" onClick={() => setShowAddCol((v) => !v)}>
             <Plus size={14} /> Add Column
@@ -372,7 +391,8 @@ export default function DynamicTable({ table, onTableChange }) {
       {showAddCol && (
         <div className="add-col-panel-wrap">
           <AddColumnPanel
-            tableId={table._id}
+            tableId={tableId}
+            tableApi={tableApi}
             onAdded={handleColAdded}
             onClose={() => setShowAddCol(false)}
           />
@@ -407,7 +427,8 @@ export default function DynamicTable({ table, onTableChange }) {
                         <div className="col-menu-wrap">
                           <ColMenu
                             col={col}
-                            tableId={table._id}
+                            tableId={tableId}
+                            tableApi={tableApi}
                             onUpdated={handleColUpdated}
                             onDeleted={handleColDeleted}
                             onClose={() => setOpenMenu(null)}
@@ -443,7 +464,7 @@ export default function DynamicTable({ table, onTableChange }) {
                         key={col.id}
                         col={col}
                         value={row.data?.[col.id]}
-                        tableId={table._id}
+                        tableId={tableId}
                         rowId={row.id}
                         onSave={(colId, val) => handleCellSave(row.id, colId, val)}
                       />

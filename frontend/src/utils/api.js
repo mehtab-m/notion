@@ -6,9 +6,46 @@ const api = axios.create({
 
 // ── Projects ────────────────────────────────────────────
 export const getProjects = () => api.get('/projects').then((r) => r.data);
+export const getProject = (id) => api.get(`/projects/${id}`).then((r) => r.data);
 export const createProject = (data) => api.post('/projects', data).then((r) => r.data);
 export const updateProject = (id, data) => api.put(`/projects/${id}`, data).then((r) => r.data);
 export const deleteProject = (id) => api.delete(`/projects/${id}`).then((r) => r.data);
+export const addTeamMember = (projectId, name) =>
+  api.post(`/projects/${projectId}/team`, { name }).then((r) => r.data);
+export const removeTeamMember = (projectId, name) =>
+  api.delete(`/projects/${projectId}/team/${encodeURIComponent(name)}`).then((r) => r.data);
+export const addProjectTask = (projectId, data) =>
+  api.post(`/projects/${projectId}/tasks`, data).then((r) => r.data);
+export const updateProjectTask = (projectId, taskId, data) =>
+  api.put(`/projects/${projectId}/tasks/${taskId}`, data).then((r) => r.data);
+export const toggleProjectTask = (projectId, taskId) =>
+  api.post(`/projects/${projectId}/tasks/${taskId}/toggle`).then((r) => r.data);
+export const deleteProjectTask = (projectId, taskId) =>
+  api.delete(`/projects/${projectId}/tasks/${taskId}`).then((r) => r.data);
+export const addProjectSubtask = (projectId, taskId, data) =>
+  api.post(`/projects/${projectId}/tasks/${taskId}/subtasks`, data).then((r) => r.data);
+export const updateProjectSubtask = (projectId, taskId, subId, data) =>
+  api.put(`/projects/${projectId}/tasks/${taskId}/subtasks/${subId}`, data).then((r) => r.data);
+export const toggleProjectSubtask = (projectId, taskId, subId) =>
+  api.post(`/projects/${projectId}/tasks/${taskId}/subtasks/${subId}/toggle`).then((r) => r.data);
+export const deleteProjectSubtask = (projectId, taskId, subId) =>
+  api.delete(`/projects/${projectId}/tasks/${taskId}/subtasks/${subId}`).then((r) => r.data);
+export const addProjectTable = (projectId, data) =>
+  api.post(`/projects/${projectId}/tables`, data).then((r) => r.data);
+export const deleteProjectTable = (projectId, tableId) =>
+  api.delete(`/projects/${projectId}/tables/${tableId}`).then((r) => r.data);
+export const addProjectTableRow = (projectId, tableId, data) =>
+  api.post(`/projects/${projectId}/tables/${tableId}/rows`, data).then((r) => r.data);
+export const updateProjectTableRow = (projectId, tableId, rowId, data) =>
+  api.put(`/projects/${projectId}/tables/${tableId}/rows/${rowId}`, data).then((r) => r.data);
+export const deleteProjectTableRow = (projectId, tableId, rowId) =>
+  api.delete(`/projects/${projectId}/tables/${tableId}/rows/${rowId}`).then((r) => r.data);
+export const addProjectTableColumn = (projectId, tableId, col) =>
+  api.post(`/projects/${projectId}/tables/${tableId}/columns`, col).then((r) => r.data);
+export const updateProjectTableColumn = (projectId, tableId, colId, data) =>
+  api.put(`/projects/${projectId}/tables/${tableId}/columns/${colId}`, data).then((r) => r.data);
+export const deleteProjectTableColumn = (projectId, tableId, colId) =>
+  api.delete(`/projects/${projectId}/tables/${tableId}/columns/${colId}`).then((r) => r.data);
 
 // ── Books ────────────────────────────────────────────────
 export const getBooks = () => api.get('/books').then((r) => r.data);

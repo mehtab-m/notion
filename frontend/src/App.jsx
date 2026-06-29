@@ -7,6 +7,7 @@ import Navbar from './components/Navbar';
 import StickyNotesOverlay from './components/StickyNotes/StickyNotesOverlay';
 import Dashboard from './pages/Dashboard';
 import ProjectsPage from './pages/ProjectsPage';
+import ProjectDetailPage from './pages/ProjectDetailPage';
 import BooksPage from './pages/BooksPage';
 import ShowsPage from './pages/ShowsPage';
 import TablesPage from './pages/TablesPage';
@@ -29,6 +30,7 @@ const PAGE_TITLES = {
 
 function getTitle(pathname) {
   if (pathname.startsWith('/tables/')) return 'Table View';
+  if (pathname.startsWith('/projects/')) return 'Project';
   return PAGE_TITLES[pathname] || 'Dashboard';
 }
 
@@ -53,6 +55,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/projects/:id" element={<ProjectDetailPage />} />
             <Route path="/books" element={<BooksPage />} />
             <Route path="/shows" element={<ShowsPage />} />
             <Route path="/tables" element={<TablesPage />} />

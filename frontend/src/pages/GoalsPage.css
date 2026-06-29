@@ -4,6 +4,12 @@
   gap: 16px;
 }
 
+@media (max-width: 480px) {
+  .goals-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .goal-card {
   background: var(--bg-card);
   border: 1px solid var(--border);

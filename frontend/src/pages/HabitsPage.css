@@ -1,5 +1,9 @@
 .habits-table-wrap {
-  overflow-x: auto;
+  overflow: auto;
+  max-width: 100%;
+  max-height: min(70vh, 520px);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);

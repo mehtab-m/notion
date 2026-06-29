@@ -150,7 +150,18 @@ a {
 .app-content {
   flex: 1;
   padding: 24px;
+  overflow-x: hidden;
   overflow-y: auto;
+  min-width: 0;
+}
+
+/* Scrollable table wrapper — only the table scrolls, not the page */
+.table-scroll-wrap {
+  overflow: auto;
+  max-width: 100%;
+  max-height: min(70vh, 600px);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 /* Overlay modal backdrop */
@@ -501,6 +512,12 @@ a {
     padding: 20px;
     max-height: 85vh;
   }
+
+  .projects-filters {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 @media (max-width: 480px) {
@@ -514,10 +531,20 @@ a {
 
   .filter-bar {
     gap: 6px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
   }
 
   .filter-btn {
     padding: 5px 10px;
     font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .table-scroll-wrap {
+    max-height: min(55vh, 400px);
   }
 }

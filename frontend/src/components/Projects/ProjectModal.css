@@ -2,6 +2,17 @@
   max-width: 600px;
 }
 
+.project-modal-simple {
+  max-width: 440px;
+}
+
+.pm-simple-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: -12px 0 20px;
+  line-height: 1.5;
+}
+
 .progress-slider {
   width: 100%;
   height: 4px;
