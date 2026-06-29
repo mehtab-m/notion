@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const Habit = require('../models/Habit');
+const { owned } = require('../utils/scope');
 
 router.get('/', async (req, res) => {
   try {
-    const habits = await Habit.find().sort({ createdAt: -1 });
+    const habits = await Habit.find(owned(req)).sort({ createdAt: -1 });
     res.json(habits);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -13,8 +14,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const habit = new Habit(req.body);
-    const saved = await habit.save();
+    const saved = await new Habit({ ...req.body, userId: req.user._id }).save();
     res.status(201).json(saved);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -23,8 +23,8 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const updated = await Habit.findByIdAndUpdate(
-      req.params.id,
+    const updated = await Habit.findOneAndUpdate(
+      owned(req, { _id: req.params.id }),
       req.body,
       { new: true, runValidators: true }
     );
@@ -35,19 +35,14 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Toggle a date on/off for a habit
 router.post('/:id/toggle', async (req, res) => {
   try {
-    const { date } = req.body; // "YYYY-MM-DD"
-    const habit = await Habit.findById(req.params.id);
+    const { date } = req.body;
+    const habit = await Habit.findOne(owned(req, { _id: req.params.id }));
     if (!habit) return res.status(404).json({ error: 'Habit not found' });
     const idx = habit.completedDates.indexOf(date);
-    if (idx >= 0) {
-      habit.completedDates.splice(idx, 1);
-    } else {
-      habit.completedDates.push(date);
-    }
-    // Recalculate streak (consecutive days ending today or yesterday)
+    if (idx >= 0) habit.completedDates.splice(idx, 1);
+    else habit.completedDates.push(date);
     const sorted = [...habit.completedDates].sort((a, b) => (a > b ? -1 : 1));
     let streak = 0;
     let cursor = new Date();
@@ -56,12 +51,8 @@ router.post('/:id/toggle', async (req, res) => {
       const dt = new Date(d);
       dt.setHours(0, 0, 0, 0);
       const diff = Math.round((cursor - dt) / 86400000);
-      if (diff === 0 || diff === 1) {
-        streak++;
-        cursor = dt;
-      } else {
-        break;
-      }
+      if (diff === 0 || diff === 1) { streak++; cursor = dt; }
+      else break;
     }
     habit.streak = streak;
     await habit.save();
@@ -73,7 +64,7 @@ router.post('/:id/toggle', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    const deleted = await Habit.findByIdAndDelete(req.params.id);
+    const deleted = await Habit.findOneAndDelete(owned(req, { _id: req.params.id }));
     if (!deleted) return res.status(404).json({ error: 'Habit not found' });
     res.json({ message: 'Habit deleted' });
   } catch (err) {

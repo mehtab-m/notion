@@ -67,6 +67,29 @@
   white-space: nowrap;
 }
 
+.navbar-user {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.navbar-logout {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.navbar-logout:hover {
+  color: var(--accent-red);
+  border-color: var(--accent-red);
+}
+
 /* ── Theme toggle pill ───────────────────────────────────── */
 .theme-toggle {
   background: none;

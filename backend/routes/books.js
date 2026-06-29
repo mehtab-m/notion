@@ -3,24 +3,21 @@ const router = express.Router();
 const Book = require('../models/Book');
 const Note = require('../models/Note');
 const upload = require('../middleware/upload');
+const { owned } = require('../utils/scope');
 
-// GET all books
 router.get('/', async (req, res) => {
   try {
-    const books = await Book.find().sort({ createdAt: -1 });
+    const books = await Book.find(owned(req)).sort({ createdAt: -1 });
     res.json(books);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// POST create book — auto-creates a linked notebook
 router.post('/', upload.single('coverImage'), async (req, res) => {
   try {
-    const data = { ...req.body };
-    if (req.file) {
-      data.coverImage = '/uploads/' + req.file.filename;
-    }
+    const data = { ...req.body, userId: req.user._id };
+    if (req.file) data.coverImage = '/uploads/' + req.file.filename;
     const book = new Book(data);
     const saved = await book.save();
 
@@ -30,22 +27,20 @@ router.post('/', upload.single('coverImage'), async (req, res) => {
       bookId: saved._id,
       folder: 'Books',
       tags: ['book-notebook'],
+      userId: req.user._id,
     });
     const savedNotebook = await notebook.save();
-
     saved.notebookId = savedNotebook._id;
     await saved.save();
-
     res.status(201).json(saved);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-// GET single book
 router.get('/:id', async (req, res) => {
   try {
-    const book = await Book.findById(req.params.id);
+    const book = await Book.findOne(owned(req, { _id: req.params.id }));
     if (!book) return res.status(404).json({ error: 'Book not found' });
     res.json(book);
   } catch (err) {
@@ -53,29 +48,24 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// PATCH increment page
 router.patch('/:id/increment-page', async (req, res) => {
   try {
-    const book = await Book.findById(req.params.id);
+    const book = await Book.findOne(owned(req, { _id: req.params.id }));
     if (!book) return res.status(404).json({ error: 'Book not found' });
-
     const increment = parseInt(req.body.increment, 10) || 1;
     book.currentPage = Math.min(
       (book.currentPage || 0) + increment,
       book.totalPages > 0 ? book.totalPages : Infinity
     );
-
     if (book.status === 'want-to-read' && book.currentPage > 0) {
       book.status = 'reading';
       if (!book.startedAt) book.startedAt = new Date();
     }
-
     if (book.totalPages > 0 && book.currentPage >= book.totalPages) {
       book.currentPage = book.totalPages;
       book.status = 'completed';
       if (!book.finishedAt) book.finishedAt = new Date();
     }
-
     await book.save();
     res.json(book);
   } catch (err) {
@@ -83,12 +73,10 @@ router.patch('/:id/increment-page', async (req, res) => {
   }
 });
 
-// POST learning line — saves to book's notebook
 router.post('/:id/learning-line', async (req, res) => {
   try {
-    const book = await Book.findById(req.params.id);
+    const book = await Book.findOne(owned(req, { _id: req.params.id }));
     if (!book) return res.status(404).json({ error: 'Book not found' });
-
     const { text } = req.body;
     if (!text || !text.trim()) return res.status(400).json({ error: 'Text is required' });
 
@@ -100,6 +88,7 @@ router.post('/:id/learning-line', async (req, res) => {
         bookId: book._id,
         folder: 'Books',
         tags: ['book-notebook'],
+        userId: req.user._id,
       });
       const savedNotebook = await notebook.save();
       notebookId = savedNotebook._id;
@@ -107,7 +96,7 @@ router.post('/:id/learning-line', async (req, res) => {
       await book.save();
     }
 
-    const pageCount = await Note.countDocuments({ notebookId, isNotebook: false });
+    const pageCount = await Note.countDocuments(owned(req, { notebookId, isNotebook: false }));
     const page = new Note({
       title: `Learning · p.${book.currentPage || '?'}`,
       content: text.trim(),
@@ -119,6 +108,7 @@ router.post('/:id/learning-line', async (req, res) => {
       folder: 'Books',
       tags: ['learning-line'],
       order: pageCount,
+      userId: req.user._id,
     });
     const saved = await page.save();
     res.status(201).json(saved);
@@ -127,39 +117,36 @@ router.post('/:id/learning-line', async (req, res) => {
   }
 });
 
-// PUT update book
 router.put('/:id', upload.single('coverImage'), async (req, res) => {
   try {
     const data = { ...req.body };
-    if (req.file) {
-      data.coverImage = '/uploads/' + req.file.filename;
-    }
-    const updated = await Book.findByIdAndUpdate(req.params.id, data, {
+    if (req.file) data.coverImage = '/uploads/' + req.file.filename;
+    const updated = await Book.findOneAndUpdate(owned(req, { _id: req.params.id }), data, {
       new: true,
       runValidators: true,
     });
     if (!updated) return res.status(404).json({ error: 'Book not found' });
-
     if (updated.notebookId && data.title) {
-      await Note.findByIdAndUpdate(updated.notebookId, { title: data.title, updatedAt: Date.now() });
+      await Note.findOneAndUpdate(
+        owned(req, { _id: updated.notebookId }),
+        { title: data.title, updatedAt: Date.now() }
+      );
     }
-
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-// DELETE book
 router.delete('/:id', async (req, res) => {
   try {
-    const book = await Book.findById(req.params.id);
+    const book = await Book.findOne(owned(req, { _id: req.params.id }));
     if (!book) return res.status(404).json({ error: 'Book not found' });
     if (book.notebookId) {
-      await Note.deleteMany({ notebookId: book.notebookId });
-      await Note.findByIdAndDelete(book.notebookId);
+      await Note.deleteMany(owned(req, { notebookId: book.notebookId }));
+      await Note.findOneAndDelete(owned(req, { _id: book.notebookId }));
     }
-    await Book.findByIdAndDelete(req.params.id);
+    await Book.findOneAndDelete(owned(req, { _id: req.params.id }));
     res.json({ message: 'Book deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

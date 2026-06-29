@@ -13,6 +13,7 @@ const HabitSchema = new mongoose.Schema({
   // Array of date strings "YYYY-MM-DD" when the habit was completed
   completedDates: [{ type: String }],
   streak: { type: Number, default: 0 },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   createdAt: { type: Date, default: Date.now },
 });
 

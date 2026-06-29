@@ -26,6 +26,7 @@ const TableSchema = new mongoose.Schema({
   name: { type: String, required: true },
   columns: [ColumnSchema],
   rows: [RowSchema],
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

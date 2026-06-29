@@ -15,6 +15,7 @@ const BookSchema = new mongoose.Schema({
   notes: { type: String },
   coverImage: { type: String },
   notebookId: { type: mongoose.Schema.Types.ObjectId, ref: 'Note', default: null },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   startedAt: { type: Date },
   finishedAt: { type: Date },
   createdAt: { type: Date, default: Date.now },

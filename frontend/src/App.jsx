@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useTheme } from './context/ThemeContext';
+import { useAuth } from './context/AuthContext';
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 import StickyNotesOverlay from './components/StickyNotes/StickyNotesOverlay';
+import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
@@ -34,7 +36,7 @@ function getTitle(pathname) {
   return PAGE_TITLES[pathname] || 'Dashboard';
 }
 
-export default function App() {
+function AppShell() {
   const location = useLocation();
   const { theme } = useTheme();
   const title = getTitle(location.pathname);
@@ -71,4 +73,27 @@ export default function App() {
       <Toaster position="bottom-right" toastOptions={{ style: toastStyle }} />
     </div>
   );
+}
+
+export default function App() {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="spinner-container" style={{ minHeight: '100vh' }}>
+        <div className="spinner" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <AuthPage />
+        <Toaster position="bottom-right" />
+      </>
+    );
+  }
+
+  return <AppShell />;
 }

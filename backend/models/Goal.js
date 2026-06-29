@@ -26,6 +26,7 @@ const GoalSchema = new mongoose.Schema({
   targetDate: { type: Date },
   progress: { type: Number, min: 0, max: 100, default: 0 },
   milestones: [MilestoneSchema],
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

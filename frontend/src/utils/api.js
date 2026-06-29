@@ -1,8 +1,33 @@
 import axios from 'axios';
 
+const TOKEN_KEY = 'auth_token';
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
 });
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401 && !err.config?.url?.includes('/auth/')) {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+    return Promise.reject(err);
+  }
+);
+
+// ── Auth ─────────────────────────────────────────────────
+export const signup = (data) => api.post('/auth/signup', data).then((r) => r.data);
+export const verifyEmail = (data) => api.post('/auth/verify', data).then((r) => r.data);
+export const resendCode = (email) => api.post('/auth/resend', { email }).then((r) => r.data);
+export const login = (data) => api.post('/auth/login', data).then((r) => r.data);
+export const getMe = () => api.get('/auth/me').then((r) => r.data);
 
 // ── Projects ────────────────────────────────────────────
 export const getProjects = () => api.get('/projects').then((r) => r.data);

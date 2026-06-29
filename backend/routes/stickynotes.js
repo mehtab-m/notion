@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const StickyNote = require('../models/StickyNote');
+const { owned } = require('../utils/scope');
 
 router.get('/', async (req, res) => {
   try {
-    const notes = await StickyNote.find().sort({ pinned: -1, createdAt: -1 });
+    const notes = await StickyNote.find(owned(req)).sort({ pinned: -1, createdAt: -1 });
     res.json(notes);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -13,7 +14,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const note = new StickyNote(req.body);
+    const note = new StickyNote({ ...req.body, userId: req.user._id });
     const saved = await note.save();
     res.status(201).json(saved);
   } catch (err) {
@@ -23,8 +24,8 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const updated = await StickyNote.findByIdAndUpdate(
-      req.params.id,
+    const updated = await StickyNote.findOneAndUpdate(
+      owned(req, { _id: req.params.id }),
       { ...req.body, updatedAt: Date.now() },
       { new: true }
     );
@@ -37,7 +38,7 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    const deleted = await StickyNote.findByIdAndDelete(req.params.id);
+    const deleted = await StickyNote.findOneAndDelete(owned(req, { _id: req.params.id }));
     if (!deleted) return res.status(404).json({ error: 'Sticky note not found' });
     res.json({ message: 'Deleted' });
   } catch (err) {

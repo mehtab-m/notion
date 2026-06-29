@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const Project = require('../models/Project');
+const { owned } = require('../utils/scope');
 
 function calcProgress(tasks) {
   const items = [];
@@ -17,7 +18,7 @@ function calcProgress(tasks) {
 // GET all projects
 router.get('/', async (req, res) => {
   try {
-    const projects = await Project.find().sort({ createdAt: -1 });
+    const projects = await Project.find(owned(req)).sort({ createdAt: -1 });
     res.json(projects);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -27,7 +28,7 @@ router.get('/', async (req, res) => {
 // POST create project
 router.post('/', async (req, res) => {
   try {
-    const project = new Project(req.body);
+    const project = new Project({ ...req.body, userId: req.user._id });
     const saved = await project.save();
     res.status(201).json(saved);
   } catch (err) {
@@ -38,7 +39,7 @@ router.post('/', async (req, res) => {
 // GET single project
 router.get('/:id', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     res.json(project);
   } catch (err) {
@@ -49,8 +50,8 @@ router.get('/:id', async (req, res) => {
 // PUT update project
 router.put('/:id', async (req, res) => {
   try {
-    const updated = await Project.findByIdAndUpdate(
-      req.params.id,
+    const updated = await Project.findOneAndUpdate(
+      owned(req, { _id: req.params.id }),
       { ...req.body, updatedAt: Date.now() },
       { new: true, runValidators: true }
     );
@@ -64,7 +65,7 @@ router.put('/:id', async (req, res) => {
 // DELETE project
 router.delete('/:id', async (req, res) => {
   try {
-    const deleted = await Project.findByIdAndDelete(req.params.id);
+    const deleted = await Project.findOneAndDelete(owned(req, { _id: req.params.id }));
     if (!deleted) return res.status(404).json({ error: 'Project not found' });
     res.json({ message: 'Project deleted' });
   } catch (err) {
@@ -75,7 +76,7 @@ router.delete('/:id', async (req, res) => {
 // ── Team ─────────────────────────────────────────────────
 router.post('/:id/team', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const name = (req.body.name || '').trim();
     if (!name) return res.status(400).json({ error: 'Name is required' });
@@ -92,7 +93,7 @@ router.post('/:id/team', async (req, res) => {
 
 router.delete('/:id/team/:name', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     project.team = (project.team || []).filter((m) => m !== decodeURIComponent(req.params.name));
     project.updatedAt = Date.now();
@@ -107,7 +108,7 @@ router.delete('/:id/team/:name', async (req, res) => {
 // ── Tasks ────────────────────────────────────────────────
 router.post('/:id/tasks', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const text = (req.body.text || '').trim();
     if (!text) return res.status(400).json({ error: 'Task text is required' });
@@ -131,7 +132,7 @@ router.post('/:id/tasks', async (req, res) => {
 
 router.put('/:id/tasks/:taskId', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const task = project.tasks.find((t) => t.id === req.params.taskId);
     if (!task) return res.status(404).json({ error: 'Task not found' });
@@ -150,7 +151,7 @@ router.put('/:id/tasks/:taskId', async (req, res) => {
 
 router.post('/:id/tasks/:taskId/toggle', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const task = project.tasks.find((t) => t.id === req.params.taskId);
     if (!task) return res.status(404).json({ error: 'Task not found' });
@@ -167,7 +168,7 @@ router.post('/:id/tasks/:taskId/toggle', async (req, res) => {
 
 router.delete('/:id/tasks/:taskId', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     project.tasks = project.tasks.filter((t) => t.id !== req.params.taskId);
     project.progress = calcProgress(project.tasks);
@@ -183,7 +184,7 @@ router.delete('/:id/tasks/:taskId', async (req, res) => {
 // ── Subtasks ─────────────────────────────────────────────
 router.post('/:id/tasks/:taskId/subtasks', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const task = project.tasks.find((t) => t.id === req.params.taskId);
     if (!task) return res.status(404).json({ error: 'Task not found' });
@@ -208,7 +209,7 @@ router.post('/:id/tasks/:taskId/subtasks', async (req, res) => {
 
 router.post('/:id/tasks/:taskId/subtasks/:subId/toggle', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const task = project.tasks.find((t) => t.id === req.params.taskId);
     if (!task) return res.status(404).json({ error: 'Task not found' });
@@ -227,7 +228,7 @@ router.post('/:id/tasks/:taskId/subtasks/:subId/toggle', async (req, res) => {
 
 router.put('/:id/tasks/:taskId/subtasks/:subId', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const task = project.tasks.find((t) => t.id === req.params.taskId);
     if (!task) return res.status(404).json({ error: 'Task not found' });
@@ -248,7 +249,7 @@ router.put('/:id/tasks/:taskId/subtasks/:subId', async (req, res) => {
 
 router.delete('/:id/tasks/:taskId/subtasks/:subId', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const task = project.tasks.find((t) => t.id === req.params.taskId);
     if (!task) return res.status(404).json({ error: 'Task not found' });
@@ -288,7 +289,7 @@ function getProjectTable(project, tableId) {
 
 router.post('/:id/tables', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const name = (req.body.name || '').trim();
     if (!name) return res.status(400).json({ error: 'Table name is required' });
@@ -311,7 +312,7 @@ router.post('/:id/tables', async (req, res) => {
 
 router.put('/:id/tables/:tableId', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const table = getProjectTable(project, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });
@@ -327,7 +328,7 @@ router.put('/:id/tables/:tableId', async (req, res) => {
 
 router.delete('/:id/tables/:tableId', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     project.dataTables = (project.dataTables || []).filter((t) => t.id !== req.params.tableId);
     project.updatedAt = Date.now();
@@ -341,7 +342,7 @@ router.delete('/:id/tables/:tableId', async (req, res) => {
 
 router.post('/:id/tables/:tableId/rows', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const table = getProjectTable(project, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });
@@ -358,7 +359,7 @@ router.post('/:id/tables/:tableId/rows', async (req, res) => {
 
 router.put('/:id/tables/:tableId/rows/:rowId', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const table = getProjectTable(project, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });
@@ -376,7 +377,7 @@ router.put('/:id/tables/:tableId/rows/:rowId', async (req, res) => {
 
 router.delete('/:id/tables/:tableId/rows/:rowId', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const table = getProjectTable(project, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });
@@ -392,7 +393,7 @@ router.delete('/:id/tables/:tableId/rows/:rowId', async (req, res) => {
 
 router.post('/:id/tables/:tableId/columns', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const table = getProjectTable(project, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });
@@ -414,7 +415,7 @@ router.post('/:id/tables/:tableId/columns', async (req, res) => {
 
 router.put('/:id/tables/:tableId/columns/:colId', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const table = getProjectTable(project, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });
@@ -432,7 +433,7 @@ router.put('/:id/tables/:tableId/columns/:colId', async (req, res) => {
 
 router.delete('/:id/tables/:tableId/columns/:colId', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(owned(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const table = getProjectTable(project, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Search, Sun, Moon, Menu } from 'lucide-react';
+import { Search, Sun, Moon, Menu, LogOut } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import './Navbar.css';
 
 function getGreeting() {
@@ -13,6 +14,7 @@ function getGreeting() {
 export default function Navbar({ title, onMenuClick }) {
   const [searchVal, setSearchVal] = useState('');
   const { theme, toggleTheme } = useTheme();
+  const { user, logout } = useAuth();
 
   return (
     <header className="navbar">
@@ -33,6 +35,7 @@ export default function Navbar({ title, onMenuClick }) {
       </div>
 
       <div className="navbar-right">
+        {user && <span className="navbar-user">{user.name}</span>}
         <span className="navbar-greeting">{getGreeting()} 👋</span>
 
         <button
@@ -50,6 +53,10 @@ export default function Navbar({ title, onMenuClick }) {
               )}
             </span>
           </span>
+        </button>
+
+        <button className="navbar-logout" onClick={logout} title="Log out">
+          <LogOut size={16} />
         </button>
       </div>
     </header>

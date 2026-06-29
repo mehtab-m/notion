@@ -10,6 +10,7 @@ const StickyNoteSchema = new mongoose.Schema({
   pinned: { type: Boolean, default: false },
   posX: { type: Number, default: 0 },
   posY: { type: Number, default: 0 },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

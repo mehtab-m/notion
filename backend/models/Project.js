@@ -74,6 +74,7 @@ const ProjectSchema = new mongoose.Schema({
   team: [{ type: String }],
   assignees: [{ type: String }],
   color: { type: String, default: '' },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

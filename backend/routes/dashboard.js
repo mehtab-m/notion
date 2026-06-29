@@ -4,14 +4,16 @@ const Book = require('../models/Book');
 const Goal = require('../models/Goal');
 const Habit = require('../models/Habit');
 const Project = require('../models/Project');
+const { owned } = require('../utils/scope');
 
 router.get('/stats', async (req, res) => {
   try {
+    const filter = owned(req);
     const [books, goals, habits, projects] = await Promise.all([
-      Book.find(),
-      Goal.find(),
-      Habit.find(),
-      Project.find(),
+      Book.find(filter),
+      Goal.find(filter),
+      Habit.find(filter),
+      Project.find(filter),
     ]);
 
     const bookProgress = books.map((b) => ({

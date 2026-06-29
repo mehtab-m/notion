@@ -19,6 +19,7 @@ const ShowSchema = new mongoose.Schema({
   genre: { type: String },
   notes: { type: String },
   posterImage: { type: String },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   createdAt: { type: Date, default: Date.now },
 });
 
