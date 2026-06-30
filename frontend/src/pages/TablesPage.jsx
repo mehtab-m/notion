@@ -1,12 +1,14 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Table, Trash2, Columns, Zap } from 'lucide-react';
-import { format } from 'date-fns';
+import { Plus, Table, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useApi from '../hooks/useApi';
-import { getTables, deleteTable, createTable } from '../utils/api';
+import { getTables, getTable, deleteTable, createTable } from '../utils/api';
 import TableModal from '../components/Tables/TableModal';
-import TableView from '../components/Tables/TableView';
+import TableBoard from '../components/Tables/TableBoard';
+import {
+  addRow, updateRow, deleteRow, addColumn, updateColumn, deleteColumn,
+} from '../utils/api';
 import './TablesPage.css';
 
 const TEMPLATES = [
@@ -61,32 +63,74 @@ const TEMPLATES = [
   },
 ];
 
-export default function TablesPage() {
-  const { id } = useParams();
-
-  if (id) {
-    return <TableView />;
-  }
-
-  return <TableList />;
+function makeTableApi(tableId) {
+  return {
+    addRow: (_id, data) => addRow(tableId, data),
+    updateRow: (_id, rowId, data) => updateRow(tableId, rowId, data),
+    deleteRow: (_id, rowId) => deleteRow(tableId, rowId),
+    addColumn: (_id, col) => addColumn(tableId, col),
+    updateColumn: (_id, colId, data) => updateColumn(tableId, colId, data),
+    deleteColumn: (_id, colId) => deleteColumn(tableId, colId),
+  };
 }
 
-function TableList() {
+export default function TablesPage() {
+  const { id: highlightId } = useParams();
   const navigate = useNavigate();
-  const { data: tables, loading, refetch } = useApi(getTables);
+  const { data: tableList, loading: listLoading, refetch } = useApi(getTables);
+  const [fullTables, setFullTables] = useState([]);
+  const [loadingFull, setLoadingFull] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [confirmId, setConfirmId] = useState(null);
   const [creatingTemplate, setCreatingTemplate] = useState(false);
+  const [highlightTableId, setHighlightTableId] = useState(highlightId || null);
+
+  useEffect(() => {
+    if (highlightId) {
+      setHighlightTableId(highlightId);
+      navigate('/tables', { replace: true });
+    }
+  }, [highlightId, navigate]);
+
+  const loadFullTables = useCallback(async () => {
+    if (!tableList?.length) {
+      setFullTables([]);
+      return;
+    }
+    setLoadingFull(true);
+    try {
+      const full = await Promise.all(tableList.map((t) => getTable(t._id)));
+      setFullTables(full);
+    } catch {
+      toast.error('Failed to load table data');
+    } finally {
+      setLoadingFull(false);
+    }
+  }, [tableList]);
+
+  useEffect(() => {
+    loadFullTables();
+  }, [loadFullTables]);
+
+  const refreshTable = useCallback(async (tableId) => {
+    try {
+      const updated = await getTable(tableId);
+      setFullTables((prev) => prev.map((t) => ((t._id || t.id) === tableId ? updated : t)));
+      refetch();
+    } catch {
+      toast.error('Failed to refresh table');
+    }
+  }, [refetch]);
 
   const handleDelete = async (tableId) => {
+    if (!window.confirm('Delete this table and all its data?')) return;
     try {
       await deleteTable(tableId);
       toast.success('Table deleted');
       refetch();
+      setFullTables((prev) => prev.filter((t) => (t._id || t.id) !== tableId));
     } catch {
       toast.error('Failed to delete table');
     }
-    setConfirmId(null);
   };
 
   const handleTemplate = async (tpl) => {
@@ -95,8 +139,10 @@ function TableList() {
       const cols = tpl.columns.map((c) => ({ id: crypto.randomUUID(), ...c, options: c.options || [] }));
       const created = await createTable({ name: tpl.name, columns: cols });
       toast.success(`"${tpl.name}" table created!`);
-      refetch();
-      navigate(`/tables/${created._id}`);
+      setHighlightTableId(created._id);
+      await refetch();
+      const full = await getTable(created._id);
+      setFullTables((prev) => [...prev, full]);
     } catch {
       toast.error('Failed to create template');
     } finally {
@@ -106,16 +152,31 @@ function TableList() {
 
   const handleClose = useCallback(() => setModalOpen(false), []);
 
+  const handleModalSaved = async (created) => {
+    await refetch();
+    setModalOpen(false);
+    if (created?._id) {
+      setHighlightTableId(created._id);
+      const full = await getTable(created._id);
+      setFullTables((prev) => [...prev.filter((t) => t._id !== created._id), full]);
+    }
+  };
+
+  const loading = listLoading || loadingFull;
+  const isEmpty = !loading && (!tableList || tableList.length === 0);
+
   return (
-    <div>
+    <div className="tables-page">
       <div className="page-header">
-        <h1>Tables</h1>
+        <div>
+          <h1>Tables</h1>
+          <p className="tables-page-subtitle">All your boards on one page — expand, edit rows & columns inline</p>
+        </div>
         <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
           <Plus size={16} /> New Table
         </button>
       </div>
 
-      {/* Templates */}
       <div className="table-templates">
         <span className="table-templates-label"><Zap size={13} /> Quick Templates:</span>
         {TEMPLATES.map((tpl) => (
@@ -130,64 +191,27 @@ function TableList() {
         ))}
       </div>
 
-      {loading ? (
-        <div className="spinner-container"><div className="spinner" /></div>
-      ) : !tables || tables.length === 0 ? (
+      {isEmpty ? (
         <div className="empty-state">
           <Table size={48} strokeWidth={1} />
           <h3>No tables yet</h3>
-          <p>Create a custom table to track anything.</p>
+          <p>Create a custom table or pick a template above.</p>
         </div>
       ) : (
-        <div className="tables-grid">
-          {tables.map((table) => (
-            <div
-              key={table._id}
-              className="table-card"
-              onClick={() => navigate(`/tables/${table._id}`)}
-            >
-              <div className="table-card-icon">
-                <Table size={22} color="var(--accent-blue)" />
-              </div>
-              <div className="table-card-info">
-                <h3 className="table-card-name">{table.name}</h3>
-                <div className="table-card-meta">
-                  <span className="table-card-meta-item">
-                    <Columns size={12} />
-                    {table.columnCount} columns
-                  </span>
-                  <span className="table-card-meta-item">{table.rowCount} rows</span>
-                  <span className="table-card-meta-item">
-                    {format(new Date(table.createdAt), 'MMM d, yyyy')}
-                  </span>
-                </div>
-              </div>
-              <div className="table-card-actions" onClick={(e) => e.stopPropagation()}>
-                {confirmId === table._id ? (
-                  <div className="confirm-delete">
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(table._id)}>
-                      Delete
-                    </button>
-                    <button className="btn btn-secondary btn-sm" onClick={() => setConfirmId(null)}>
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    className="card-action-btn danger"
-                    onClick={() => setConfirmId(table._id)}
-                    title="Delete table"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+        <TableBoard
+          tables={fullTables}
+          getTableApi={(tableId) => makeTableApi(tableId)}
+          onDeleteTable={handleDelete}
+          onTableChange={refreshTable}
+          highlightId={highlightTableId}
+          loading={loading}
+          emptyMessage="No tables yet. Create one to get started."
+        />
       )}
 
-      {modalOpen && <TableModal onClose={handleClose} onSaved={refetch} />}
+      {modalOpen && (
+        <TableModal onClose={handleClose} onSaved={handleModalSaved} />
+      )}
     </div>
   );
 }

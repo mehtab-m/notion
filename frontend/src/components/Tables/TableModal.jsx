@@ -50,12 +50,12 @@ export default function TableModal({ onClose, onSaved }) {
     const validCols = columns.filter((c) => c.name.trim());
     setLoading(true);
     try {
-      await createTable({
+      const created = await createTable({
         name: tableName.trim(),
         columns: validCols.map(({ id, name, type, options }) => ({ id, name, type, options })),
       });
       toast.success('Table created!');
-      onSaved();
+      onSaved(created);
       onClose();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to create table');

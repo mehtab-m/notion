@@ -1,3 +1,10 @@
+.tables-page-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-weight: 400;
+}
+
 .table-templates {
   display: flex;
   align-items: center;

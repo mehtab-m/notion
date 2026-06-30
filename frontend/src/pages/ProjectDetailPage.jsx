@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Calendar, Plus, Trash2, ChevronDown, ChevronRight,
@@ -15,7 +15,7 @@ import {
   addProjectTableRow, updateProjectTableRow, deleteProjectTableRow,
   addProjectTableColumn, updateProjectTableColumn, deleteProjectTableColumn,
 } from '../utils/api';
-import DynamicTable from '../components/Tables/DynamicTable';
+import TableBoard from '../components/Tables/TableBoard';
 import './ProjectDetailPage.css';
 
 const TABLE_TEMPLATES = [
@@ -191,7 +191,7 @@ export default function ProjectDetailPage() {
   const [taskAssignee, setTaskAssignee] = useState('');
   const [teamInput, setTeamInput] = useState('');
   const [tableInput, setTableInput] = useState('');
-  const [activeTableId, setActiveTableId] = useState(null);
+  const [highlightTableId, setHighlightTableId] = useState(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
 
@@ -199,7 +199,6 @@ export default function ProjectDetailPage() {
     try {
       const data = await getProject(id);
       setProject(data);
-      setActiveTableId((prev) => prev || data.dataTables?.[0]?.id || null);
     } catch {
       toast.error('Project not found');
       navigate('/projects');
@@ -261,7 +260,8 @@ export default function ProjectDetailPage() {
     try {
       const updated = await addProjectTable(id, payload);
       setProject(updated);
-      setActiveTableId(updated.dataTables[updated.dataTables.length - 1].id);
+      const newId = updated.dataTables[updated.dataTables.length - 1].id;
+      setHighlightTableId(newId);
       setTableInput('');
       toast.success(`Table "${payload.name}" created`);
     } catch { toast.error('Failed'); }
@@ -274,21 +274,20 @@ export default function ProjectDetailPage() {
     } catch { /* silent */ }
   }, [id]);
 
-  const projectTableApi = useMemo(() => ({
-    addRow: (_tableId, data) => addProjectTableRow(id, activeTableId, { data }),
-    updateRow: (_tableId, rowId, data) => updateProjectTableRow(id, activeTableId, rowId, { data }),
-    deleteRow: (_tableId, rowId) => deleteProjectTableRow(id, activeTableId, rowId),
-    addColumn: (_tableId, col) => addProjectTableColumn(id, activeTableId, col),
-    updateColumn: (_tableId, colId, data) => updateProjectTableColumn(id, activeTableId, colId, data),
-    deleteColumn: (_tableId, colId) => deleteProjectTableColumn(id, activeTableId, colId),
-  }), [id, activeTableId]);
+  const getProjectTableApi = useCallback((tableId) => ({
+    addRow: (_tableId, data) => addProjectTableRow(id, tableId, { data }),
+    updateRow: (_tableId, rowId, data) => updateProjectTableRow(id, tableId, rowId, { data }),
+    deleteRow: (_tableId, rowId) => deleteProjectTableRow(id, tableId, rowId),
+    addColumn: (_tableId, col) => addProjectTableColumn(id, tableId, col),
+    updateColumn: (_tableId, colId, data) => updateProjectTableColumn(id, tableId, colId, data),
+    deleteColumn: (_tableId, colId) => deleteProjectTableColumn(id, tableId, colId),
+  }), [id]);
 
   if (loading) return <div className="spinner-container"><div className="spinner" /></div>;
   if (!project) return null;
 
   const dueDate = project.dueDate ? new Date(project.dueDate) : null;
   const overdue = dueDate && isPast(dueDate) && !isToday(dueDate) && project.status !== 'completed';
-  const activeTable = (project.dataTables || []).find((t) => t.id === activeTableId);
   const taskCount = (project.tasks || []).length;
 
   return (
@@ -414,7 +413,7 @@ export default function ProjectDetailPage() {
         {tab === 'tables' && (
           <div className="pd-tables-panel">
             <p className="pd-hint">
-              Full dynamic tables — same as main Tables. Add unlimited columns (text, number, date, dropdown, image, checkbox, url) and rows.
+              All project tables on one board — expand or collapse each, add columns and rows inline.
             </p>
             <div className="pd-table-presets">
               {TABLE_TEMPLATES.map((tpl) => (
@@ -441,38 +440,19 @@ export default function ProjectDetailPage() {
                 <p>No tables yet. Use a template or create a blank table, then add columns and rows.</p>
               </div>
             ) : (
-              <div className="pd-tables-layout">
-                <div className="pd-table-tabs">
-                  {(project.dataTables || []).map((t) => (
-                    <div key={t.id} className={`pd-table-tab ${activeTableId === t.id ? 'active' : ''}`}>
-                      <button onClick={() => setActiveTableId(t.id)}>{t.name}</button>
-                      <span className="pd-table-count">
-                        {(t.columns || []).length}c · {(t.rows || []).length}r
-                      </span>
-                      <button
-                        className="pd-table-tab-del"
-                        onClick={async () => {
-                          if (!window.confirm(`Delete "${t.name}" and all its data?`)) return;
-                          const updated = await deleteProjectTable(id, t.id);
-                          setProject(updated);
-                          setActiveTableId(updated.dataTables?.[0]?.id || null);
-                        }}
-                      >
-                        <Trash2 size={11} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                {activeTable && activeTableId && (
-                  <DynamicTable
-                    key={activeTable.id}
-                    table={activeTable}
-                    tableApi={projectTableApi}
-                    hideName
-                    onTableChange={refreshProject}
-                  />
-                )}
-              </div>
+              <TableBoard
+                tables={project.dataTables || []}
+                getTableApi={getProjectTableApi}
+                onDeleteTable={async (tableId) => {
+                  if (!window.confirm('Delete this table and all its data?')) return;
+                  const updated = await deleteProjectTable(id, tableId);
+                  setProject(updated);
+                  toast.success('Table deleted');
+                }}
+                onTableChange={refreshProject}
+                highlightId={highlightTableId}
+                emptyMessage="No tables yet."
+              />
             )}
           </div>
         )}
