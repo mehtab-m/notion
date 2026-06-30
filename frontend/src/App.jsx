@@ -77,6 +77,8 @@ function AppShell() {
 
 export default function App() {
   const { isAuthenticated, loading, user } = useAuth();
+  const location = useLocation();
+  const redirectTo = location.pathname + location.search;
 
   if (loading) {
     return (
@@ -89,7 +91,7 @@ export default function App() {
   if (!isAuthenticated) {
     return (
       <>
-        <AuthPage />
+        <AuthPage redirectTo={redirectTo !== '/' ? redirectTo : undefined} />
         <Toaster position="bottom-right" />
       </>
     );

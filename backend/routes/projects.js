@@ -5,7 +5,7 @@ const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
 const { cleanBody } = require('../utils/body');
 const { serialize, serializeTablePart } = require('../utils/serialize');
-const { findAccessibleProject, findOwnedProject, acceptedAssignees, accessibleProjectsWhere } = require('../utils/projectAccess');
+const { findAccessibleProject, findEditableProject, findOwnedProject, acceptedAssignees, accessibleProjectsWhere } = require('../utils/projectAccess');
 const { sendProjectInviteEmail } = require('../utils/email');
 
 function calcProgress(tasks) {
@@ -19,8 +19,9 @@ function calcProgress(tasks) {
   return Math.round((done / items.length) * 100);
 }
 
-async function loadProject(req, id) {
-  return findAccessibleProject(id, req.user);
+async function loadProject(req, id, { requireEdit = false } = {}) {
+  const finder = requireEdit ? findEditableProject : findAccessibleProject;
+  return finder(id, req.user);
 }
 
 async function saveProject(project, data, user) {
@@ -170,7 +171,7 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const existing = await loadProject(req, req.params.id);
+    const existing = await loadProject(req, req.params.id, { requireEdit: true });
     if (!existing) return res.status(404).json({ error: 'Project not found' });
     const full = await saveProject(existing, cleanBody(req.body), req.user);
     replyProject(res, full, req.user.id);
@@ -279,7 +280,7 @@ router.get('/:id/messages', async (req, res) => {
 
 router.post('/:id/messages', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const text = (req.body.text || '').trim();
     if (!text) return res.status(400).json({ error: 'Message is required' });
@@ -312,7 +313,7 @@ router.delete('/:id/team/:name', async (req, res) => {
 
 router.post('/:id/tasks', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const text = (req.body.text || '').trim();
     if (!text) return res.status(400).json({ error: 'Task text is required' });
@@ -333,7 +334,7 @@ router.post('/:id/tasks', async (req, res) => {
 
 router.put('/:id/tasks/:taskId', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const tasks = getTasks(project);
     const task = tasks.find((t) => t.id === req.params.taskId);
@@ -350,7 +351,7 @@ router.put('/:id/tasks/:taskId', async (req, res) => {
 
 router.post('/:id/tasks/:taskId/toggle', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const tasks = getTasks(project);
     const task = tasks.find((t) => t.id === req.params.taskId);
@@ -365,7 +366,7 @@ router.post('/:id/tasks/:taskId/toggle', async (req, res) => {
 
 router.delete('/:id/tasks/:taskId', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const tasks = getTasks(project).filter((t) => t.id !== req.params.taskId);
     const full = await saveProject(project, { tasks, progress: calcProgress(tasks) }, req.user);
@@ -377,7 +378,7 @@ router.delete('/:id/tasks/:taskId', async (req, res) => {
 
 router.post('/:id/tasks/:taskId/subtasks', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const tasks = getTasks(project);
     const task = tasks.find((t) => t.id === req.params.taskId);
@@ -400,7 +401,7 @@ router.post('/:id/tasks/:taskId/subtasks', async (req, res) => {
 
 router.post('/:id/tasks/:taskId/subtasks/:subId/toggle', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const tasks = getTasks(project);
     const task = tasks.find((t) => t.id === req.params.taskId);
@@ -417,7 +418,7 @@ router.post('/:id/tasks/:taskId/subtasks/:subId/toggle', async (req, res) => {
 
 router.put('/:id/tasks/:taskId/subtasks/:subId', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const tasks = getTasks(project);
     const task = tasks.find((t) => t.id === req.params.taskId);
@@ -436,7 +437,7 @@ router.put('/:id/tasks/:taskId/subtasks/:subId', async (req, res) => {
 
 router.delete('/:id/tasks/:taskId/subtasks/:subId', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const tasks = getTasks(project);
     const task = tasks.find((t) => t.id === req.params.taskId);
@@ -451,7 +452,7 @@ router.delete('/:id/tasks/:taskId/subtasks/:subId', async (req, res) => {
 
 router.post('/:id/tables', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const name = (req.body.name || '').trim();
     if (!name) return res.status(400).json({ error: 'Table name is required' });
@@ -472,7 +473,7 @@ router.post('/:id/tables', async (req, res) => {
 
 router.put('/:id/tables/:tableId', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const dataTables = getDataTables(project);
     const table = getProjectTable({ dataTables }, req.params.tableId);
@@ -487,7 +488,7 @@ router.put('/:id/tables/:tableId', async (req, res) => {
 
 router.delete('/:id/tables/:tableId', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const dataTables = getDataTables(project).filter((t) => t.id !== req.params.tableId);
     const full = await saveProject(project, { dataTables }, req.user);
@@ -499,7 +500,7 @@ router.delete('/:id/tables/:tableId', async (req, res) => {
 
 router.post('/:id/tables/:tableId/rows', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const dataTables = getDataTables(project);
     const table = getProjectTable({ dataTables }, req.params.tableId);
@@ -515,7 +516,7 @@ router.post('/:id/tables/:tableId/rows', async (req, res) => {
 
 router.put('/:id/tables/:tableId/rows/:rowId', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const dataTables = getDataTables(project);
     const table = getProjectTable({ dataTables }, req.params.tableId);
@@ -532,7 +533,7 @@ router.put('/:id/tables/:tableId/rows/:rowId', async (req, res) => {
 
 router.delete('/:id/tables/:tableId/rows/:rowId', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const dataTables = getDataTables(project);
     const table = getProjectTable({ dataTables }, req.params.tableId);
@@ -547,7 +548,7 @@ router.delete('/:id/tables/:tableId/rows/:rowId', async (req, res) => {
 
 router.post('/:id/tables/:tableId/columns', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const dataTables = getDataTables(project);
     const table = getProjectTable({ dataTables }, req.params.tableId);
@@ -568,7 +569,7 @@ router.post('/:id/tables/:tableId/columns', async (req, res) => {
 
 router.put('/:id/tables/:tableId/columns/:colId', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const dataTables = getDataTables(project);
     const table = getProjectTable({ dataTables }, req.params.tableId);
@@ -585,7 +586,7 @@ router.put('/:id/tables/:tableId/columns/:colId', async (req, res) => {
 
 router.delete('/:id/tables/:tableId/columns/:colId', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const dataTables = getDataTables(project);
     const table = getProjectTable({ dataTables }, req.params.tableId);

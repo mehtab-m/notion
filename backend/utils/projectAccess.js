@@ -1,7 +1,36 @@
 const prisma = require('../lib/prisma');
 
-/** Projects the user owns or has accepted an invite to */
+/** Projects listed on the projects page (owned + accepted invites only) */
 function accessibleProjectsWhere(user) {
+  return {
+    OR: [
+      { userId: user.id },
+      { members: { some: { userId: user.id, status: 'accepted' } } },
+    ],
+  };
+}
+
+/** View project detail — includes pending invites so invite links work */
+function viewableProjectWhere(user) {
+  return {
+    OR: [
+      { userId: user.id },
+      {
+        members: {
+          some: {
+            OR: [
+              { userId: user.id, status: { in: ['pending', 'accepted'] } },
+              { email: user.email, status: { in: ['pending', 'accepted'] } },
+            ],
+          },
+        },
+      },
+    ],
+  };
+}
+
+/** Edit project — owner or accepted members only */
+function editableProjectWhere(user) {
   return {
     OR: [
       { userId: user.id },
@@ -12,10 +41,17 @@ function accessibleProjectsWhere(user) {
 
 async function findAccessibleProject(projectId, user) {
   return prisma.project.findFirst({
-    where: {
-      id: projectId,
-      ...accessibleProjectsWhere(user),
+    where: { id: projectId, ...viewableProjectWhere(user) },
+    include: {
+      members: { orderBy: { createdAt: 'asc' } },
+      user: { select: { id: true, name: true, email: true } },
     },
+  });
+}
+
+async function findEditableProject(projectId, user) {
+  return prisma.project.findFirst({
+    where: { id: projectId, ...editableProjectWhere(user) },
     include: {
       members: { orderBy: { createdAt: 'asc' } },
       user: { select: { id: true, name: true, email: true } },
@@ -43,7 +79,10 @@ function acceptedAssignees(project) {
 
 module.exports = {
   accessibleProjectsWhere,
+  viewableProjectWhere,
+  editableProjectWhere,
   findAccessibleProject,
+  findEditableProject,
   findOwnedProject,
   acceptedAssignees,
 };

@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Grid2x2, Mail, Lock, User, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { signup, verifyEmail, login, resendCode } from '../utils/api';
 import './AuthPage.css';
 
-export default function AuthPage() {
+export default function AuthPage({ redirectTo }) {
   const { login: authLogin } = useAuth();
+  const navigate = useNavigate();
   const [mode, setMode] = useState('login'); // login | signup | verify
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
@@ -56,6 +58,10 @@ export default function AuthPage() {
     }
   };
 
+  const goAfterAuth = () => {
+    if (redirectTo) navigate(redirectTo, { replace: true });
+  };
+
   const handleVerify = async (e) => {
     e.preventDefault();
     startLoading('Verifying…');
@@ -63,6 +69,7 @@ export default function AuthPage() {
       const { token, user } = await verifyEmail({ email: form.email, code: form.code });
       authLogin(token, user);
       toast.success('Welcome!');
+      goAfterAuth();
     } catch (err) {
       toast.error(authError(err, 'Verification failed'));
     } finally {
@@ -77,6 +84,7 @@ export default function AuthPage() {
       const { token, user } = await login({ email: form.email, password: form.password });
       authLogin(token, user);
       toast.success(`Welcome back, ${user.name}!`);
+      goAfterAuth();
     } catch (err) {
       const data = err.response?.data;
       if (data?.needsVerification) {
