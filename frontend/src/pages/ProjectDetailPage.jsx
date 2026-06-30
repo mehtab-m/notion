@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Calendar, Plus, Trash2, ChevronDown, ChevronRight,
+  ArrowLeft, Calendar, Plus, Trash2, MessageCircle,
   Users, CheckSquare, Database, User, MessageSquare, Mail,
 } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
@@ -10,8 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   getProject, updateProject, deleteProject,
   inviteProjectMember, removeProjectMember, acceptProjectInvite,
-  addProjectTask, toggleProjectTask, deleteProjectTask,
-  addProjectSubtask, toggleProjectSubtask, deleteProjectSubtask, updateProjectTask, updateProjectSubtask,
+  addProjectTask, toggleProjectTask, deleteProjectTask, updateProjectTask,
   addProjectTable, deleteProjectTable,
   addProjectTableRow, updateProjectTableRow, deleteProjectTableRow,
   addProjectTableColumn, updateProjectTableColumn, deleteProjectTableColumn,
@@ -89,28 +88,34 @@ function TaskComments({ projectId, taskId }) {
   };
 
   return (
-    <div className="pd-task-comments">
-      <div className="pd-comments-list">
+    <div className="pd-task-discussion">
+      <div className="pd-discussion-header">
+        <MessageCircle size={14} />
+        <span>Task discussion</span>
+      </div>
+      <div className="pd-discussion-messages">
         {messages.length === 0 ? (
-          <p className="pd-comments-empty">No comments yet</p>
+          <p className="pd-discussion-empty">No messages yet — start the conversation</p>
         ) : (
           messages.map((m) => (
-            <div key={m._id} className="pd-comment">
-              <strong>{m.userName}</strong>
-              <span>{m.text}</span>
-              <time>{format(new Date(m.createdAt), 'MMM d, h:mm a')}</time>
+            <div key={m._id} className="pd-discussion-bubble">
+              <div className="pd-discussion-bubble-top">
+                <span className="pd-discussion-author">{m.userName}</span>
+                <time>{format(new Date(m.createdAt), 'MMM d, h:mm a')}</time>
+              </div>
+              <p>{m.text}</p>
             </div>
           ))
         )}
       </div>
-      <div className="pd-comment-input">
+      <div className="pd-discussion-compose">
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Comment on this task..."
+          placeholder="Write a message..."
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
         />
-        <button type="button" className="btn btn-secondary btn-sm" onClick={handleSend}>Send</button>
+        <button type="button" className="btn btn-primary btn-sm" onClick={handleSend}>Send</button>
       </div>
     </div>
   );
@@ -142,6 +147,10 @@ function ProjectChat({ projectId }) {
 
   return (
     <div className="pd-chat-panel">
+      <div className="pd-panel-title">
+        <MessageSquare size={16} />
+        <h3>Team chat</h3>
+      </div>
       <div className="pd-chat-messages">
         {messages.length === 0 ? (
           <div className="pd-empty"><MessageSquare size={36} strokeWidth={1} /><p>Start the project conversation</p></div>
@@ -182,6 +191,7 @@ function memberStatusClass(status) {
   if (status === 'pending') return 'ms-pending';
   return 'ms-declined';
 }
+
 function AssigneeSelect({ team, value, onChange, disabled }) {
   if (!team.length) return null;
   return (
@@ -195,9 +205,7 @@ function AssigneeSelect({ team, value, onChange, disabled }) {
 }
 
 function TaskItem({ task, team, projectId, onUpdate }) {
-  const [expanded, setExpanded] = useState(true);
-  const [subInput, setSubInput] = useState('');
-  const [subAssignee, setSubAssignee] = useState('');
+  const [showDiscussion, setShowDiscussion] = useState(false);
 
   const handleToggle = async () => {
     try {
@@ -214,92 +222,38 @@ function TaskItem({ task, team, projectId, onUpdate }) {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Delete this task and its subtasks?')) return;
+    if (!window.confirm('Delete this task?')) return;
     try {
       const updated = await deleteProjectTask(projectId, task.id);
       onUpdate(updated);
     } catch { toast.error('Failed'); }
   };
 
-  const handleAddSub = async () => {
-    if (!subInput.trim()) return;
-    try {
-      const updated = await addProjectSubtask(projectId, task.id, { text: subInput.trim(), assignee: subAssignee });
-      onUpdate(updated);
-      setSubInput('');
-      setSubAssignee('');
-    } catch { toast.error('Failed to add subtask'); }
-  };
-
-  const subtasks = task.subtasks || [];
-
   return (
-    <div className={`pd-task ${task.done ? 'done' : ''}`}>
-      <div className="pd-task-main">
-        <button className="pd-expand-btn" onClick={() => setExpanded(!expanded)}>
-          {subtasks.length > 0 ? (expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : <span className="pd-expand-spacer" />}
-        </button>
-        <input type="checkbox" checked={task.done} onChange={handleToggle} />
+    <div className={`pd-task-card ${task.done ? 'done' : ''}`}>
+      <div className="pd-task-row">
+        <label className="pd-task-check">
+          <input type="checkbox" checked={task.done} onChange={handleToggle} />
+        </label>
         <span className="pd-task-text">{task.text}</span>
-        <AssigneeSelect team={team} value={task.assignee} onChange={handleAssignee} />
-        <button className="pd-icon-btn danger" onClick={handleDelete}><Trash2 size={13} /></button>
-      </div>
-
-      {expanded && subtasks.length > 0 && (
-        <ul className="pd-subtask-list">
-          {subtasks.map((sub) => (
-            <li key={sub.id} className={`pd-subtask ${sub.done ? 'done' : ''}`}>
-              <input
-                type="checkbox"
-                checked={sub.done}
-                onChange={async () => {
-                  try {
-                    const updated = await toggleProjectSubtask(projectId, task.id, sub.id);
-                    onUpdate(updated);
-                  } catch { toast.error('Failed'); }
-                }}
-              />
-              <span>{sub.text}</span>
-              <AssigneeSelect
-                team={team}
-                value={sub.assignee}
-                onChange={async (assignee) => {
-                  try {
-                    const updated = await updateProjectSubtask(projectId, task.id, sub.id, { assignee });
-                    onUpdate(updated);
-                  } catch { toast.error('Failed'); }
-                }}
-              />
-              <button
-                className="pd-icon-btn danger"
-                onClick={async () => {
-                  try {
-                    const updated = await deleteProjectSubtask(projectId, task.id, sub.id);
-                    onUpdate(updated);
-                  } catch { toast.error('Failed'); }
-                }}
-              >
-                <Trash2 size={12} />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {expanded && (
-        <>
-          <TaskComments projectId={projectId} taskId={task.id} />
-          <div className="pd-subtask-add">
-          <input
-            value={subInput}
-            onChange={(e) => setSubInput(e.target.value)}
-            placeholder="Add subtask..."
-            onKeyDown={(e) => e.key === 'Enter' && handleAddSub()}
-          />
-          <AssigneeSelect team={team} value={subAssignee} onChange={setSubAssignee} />
-          <button className="btn btn-secondary btn-sm" onClick={handleAddSub}><Plus size={12} /></button>
+        <div className="pd-task-actions">
+          <AssigneeSelect team={team} value={task.assignee} onChange={handleAssignee} />
+          <button
+            type="button"
+            className={`pd-discuss-btn ${showDiscussion ? 'active' : ''}`}
+            onClick={() => setShowDiscussion((v) => !v)}
+            title="Task discussion"
+          >
+            <MessageCircle size={14} />
+            <span className="pd-discuss-label">Chat</span>
+          </button>
+          <button type="button" className="pd-icon-btn danger" onClick={handleDelete}>
+            <Trash2 size={14} />
+          </button>
         </div>
-        </>
+      </div>
+      {showDiscussion && (
+        <TaskComments projectId={projectId} taskId={task.id} />
       )}
     </div>
   );
@@ -432,14 +386,21 @@ export default function ProjectDetailPage() {
   const overdue = dueDate && isPast(dueDate) && !isToday(dueDate) && project.status !== 'completed';
   const taskCount = (project.tasks || []).length;
 
+  const tabs = [
+    { id: 'tasks', icon: CheckSquare, label: 'Tasks', count: taskCount },
+    { id: 'tables', icon: Database, label: 'Tables', count: (project.dataTables || []).length },
+    { id: 'team', icon: Users, label: 'Team', count: members.length },
+    { id: 'chat', icon: MessageSquare, label: 'Chat' },
+  ];
+
   return (
     <div className="project-detail">
-      <div className="pd-header">
-        <button className="pd-back" onClick={() => navigate('/projects')}>
-          <ArrowLeft size={16} /> Projects
-        </button>
+      <button className="pd-back" onClick={() => navigate('/projects')}>
+        <ArrowLeft size={16} /> Back to Projects
+      </button>
 
-        <div className="pd-header-main">
+      <header className="pd-hero">
+        <div className="pd-hero-top">
           {editingTitle ? (
             <input
               className="pd-title-input"
@@ -460,89 +421,91 @@ export default function ProjectDetailPage() {
               {project.title}
             </h1>
           )}
-
-          <div className="pd-header-meta">
-            <label className="pd-deadline">
-              <Calendar size={14} />
-              <input
-                type="date"
-                value={project.dueDate ? project.dueDate.slice(0, 10) : ''}
-                onChange={(e) => saveField({ dueDate: e.target.value || undefined })}
-              />
-              {dueDate && (
-                <span className={`pd-deadline-label ${overdue ? 'overdue' : ''}`}>
-                  {format(dueDate, 'MMM d, yyyy')}
-                  {overdue && ' · Overdue'}
-                </span>
-              )}
-            </label>
-            {taskCount > 0 && (
-              <span className="pd-progress-badge">{project.progress}% done</span>
-            )}
-            <select
-              className="pd-status-select"
-              value={project.status}
-              onChange={(e) => saveField({ status: e.target.value })}
+          {isOwner && (
+            <button
+              type="button"
+              className="btn btn-danger btn-sm pd-delete-btn"
+              onClick={async () => {
+                if (!window.confirm('Delete this project permanently?')) return;
+                await deleteProject(id);
+                toast.success('Deleted');
+                navigate('/projects');
+              }}
             >
-              <option value="active">Active</option>
-              <option value="planned">Planned</option>
-              <option value="on-hold">On Hold</option>
-              <option value="completed">Completed</option>
-            </select>
-          </div>
+              <Trash2 size={13} /> Delete
+            </button>
+          )}
         </div>
 
-        <button
-          className="btn btn-danger btn-sm pd-delete-btn"
-          onClick={async () => {
-            if (!window.confirm('Delete this project permanently?')) return;
-            await deleteProject(id);
-            toast.success('Deleted');
-            navigate('/projects');
-          }}
-          style={{ display: isOwner ? undefined : 'none' }}
-        >
-          <Trash2 size={13} /> Delete
-        </button>
-      </div>
+        <div className="pd-hero-chips">
+          <label className="pd-chip pd-chip-deadline">
+            <Calendar size={14} />
+            <input
+              type="date"
+              value={project.dueDate ? project.dueDate.slice(0, 10) : ''}
+              onChange={(e) => saveField({ dueDate: e.target.value || undefined })}
+            />
+            {dueDate && (
+              <span className={overdue ? 'overdue' : ''}>
+                {format(dueDate, 'MMM d, yyyy')}
+                {overdue && ' · Overdue'}
+              </span>
+            )}
+          </label>
+          <select
+            className="pd-chip pd-chip-status"
+            value={project.status}
+            onChange={(e) => saveField({ status: e.target.value })}
+          >
+            <option value="active">Active</option>
+            <option value="planned">Planned</option>
+            <option value="on-hold">On Hold</option>
+            <option value="completed">Completed</option>
+          </select>
+          {taskCount > 0 && (
+            <span className="pd-chip pd-chip-progress">{project.progress}% complete</span>
+          )}
+        </div>
+      </header>
 
-      <div className="pd-tabs">
-        {[
-          { id: 'tasks', icon: CheckSquare, label: `Tasks (${taskCount})` },
-          { id: 'tables', icon: Database, label: `Data Tables (${(project.dataTables || []).length})` },
-          { id: 'team', icon: Users, label: `Team (${members.length})` },
-          { id: 'chat', icon: MessageSquare, label: 'Chat' },
-        ].map(({ id: tabId, icon: Icon, label }) => (
+      <nav className="pd-nav" aria-label="Project sections">
+        {tabs.map(({ id: tabId, icon: Icon, label, count }) => (
           <button
             key={tabId}
-            className={`pd-tab ${tab === tabId ? 'active' : ''}`}
+            type="button"
+            className={`pd-nav-item ${tab === tabId ? 'active' : ''}`}
             onClick={() => setTab(tabId)}
           >
-            <Icon size={15} /> {label}
+            <Icon size={16} />
+            <span>{label}</span>
+            {count != null && <span className="pd-nav-count">{count}</span>}
           </button>
         ))}
-      </div>
+      </nav>
 
-      <div className="pd-content">
+      <main className="pd-content">
         {tab === 'tasks' && (
-          <div className="pd-tasks-panel">
-            <p className="pd-hint">Tasks are optional — add them only when this project needs a breakdown for you or your team.</p>
-            <div className="pd-task-add">
+          <section className="pd-section">
+            <div className="pd-panel-title">
+              <CheckSquare size={16} />
+              <h3>Tasks</h3>
+            </div>
+            <div className="pd-add-bar">
               <input
                 value={taskInput}
                 onChange={(e) => setTaskInput(e.target.value)}
-                placeholder="New task..."
+                placeholder="Add a new task..."
                 onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
               />
               <AssigneeSelect team={team} value={taskAssignee} onChange={setTaskAssignee} />
-              <button className="btn btn-primary btn-sm" onClick={handleAddTask}>
-                <Plus size={14} /> Add Task
+              <button type="button" className="btn btn-primary btn-sm" onClick={handleAddTask}>
+                <Plus size={14} /> Add
               </button>
             </div>
             {taskCount === 0 ? (
               <div className="pd-empty">
                 <CheckSquare size={36} strokeWidth={1} />
-                <p>No tasks yet. This project is just name + deadline until you add work items.</p>
+                <p>No tasks yet</p>
               </div>
             ) : (
               <div className="pd-task-list">
@@ -551,37 +514,37 @@ export default function ProjectDetailPage() {
                 ))}
               </div>
             )}
-          </div>
+          </section>
         )}
 
         {tab === 'tables' && (
-          <div className="pd-tables-panel">
-            <p className="pd-hint">
-              All project tables on one board — expand or collapse each, add columns and rows inline.
-            </p>
+          <section className="pd-section">
+            <div className="pd-panel-title">
+              <Database size={16} />
+              <h3>Data tables</h3>
+            </div>
             <div className="pd-table-presets">
               {TABLE_TEMPLATES.map((tpl) => (
-                <button key={tpl.name} className="filter-btn" onClick={() => handleAddTable(tpl)}>
+                <button key={tpl.name} type="button" className="filter-btn" onClick={() => handleAddTable(tpl)}>
                   + {tpl.name}
                 </button>
               ))}
             </div>
-            <div className="pd-table-add">
+            <div className="pd-add-bar">
               <input
                 value={tableInput}
                 onChange={(e) => setTableInput(e.target.value)}
                 placeholder="Blank table name..."
                 onKeyDown={(e) => e.key === 'Enter' && handleAddTable()}
               />
-              <button className="btn btn-primary btn-sm" onClick={() => handleAddTable()}>
-                <Plus size={14} /> Blank Table
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => handleAddTable()}>
+                <Plus size={14} /> Create
               </button>
             </div>
-
             {(project.dataTables || []).length === 0 ? (
               <div className="pd-empty">
                 <Database size={36} strokeWidth={1} />
-                <p>No tables yet. Use a template or create a blank table, then add columns and rows.</p>
+                <p>No tables yet</p>
               </div>
             ) : (
               <TableBoard
@@ -598,39 +561,40 @@ export default function ProjectDetailPage() {
                 emptyMessage="No tables yet."
               />
             )}
-          </div>
+          </section>
         )}
 
         {tab === 'team' && (
-          <div className="pd-team-panel">
+          <section className="pd-section">
+            <div className="pd-panel-title">
+              <Users size={16} />
+              <h3>Team members</h3>
+            </div>
             {myPending && (
               <div className="pd-invite-banner">
                 <p>You have been invited to this project.</p>
-                <button className="btn btn-primary btn-sm" onClick={handleAcceptMyInvite}>Accept invitation</button>
+                <button type="button" className="btn btn-primary btn-sm" onClick={handleAcceptMyInvite}>Accept</button>
               </div>
             )}
             {isOwner && (
-              <>
-                <p className="pd-hint">Invite verified My Notion members by Gmail. They must accept before you can assign tasks.</p>
-                <div className="pd-team-add">
-                  <Mail size={16} className="pd-input-icon" />
-                  <input
-                    type="email"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    placeholder="teammate@gmail.com"
-                    onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
-                  />
-                  <button className="btn btn-primary btn-sm" onClick={handleInvite}>
-                    <Plus size={14} /> Send Invite
-                  </button>
-                </div>
-              </>
+              <div className="pd-add-bar pd-add-bar-email">
+                <Mail size={16} className="pd-input-icon" />
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="Invite by Gmail..."
+                  onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
+                />
+                <button type="button" className="btn btn-primary btn-sm" onClick={handleInvite}>
+                  <Plus size={14} /> Invite
+                </button>
+              </div>
             )}
             {members.length === 0 ? (
               <div className="pd-empty">
                 <User size={36} strokeWidth={1} />
-                <p>No team members yet. Invite collaborators by email.</p>
+                <p>No team members yet</p>
               </div>
             ) : (
               <div className="pd-members-table-wrap">
@@ -647,16 +611,21 @@ export default function ProjectDetailPage() {
                   <tbody>
                     {members.map((m) => (
                       <tr key={m._id}>
-                        <td>
+                        <td data-label="Name">
                           <span className="pd-team-avatar-inline">{(m.name || m.email).charAt(0).toUpperCase()}</span>
                           {m.name || '—'}
                         </td>
-                        <td>{m.email}</td>
-                        <td><span className={`pd-member-status ${memberStatusClass(m.status)}`}>{memberStatusLabel(m.status)}</span></td>
-                        <td>{m.createdAt ? format(new Date(m.createdAt), 'MMM d, yyyy') : '—'}</td>
+                        <td data-label="Email">{m.email}</td>
+                        <td data-label="Status">
+                          <span className={`pd-member-status ${memberStatusClass(m.status)}`}>
+                            {memberStatusLabel(m.status)}
+                          </span>
+                        </td>
+                        <td data-label="Invited">{m.createdAt ? format(new Date(m.createdAt), 'MMM d, yyyy') : '—'}</td>
                         {isOwner && (
-                          <td>
+                          <td data-label="">
                             <button
+                              type="button"
                               className="pd-icon-btn danger"
                               onClick={async () => {
                                 const updated = await removeProjectMember(id, m._id);
@@ -673,11 +642,15 @@ export default function ProjectDetailPage() {
                 </table>
               </div>
             )}
-          </div>
+          </section>
         )}
 
-        {tab === 'chat' && <ProjectChat projectId={id} />}
-      </div>
+        {tab === 'chat' && (
+          <section className="pd-section">
+            <ProjectChat projectId={id} />
+          </section>
+        )}
+      </main>
     </div>
   );
 }
