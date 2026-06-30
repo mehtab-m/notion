@@ -191,7 +191,7 @@ function Cell({ col, value, tableId, rowId, onSave }) {
   const save = async (val) => {
     if (val === value) { setEditing(false); return; }
     try {
-      await onSave(col.id, val);
+      await onSave(cid(col), val);
     } catch {
       toast.error('Failed to save');
     }
@@ -313,17 +313,26 @@ function Cell({ col, value, tableId, rowId, onSave }) {
 const rid = (item) => item?.id || item?._id;
 const cid = (col) => col?.id || col?._id;
 
+function normColumns(cols) {
+  return (cols || []).map((c) => ({ ...c, id: cid(c) }));
+}
+
+function normRows(rows) {
+  return (rows || []).map((r) => ({ ...r, id: rid(r) }));
+}
+
 export default function DynamicTable({ table, onTableChange, tableApi = defaultTableApi, hideName }) {
   const tableId = table._id || table.id;
-  const [columns, setColumns] = useState(table.columns || []);
-  const [rows, setRows] = useState(table.rows || []);
+  const [columns, setColumns] = useState(normColumns(table.columns));
+  const [rows, setRows] = useState(normRows(table.rows));
   const [showAddCol, setShowAddCol] = useState(false);
   const [openMenu, setOpenMenu] = useState(null);
   const [addingRow, setAddingRow] = useState(false);
+  const [deletingCol, setDeletingCol] = useState(null);
 
   useEffect(() => {
-    setColumns(table.columns || []);
-    setRows(table.rows || []);
+    setColumns(normColumns(table.columns));
+    setRows(normRows(table.rows));
   }, [table]);
 
   const handleAddRow = async () => {
@@ -378,6 +387,23 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
       delete newData[colId];
       return { ...r, data: newData };
     }));
+    setOpenMenu(null);
+    onTableChange?.();
+  };
+
+  const handleDeleteColumn = async (col) => {
+    const colId = cid(col);
+    if (!window.confirm(`Delete column "${col.name}"?`)) return;
+    setDeletingCol(colId);
+    try {
+      await tableApi.deleteColumn(tableId, colId);
+      handleColDeleted(colId);
+      toast.success('Column deleted');
+    } catch {
+      toast.error('Failed to delete column');
+    } finally {
+      setDeletingCol(null);
+    }
   };
 
   return (
@@ -424,8 +450,19 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
                         <Icon size={13} />
                         <span>{col.name}</span>
                         <button
+                          type="button"
+                          className="col-delete-btn"
+                          onClick={() => handleDeleteColumn(col)}
+                          disabled={deletingCol === colId}
+                          title={`Delete column "${col.name}"`}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                        <button
+                          type="button"
                           className="col-menu-trigger"
                           onClick={() => setOpenMenu(openMenu === colId ? null : colId)}
+                          title="Column options"
                         >
                           <MoreHorizontal size={13} />
                         </button>

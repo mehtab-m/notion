@@ -12,6 +12,10 @@ async function loadTable(req) {
   });
 }
 
+function matchColId(col, id) {
+  return col.id === id || col._id === id;
+}
+
 router.get('/', async (req, res) => {
   try {
     const tables = await prisma.spreadsheet.findMany({
@@ -168,7 +172,7 @@ router.put('/:id/columns/:colId', async (req, res) => {
     const table = await loadTable(req);
     if (!table) return res.status(404).json({ error: 'Table not found' });
     const columns = Array.isArray(table.columns) ? [...table.columns] : [];
-    const colIndex = columns.findIndex((c) => c.id === req.params.colId);
+    const colIndex = columns.findIndex((c) => matchColId(c, req.params.colId));
     if (colIndex === -1) return res.status(404).json({ error: 'Column not found' });
     columns[colIndex] = { ...columns[colIndex], ...req.body };
     await prisma.spreadsheet.update({
@@ -186,7 +190,7 @@ router.delete('/:id/columns/:colId', async (req, res) => {
     const table = await loadTable(req);
     if (!table) return res.status(404).json({ error: 'Table not found' });
     const columns = (Array.isArray(table.columns) ? table.columns : []).filter(
-      (c) => c.id !== req.params.colId
+      (c) => !matchColId(c, req.params.colId)
     );
     const rows = (Array.isArray(table.rows) ? table.rows : []).map((row) => {
       const newData = { ...(row.data || {}) };

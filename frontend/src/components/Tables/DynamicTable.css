@@ -182,8 +182,34 @@
   border-radius: 3px;
   display: flex;
   align-items: center;
-  opacity: 0.4;
+  flex-shrink: 0;
+  opacity: 0.7;
   transition: opacity 0.1s;
+}
+
+.col-delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0.75;
+  transition: opacity 0.1s, color 0.1s;
+}
+
+.col-delete-btn:hover {
+  color: var(--accent-red);
+  background: rgba(239, 68, 68, 0.1);
+  opacity: 1;
+}
+
+.col-delete-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .dt-th:hover .col-menu-trigger {

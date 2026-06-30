@@ -53,6 +53,10 @@ function getDataTables(project) {
   return Array.isArray(project.dataTables) ? [...project.dataTables] : [];
 }
 
+function matchColId(col, id) {
+  return col.id === id || col._id === id;
+}
+
 function getProjectTable(project, tableId) {
   const tables = getDataTables(project);
   const table = tables.find((t) => t.id === tableId);
@@ -574,7 +578,7 @@ router.put('/:id/tables/:tableId/columns/:colId', async (req, res) => {
     const dataTables = getDataTables(project);
     const table = getProjectTable({ dataTables }, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });
-    const colIndex = table.columns.findIndex((c) => c.id === req.params.colId);
+    const colIndex = table.columns.findIndex((c) => matchColId(c, req.params.colId));
     if (colIndex === -1) return res.status(404).json({ error: 'Column not found' });
     table.columns[colIndex] = { ...table.columns[colIndex], ...req.body };
     await saveProject(project, { dataTables }, req.user);
@@ -591,7 +595,7 @@ router.delete('/:id/tables/:tableId/columns/:colId', async (req, res) => {
     const dataTables = getDataTables(project);
     const table = getProjectTable({ dataTables }, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });
-    table.columns = table.columns.filter((c) => c.id !== req.params.colId);
+    table.columns = table.columns.filter((c) => !matchColId(c, req.params.colId));
     table.rows = table.rows.map((row) => {
       const newData = { ...(row.data || {}) };
       delete newData[req.params.colId];
