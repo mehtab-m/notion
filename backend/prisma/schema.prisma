@@ -27,6 +27,8 @@ model User {
   habits      Habit[]
   goals       Goal[]
   stickyNotes StickyNote[]
+  projectMemberships ProjectMember[]
+  sentProjectMessages ProjectMessage[]
 }
 
 model Project {
@@ -47,8 +49,44 @@ model Project {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  members     ProjectMember[]
+  messages    ProjectMessage[]
 
   @@index([userId])
+}
+
+model ProjectMember {
+  id         String    @id @default(cuid())
+  projectId  String
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email      String
+  name       String    @default("")
+  status     String    @default("pending")
+  invitedBy  String
+  createdAt  DateTime  @default(now())
+  acceptedAt DateTime?
+
+  @@unique([projectId, email])
+  @@index([projectId])
+  @@index([userId])
+  @@index([email])
+}
+
+model ProjectMessage {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskId    String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userName  String
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+  @@index([taskId])
 }
 
 model Book {

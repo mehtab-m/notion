@@ -35,4 +35,28 @@ async function sendVerificationEmail(to, name, code) {
   });
 }
 
-module.exports = { sendVerificationEmail };
+async function sendProjectInviteEmail(to, inviterName, projectTitle, projectId) {
+  const transporter = getTransporter();
+  const frontend = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+  const link = `${frontend}/projects/${projectId}?invite=pending`;
+  if (!transporter) {
+    console.warn('Gmail not configured — project invite link:', link);
+    return;
+  }
+  await transporter.sendMail({
+    from: `"My Notion" <${process.env.GMAIL_USER}>`,
+    to,
+    subject: `${inviterName} invited you to join "${projectTitle}"`,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
+        <h2>Project invitation</h2>
+        <p><strong>${inviterName}</strong> invited you to collaborate on <strong>${projectTitle}</strong> in My Notion.</p>
+        <p>Open the project and accept the invitation to access tasks, tables, and team chat.</p>
+        <p><a href="${link}" style="display:inline-block;padding:12px 20px;background:#6366f1;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">View invitation</a></p>
+        <p style="color:#888;font-size:12px">You must be a registered My Notion member to join.</p>
+      </div>
+    `,
+  });
+}
+
+module.exports = { sendVerificationEmail, sendProjectInviteEmail };

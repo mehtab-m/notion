@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
 const { cleanBody } = require('../utils/body');
-const { serialize } = require('../utils/serialize');
+const { serialize, serializeTablePart } = require('../utils/serialize');
 
 async function loadTable(req) {
   return prisma.spreadsheet.findFirst({
@@ -100,7 +100,7 @@ router.post('/:id/rows', async (req, res) => {
       where: { id: table.id },
       data: { rows },
     });
-    res.status(201).json(serialize(newRow));
+    res.status(201).json(serializeTablePart(newRow));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -118,7 +118,7 @@ router.put('/:id/rows/:rowId', async (req, res) => {
       where: { id: table.id },
       data: { rows },
     });
-    res.json(serialize(rows[rowIndex]));
+    res.json(serializeTablePart(rows[rowIndex]));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -157,7 +157,7 @@ router.post('/:id/columns', async (req, res) => {
       where: { id: table.id },
       data: { columns },
     });
-    res.status(201).json(serialize(newCol));
+    res.status(201).json(serializeTablePart(newCol));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -175,7 +175,7 @@ router.put('/:id/columns/:colId', async (req, res) => {
       where: { id: table.id },
       data: { columns },
     });
-    res.json(serialize(columns[colIndex]));
+    res.json(serializeTablePart(columns[colIndex]));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

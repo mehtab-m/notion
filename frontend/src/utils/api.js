@@ -39,6 +39,19 @@ export const addTeamMember = (projectId, name) =>
   api.post(`/projects/${projectId}/team`, { name }).then((r) => r.data);
 export const removeTeamMember = (projectId, name) =>
   api.delete(`/projects/${projectId}/team/${encodeURIComponent(name)}`).then((r) => r.data);
+export const getPendingInvitations = () => api.get('/projects/invitations/pending').then((r) => r.data);
+export const acceptProjectInvite = (memberId) =>
+  api.post(`/projects/invitations/${memberId}/accept`).then((r) => r.data);
+export const declineProjectInvite = (memberId) =>
+  api.post(`/projects/invitations/${memberId}/decline`).then((r) => r.data);
+export const inviteProjectMember = (projectId, email) =>
+  api.post(`/projects/${projectId}/invite`, { email }).then((r) => r.data);
+export const removeProjectMember = (projectId, memberId) =>
+  api.delete(`/projects/${projectId}/members/${memberId}`).then((r) => r.data);
+export const getProjectMessages = (projectId, taskId) =>
+  api.get(`/projects/${projectId}/messages`, { params: taskId ? { taskId } : {} }).then((r) => r.data);
+export const sendProjectMessage = (projectId, data) =>
+  api.post(`/projects/${projectId}/messages`, data).then((r) => r.data);
 export const addProjectTask = (projectId, data) =>
   api.post(`/projects/${projectId}/tasks`, data).then((r) => r.data);
 export const updateProjectTask = (projectId, taskId, data) =>

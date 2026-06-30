@@ -4,7 +4,9 @@ const { v4: uuidv4 } = require('uuid');
 const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
 const { cleanBody } = require('../utils/body');
-const { serialize } = require('../utils/serialize');
+const { serialize, serializeTablePart } = require('../utils/serialize');
+const { findAccessibleProject, findOwnedProject, acceptedAssignees } = require('../utils/projectAccess');
+const { sendProjectInviteEmail } = require('../utils/email');
 
 function calcProgress(tasks) {
   const items = [];
@@ -18,15 +20,29 @@ function calcProgress(tasks) {
 }
 
 async function loadProject(req, id) {
-  return prisma.project.findFirst({ where: owned(req, { _id: id }) });
+  return findAccessibleProject(id, req.user);
 }
 
-async function saveProject(project, data) {
-  const updated = await prisma.project.update({
-    where: { id: project.id },
-    data,
+async function saveProject(project, data, user) {
+  const patch = { ...data };
+  if (patch.dataTables != null) patch.dataTables = JSON.parse(JSON.stringify(patch.dataTables));
+  if (patch.tasks != null) patch.tasks = JSON.parse(JSON.stringify(patch.tasks));
+  await prisma.project.update({ where: { id: project.id }, data: patch });
+  return findAccessibleProject(project.id, user);
+}
+
+function replyProject(res, project, userId, status = 200) {
+  return res.status(status).json(projectPayload(project, userId));
+}
+
+function projectPayload(project, viewerId) {
+  const team = acceptedAssignees(project);
+  return serialize({
+    ...project,
+    team,
+    members: project.members || [],
+    isOwner: project.userId === viewerId,
   });
-  return updated;
 }
 
 function getTasks(project) {
@@ -59,13 +75,68 @@ function getProjectTable(project, tableId) {
   return table;
 }
 
+router.get('/invitations/pending', async (req, res) => {
+  try {
+    const invites = await prisma.projectMember.findMany({
+      where: { email: req.user.email, status: 'pending' },
+      include: { project: { select: { id: true, title: true, userId: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(serialize(invites));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/invitations/:memberId/accept', async (req, res) => {
+  try {
+    const member = await prisma.projectMember.findFirst({
+      where: { id: req.params.memberId, email: req.user.email, status: 'pending' },
+      include: { project: true },
+    });
+    if (!member) return res.status(404).json({ error: 'Invitation not found' });
+    await prisma.projectMember.update({
+      where: { id: member.id },
+      data: { status: 'accepted', userId: req.user.id, name: req.user.name, acceptedAt: new Date() },
+    });
+    const team = [...new Set([...(member.project.team || []), req.user.name])];
+    await prisma.project.update({ where: { id: member.projectId }, data: { team } });
+    const project = await findAccessibleProject(member.projectId, req.user);
+    res.json(projectPayload(project, req.user.id));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/invitations/:memberId/decline', async (req, res) => {
+  try {
+    const member = await prisma.projectMember.findFirst({
+      where: { id: req.params.memberId, email: req.user.email, status: 'pending' },
+    });
+    if (!member) return res.status(404).json({ error: 'Invitation not found' });
+    await prisma.projectMember.update({
+      where: { id: member.id },
+      data: { status: 'declined' },
+    });
+    res.json({ message: 'Invitation declined' });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 router.get('/', async (req, res) => {
   try {
     const projects = await prisma.project.findMany({
-      where: owned(req),
-      orderBy: { createdAt: 'desc' },
+      where: {
+        OR: [
+          { userId: req.user.id },
+          { members: { some: { userId: req.user.id, status: 'accepted' } } },
+        ],
+      },
+      include: { members: true, user: { select: { id: true, name: true, email: true } } },
+      orderBy: { updatedAt: 'desc' },
     });
-    res.json(serialize(projects));
+    res.json(projects.map((p) => projectPayload(p, req.user.id)));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -92,7 +163,7 @@ router.get('/:id', async (req, res) => {
   try {
     const project = await loadProject(req, req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
-    res.json(serialize(project));
+    res.json(projectPayload(project, req.user.id));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -102,8 +173,8 @@ router.put('/:id', async (req, res) => {
   try {
     const existing = await loadProject(req, req.params.id);
     if (!existing) return res.status(404).json({ error: 'Project not found' });
-    const updated = await saveProject(existing, cleanBody(req.body));
-    res.json(serialize(updated));
+    const full = await saveProject(existing, cleanBody(req.body), req.user);
+    replyProject(res, full, req.user.id);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -111,7 +182,7 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    const existing = await loadProject(req, req.params.id);
+    const existing = await findOwnedProject(req.params.id, req.user.id);
     if (!existing) return res.status(404).json({ error: 'Project not found' });
     await prisma.project.delete({ where: { id: existing.id } });
     res.json({ message: 'Project deleted' });
@@ -120,16 +191,109 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-router.post('/:id/team', async (req, res) => {
+router.post('/:id/invite', async (req, res) => {
+  try {
+    const project = await findOwnedProject(req.params.id, req.user.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const email = (req.body.email || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+    if (email === req.user.email) return res.status(400).json({ error: 'You are already on this project' });
+
+    const invitee = await prisma.user.findUnique({ where: { email } });
+    if (!invitee?.isVerified) {
+      return res.status(400).json({ error: 'User must be a registered My Notion member with a verified email' });
+    }
+
+    const existing = await prisma.projectMember.findUnique({
+      where: { projectId_email: { projectId: project.id, email } },
+    });
+    if (existing?.status === 'accepted') {
+      return res.status(400).json({ error: 'This member is already on the project' });
+    }
+    if (existing?.status === 'pending') {
+      return res.status(400).json({ error: 'Invitation already sent' });
+    }
+
+    const member = await prisma.projectMember.upsert({
+      where: { projectId_email: { projectId: project.id, email } },
+      create: {
+        projectId: project.id,
+        email,
+        name: invitee.name,
+        userId: invitee.id,
+        status: 'pending',
+        invitedBy: req.user.name,
+      },
+      update: {
+        status: 'pending',
+        name: invitee.name,
+        userId: invitee.id,
+        invitedBy: req.user.name,
+        acceptedAt: null,
+      },
+    });
+
+    await sendProjectInviteEmail(email, req.user.name, project.title, project.id);
+    const full = await findOwnedProject(project.id, req.user.id);
+    res.status(201).json(projectPayload(full, req.user.id));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.delete('/:id/members/:memberId', async (req, res) => {
+  try {
+    const project = await findOwnedProject(req.params.id, req.user.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const member = await prisma.projectMember.findFirst({
+      where: { id: req.params.memberId, projectId: project.id },
+    });
+    if (!member) return res.status(404).json({ error: 'Member not found' });
+    await prisma.projectMember.delete({ where: { id: member.id } });
+    if (member.status === 'accepted' && member.name) {
+      const team = (project.team || []).filter((n) => n !== member.name);
+      await prisma.project.update({ where: { id: project.id }, data: { team } });
+    }
+    const full = await findOwnedProject(project.id, req.user.id);
+    res.json(projectPayload(full, req.user.id));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/:id/messages', async (req, res) => {
   try {
     const project = await loadProject(req, req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
-    const name = (req.body.name || '').trim();
-    if (!name) return res.status(400).json({ error: 'Name is required' });
-    const team = [...(project.team || [])];
-    if (!team.includes(name)) team.push(name);
-    const updated = await saveProject(project, { team });
-    res.json(serialize(updated));
+    const where = { projectId: project.id };
+    if (req.query.taskId) where.taskId = req.query.taskId;
+    else where.taskId = null;
+    const messages = await prisma.projectMessage.findMany({
+      where,
+      orderBy: { createdAt: 'asc' },
+    });
+    res.json(serialize(messages));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:id/messages', async (req, res) => {
+  try {
+    const project = await loadProject(req, req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const text = (req.body.text || '').trim();
+    if (!text) return res.status(400).json({ error: 'Message is required' });
+    const saved = await prisma.projectMessage.create({
+      data: {
+        projectId: project.id,
+        taskId: req.body.taskId || null,
+        userId: req.user.id,
+        userName: req.user.name,
+        text,
+      },
+    });
+    res.status(201).json(serialize(saved));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -137,11 +301,11 @@ router.post('/:id/team', async (req, res) => {
 
 router.delete('/:id/team/:name', async (req, res) => {
   try {
-    const project = await loadProject(req, req.params.id);
+    const project = await findOwnedProject(req.params.id, req.user.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const team = (project.team || []).filter((m) => m !== decodeURIComponent(req.params.name));
-    const updated = await saveProject(project, { team });
-    res.json(serialize(updated));
+    const full = await saveProject(project, { team }, req.user);
+    replyProject(res, full, req.user.id);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -161,8 +325,8 @@ router.post('/:id/tasks', async (req, res) => {
       assignee: req.body.assignee || '',
       subtasks: [],
     });
-    const updated = await saveProject(project, { tasks, progress: calcProgress(tasks) });
-    res.status(201).json(serialize(updated));
+    const full = await saveProject(project, { tasks, progress: calcProgress(tasks) }, req.user);
+    replyProject(res, full, req.user.id, 201);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -178,8 +342,8 @@ router.put('/:id/tasks/:taskId', async (req, res) => {
     if (req.body.text !== undefined) task.text = req.body.text;
     if (req.body.assignee !== undefined) task.assignee = req.body.assignee;
     if (req.body.done !== undefined) task.done = req.body.done;
-    const updated = await saveProject(project, { tasks, progress: calcProgress(tasks) });
-    res.json(serialize(updated));
+    const full = await saveProject(project, { tasks, progress: calcProgress(tasks) }, req.user);
+    replyProject(res, full, req.user.id);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -193,8 +357,8 @@ router.post('/:id/tasks/:taskId/toggle', async (req, res) => {
     const task = tasks.find((t) => t.id === req.params.taskId);
     if (!task) return res.status(404).json({ error: 'Task not found' });
     task.done = !task.done;
-    const updated = await saveProject(project, { tasks, progress: calcProgress(tasks) });
-    res.json(serialize(updated));
+    const full = await saveProject(project, { tasks, progress: calcProgress(tasks) }, req.user);
+    replyProject(res, full, req.user.id);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -205,8 +369,8 @@ router.delete('/:id/tasks/:taskId', async (req, res) => {
     const project = await loadProject(req, req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const tasks = getTasks(project).filter((t) => t.id !== req.params.taskId);
-    const updated = await saveProject(project, { tasks, progress: calcProgress(tasks) });
-    res.json(serialize(updated));
+    const full = await saveProject(project, { tasks, progress: calcProgress(tasks) }, req.user);
+    replyProject(res, full, req.user.id);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -228,8 +392,8 @@ router.post('/:id/tasks/:taskId/subtasks', async (req, res) => {
       done: false,
       assignee: req.body.assignee || '',
     });
-    const updated = await saveProject(project, { tasks, progress: calcProgress(tasks) });
-    res.status(201).json(serialize(updated));
+    const full = await saveProject(project, { tasks, progress: calcProgress(tasks) }, req.user);
+    replyProject(res, full, req.user.id, 201);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -245,8 +409,8 @@ router.post('/:id/tasks/:taskId/subtasks/:subId/toggle', async (req, res) => {
     const sub = (task.subtasks || []).find((s) => s.id === req.params.subId);
     if (!sub) return res.status(404).json({ error: 'Subtask not found' });
     sub.done = !sub.done;
-    const updated = await saveProject(project, { tasks, progress: calcProgress(tasks) });
-    res.json(serialize(updated));
+    const full = await saveProject(project, { tasks, progress: calcProgress(tasks) }, req.user);
+    replyProject(res, full, req.user.id);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -264,8 +428,8 @@ router.put('/:id/tasks/:taskId/subtasks/:subId', async (req, res) => {
     if (req.body.text !== undefined) sub.text = req.body.text;
     if (req.body.assignee !== undefined) sub.assignee = req.body.assignee;
     if (req.body.done !== undefined) sub.done = req.body.done;
-    const updated = await saveProject(project, { tasks, progress: calcProgress(tasks) });
-    res.json(serialize(updated));
+    const full = await saveProject(project, { tasks, progress: calcProgress(tasks) }, req.user);
+    replyProject(res, full, req.user.id);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -279,8 +443,8 @@ router.delete('/:id/tasks/:taskId/subtasks/:subId', async (req, res) => {
     const task = tasks.find((t) => t.id === req.params.taskId);
     if (!task) return res.status(404).json({ error: 'Task not found' });
     task.subtasks = (task.subtasks || []).filter((s) => s.id !== req.params.subId);
-    const updated = await saveProject(project, { tasks, progress: calcProgress(tasks) });
-    res.json(serialize(updated));
+    const full = await saveProject(project, { tasks, progress: calcProgress(tasks) }, req.user);
+    replyProject(res, full, req.user.id);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -300,8 +464,8 @@ router.post('/:id/tables', async (req, res) => {
     }));
     const dataTables = getDataTables(project);
     dataTables.push({ id: uuidv4(), name, columns: cols, rows: [] });
-    const updated = await saveProject(project, { dataTables });
-    res.status(201).json(serialize(updated));
+    const full = await saveProject(project, { dataTables }, req.user);
+    replyProject(res, full, req.user.id, 201);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -315,8 +479,8 @@ router.put('/:id/tables/:tableId', async (req, res) => {
     const table = getProjectTable({ dataTables }, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });
     if (req.body.name) table.name = req.body.name.trim();
-    const updated = await saveProject(project, { dataTables });
-    res.json(serialize(updated));
+    const full = await saveProject(project, { dataTables }, req.user);
+    replyProject(res, full, req.user.id);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -327,8 +491,8 @@ router.delete('/:id/tables/:tableId', async (req, res) => {
     const project = await loadProject(req, req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const dataTables = getDataTables(project).filter((t) => t.id !== req.params.tableId);
-    const updated = await saveProject(project, { dataTables });
-    res.json(serialize(updated));
+    const full = await saveProject(project, { dataTables }, req.user);
+    replyProject(res, full, req.user.id);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -343,8 +507,8 @@ router.post('/:id/tables/:tableId/rows', async (req, res) => {
     if (!table) return res.status(404).json({ error: 'Table not found' });
     const newRow = { id: uuidv4(), data: req.body.data || {} };
     table.rows.push(newRow);
-    await saveProject(project, { dataTables });
-    res.status(201).json(serialize(newRow));
+    await saveProject(project, { dataTables }, req.user);
+    res.status(201).json(serializeTablePart(newRow));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -360,8 +524,8 @@ router.put('/:id/tables/:tableId/rows/:rowId', async (req, res) => {
     const row = table.rows.find((r) => r.id === req.params.rowId);
     if (!row) return res.status(404).json({ error: 'Row not found' });
     row.data = req.body.data;
-    await saveProject(project, { dataTables });
-    res.json(serialize(row));
+    await saveProject(project, { dataTables }, req.user);
+    res.json(serializeTablePart(row));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -375,7 +539,7 @@ router.delete('/:id/tables/:tableId/rows/:rowId', async (req, res) => {
     const table = getProjectTable({ dataTables }, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });
     table.rows = table.rows.filter((r) => r.id !== req.params.rowId);
-    await saveProject(project, { dataTables });
+    await saveProject(project, { dataTables }, req.user);
     res.json({ message: 'Row deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -396,8 +560,8 @@ router.post('/:id/tables/:tableId/columns', async (req, res) => {
       options: req.body.options || [],
     };
     table.columns.push(newCol);
-    await saveProject(project, { dataTables });
-    res.status(201).json(serialize(newCol));
+    await saveProject(project, { dataTables }, req.user);
+    res.status(201).json(serializeTablePart(newCol));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -413,8 +577,8 @@ router.put('/:id/tables/:tableId/columns/:colId', async (req, res) => {
     const colIndex = table.columns.findIndex((c) => c.id === req.params.colId);
     if (colIndex === -1) return res.status(404).json({ error: 'Column not found' });
     table.columns[colIndex] = { ...table.columns[colIndex], ...req.body };
-    await saveProject(project, { dataTables });
-    res.json(serialize(table.columns[colIndex]));
+    await saveProject(project, { dataTables }, req.user);
+    res.json(serializeTablePart(table.columns[colIndex]));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -433,7 +597,7 @@ router.delete('/:id/tables/:tableId/columns/:colId', async (req, res) => {
       delete newData[req.params.colId];
       return { id: row.id, data: newData };
     });
-    await saveProject(project, { dataTables });
+    await saveProject(project, { dataTables }, req.user);
     res.json({ message: 'Column deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

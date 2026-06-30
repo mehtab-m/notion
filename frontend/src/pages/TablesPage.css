@@ -1,3 +1,9 @@
+.tables-page {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 .tables-page-subtitle {
   font-size: 13px;
   color: var(--text-muted);

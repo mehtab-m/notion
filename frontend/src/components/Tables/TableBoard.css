@@ -2,6 +2,8 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .table-board-loading {
@@ -149,6 +151,11 @@
   color: var(--accent-red);
   border-color: rgba(239, 68, 68, 0.4);
   background: rgba(239, 68, 68, 0.08);
+}
+
+.table-board-section-body {
+  min-width: 0;
+  overflow: hidden;
 }
 
 .table-board-section-body .dynamic-table-wrap {

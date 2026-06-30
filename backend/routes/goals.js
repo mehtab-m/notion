@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
-const { cleanBody } = require('../utils/body');
+const { cleanBody, prepareGoalData } = require('../utils/body');
 const { serialize } = require('../utils/serialize');
 
 router.get('/', async (req, res) => {
@@ -19,13 +19,9 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const body = cleanBody(req.body);
+    const data = prepareGoalData(req.body);
     const saved = await prisma.goal.create({
-      data: {
-        ...body,
-        milestones: body.milestones || [],
-        userId: req.user.id,
-      },
+      data: { ...data, userId: req.user.id },
     });
     res.status(201).json(serialize(saved));
   } catch (err) {
@@ -41,7 +37,7 @@ router.put('/:id', async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Goal not found' });
     const updated = await prisma.goal.update({
       where: { id: existing.id },
-      data: cleanBody(req.body),
+      data: prepareGoalData(req.body),
     });
     res.json(serialize(updated));
   } catch (err) {

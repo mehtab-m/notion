@@ -119,7 +119,7 @@ function ColMenu({ col, tableId, tableApi, onUpdated, onDeleted, onClose }) {
     if (!newName.trim()) return;
     setLoading(true);
     try {
-      await tableApi.updateColumn(tableId, col.id, { name: newName.trim() });
+      await tableApi.updateColumn(tableId, col.id || col._id, { name: newName.trim() });
       onUpdated({ ...col, name: newName.trim() });
       toast.success('Column renamed');
       onClose();
@@ -133,8 +133,8 @@ function ColMenu({ col, tableId, tableApi, onUpdated, onDeleted, onClose }) {
   const handleDelete = async () => {
     setLoading(true);
     try {
-      await tableApi.deleteColumn(tableId, col.id);
-      onDeleted(col.id);
+      await tableApi.deleteColumn(tableId, col.id || col._id);
+      onDeleted(col.id || col._id);
       toast.success('Column deleted');
       onClose();
     } catch {
@@ -310,6 +310,9 @@ function Cell({ col, value, tableId, rowId, onSave }) {
   );
 }
 
+const rid = (item) => item?.id || item?._id;
+const cid = (col) => col?.id || col?._id;
+
 export default function DynamicTable({ table, onTableChange, tableApi = defaultTableApi, hideName }) {
   const tableId = table._id || table.id;
   const [columns, setColumns] = useState(table.columns || []);
@@ -327,7 +330,8 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
     setAddingRow(true);
     try {
       const newRow = await tableApi.addRow(tableId, {});
-      setRows((prev) => [...prev, newRow]);
+      const normalized = { ...newRow, id: rid(newRow) };
+      setRows((prev) => [...prev, normalized]);
       onTableChange?.();
     } catch {
       toast.error('Failed to add row');
@@ -340,7 +344,7 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
     if (!window.confirm('Delete this row?')) return;
     try {
       await tableApi.deleteRow(tableId, rowId);
-      setRows((prev) => prev.filter((r) => r.id !== rowId));
+      setRows((prev) => prev.filter((r) => rid(r) !== rowId));
       toast.success('Row deleted');
       onTableChange?.();
     } catch {
@@ -349,24 +353,26 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
   };
 
   const handleCellSave = async (rowId, colId, value) => {
-    const row = rows.find((r) => r.id === rowId);
+    const row = rows.find((r) => rid(r) === rowId);
     if (!row) return;
     const newData = { ...row.data, [colId]: value };
     await tableApi.updateRow(tableId, rowId, newData);
-    setRows((prev) => prev.map((r) => r.id === rowId ? { ...r, data: newData } : r));
+    setRows((prev) => prev.map((r) => (rid(r) === rowId ? { ...r, data: newData } : r)));
   };
 
   const handleColAdded = (col) => {
-    setColumns((prev) => [...prev, col]);
+    const normalized = { ...col, id: cid(col) };
+    setColumns((prev) => [...prev, normalized]);
     if (onTableChange) onTableChange();
   };
 
   const handleColUpdated = (updatedCol) => {
-    setColumns((prev) => prev.map((c) => c.id === updatedCol.id ? updatedCol : c));
+    const id = cid(updatedCol);
+    setColumns((prev) => prev.map((c) => (cid(c) === id ? { ...updatedCol, id } : c)));
   };
 
   const handleColDeleted = (colId) => {
-    setColumns((prev) => prev.filter((c) => c.id !== colId));
+    setColumns((prev) => prev.filter((c) => cid(c) !== colId));
     setRows((prev) => prev.map((r) => {
       const newData = { ...r.data };
       delete newData[colId];
@@ -410,20 +416,21 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
               <tr>
                 <th className="dt-row-actions-th" />
                 {columns.map((col) => {
+                  const colId = cid(col);
                   const Icon = TYPE_ICONS[col.type] || Type;
                   return (
-                    <th key={col.id} className="dt-th">
+                    <th key={colId} className="dt-th">
                       <div className="dt-th-inner">
                         <Icon size={13} />
                         <span>{col.name}</span>
                         <button
                           className="col-menu-trigger"
-                          onClick={() => setOpenMenu(openMenu === col.id ? null : col.id)}
+                          onClick={() => setOpenMenu(openMenu === colId ? null : colId)}
                         >
                           <MoreHorizontal size={13} />
                         </button>
                       </div>
-                      {openMenu === col.id && (
+                      {openMenu === colId && (
                         <div className="col-menu-wrap">
                           <ColMenu
                             col={col}
@@ -448,12 +455,14 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => (
-                  <tr key={row.id} className="dt-row">
+                rows.map((row) => {
+                  const rowId = rid(row);
+                  return (
+                  <tr key={rowId} className="dt-row">
                     <td className="dt-row-delete-cell">
                       <button
                         className="dt-row-delete"
-                        onClick={() => handleDeleteRow(row.id)}
+                        onClick={() => handleDeleteRow(rowId)}
                         title="Delete row"
                       >
                         <Trash2 size={13} />
@@ -461,16 +470,17 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
                     </td>
                     {columns.map((col) => (
                       <Cell
-                        key={col.id}
+                        key={cid(col)}
                         col={col}
-                        value={row.data?.[col.id]}
+                        value={row.data?.[cid(col)]}
                         tableId={tableId}
-                        rowId={row.id}
-                        onSave={(colId, val) => handleCellSave(row.id, colId, val)}
+                        rowId={rowId}
+                        onSave={(colId, val) => handleCellSave(rowId, colId, val)}
                       />
                     ))}
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>

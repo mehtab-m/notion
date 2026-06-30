@@ -2,18 +2,20 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Calendar, Plus, Trash2, ChevronDown, ChevronRight,
-  Users, CheckSquare, Database, User,
+  Users, CheckSquare, Database, User, MessageSquare, Mail,
 } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 import {
   getProject, updateProject, deleteProject,
-  addTeamMember, removeTeamMember,
+  inviteProjectMember, removeProjectMember, acceptProjectInvite,
   addProjectTask, toggleProjectTask, deleteProjectTask,
   addProjectSubtask, toggleProjectSubtask, deleteProjectSubtask, updateProjectTask, updateProjectSubtask,
   addProjectTable, deleteProjectTable,
   addProjectTableRow, updateProjectTableRow, deleteProjectTableRow,
   addProjectTableColumn, updateProjectTableColumn, deleteProjectTableColumn,
+  getProjectMessages, sendProjectMessage,
 } from '../utils/api';
 import TableBoard from '../components/Tables/TableBoard';
 import './ProjectDetailPage.css';
@@ -62,9 +64,128 @@ const TABLE_TEMPLATES = [
   },
 ];
 
-function AssigneeSelect({ team, value, onChange }) {
+function TaskComments({ projectId, taskId }) {
+  const [messages, setMessages] = useState([]);
+  const [text, setText] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const data = await getProjectMessages(projectId, taskId);
+      setMessages(data);
+    } catch { /* silent */ }
+  }, [projectId, taskId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleSend = async () => {
+    if (!text.trim()) return;
+    try {
+      await sendProjectMessage(projectId, { text: text.trim(), taskId });
+      setText('');
+      load();
+    } catch {
+      toast.error('Failed to send');
+    }
+  };
+
   return (
-    <select className="assignee-select" value={value || ''} onChange={(e) => onChange(e.target.value)}>
+    <div className="pd-task-comments">
+      <div className="pd-comments-list">
+        {messages.length === 0 ? (
+          <p className="pd-comments-empty">No comments yet</p>
+        ) : (
+          messages.map((m) => (
+            <div key={m._id} className="pd-comment">
+              <strong>{m.userName}</strong>
+              <span>{m.text}</span>
+              <time>{format(new Date(m.createdAt), 'MMM d, h:mm a')}</time>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="pd-comment-input">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Comment on this task..."
+          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+        />
+        <button type="button" className="btn btn-secondary btn-sm" onClick={handleSend}>Send</button>
+      </div>
+    </div>
+  );
+}
+
+function ProjectChat({ projectId }) {
+  const [messages, setMessages] = useState([]);
+  const [text, setText] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const data = await getProjectMessages(projectId);
+      setMessages(data);
+    } catch { /* silent */ }
+  }, [projectId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleSend = async () => {
+    if (!text.trim()) return;
+    try {
+      await sendProjectMessage(projectId, { text: text.trim() });
+      setText('');
+      load();
+    } catch {
+      toast.error('Failed to send');
+    }
+  };
+
+  return (
+    <div className="pd-chat-panel">
+      <div className="pd-chat-messages">
+        {messages.length === 0 ? (
+          <div className="pd-empty"><MessageSquare size={36} strokeWidth={1} /><p>Start the project conversation</p></div>
+        ) : (
+          messages.map((m) => (
+            <div key={m._id} className="pd-chat-bubble">
+              <div className="pd-chat-bubble-head">
+                <span className="pd-chat-author">{m.userName}</span>
+                <time>{format(new Date(m.createdAt), 'MMM d, h:mm a')}</time>
+              </div>
+              <p>{m.text}</p>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="pd-chat-compose">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Message the team..."
+          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+        />
+        <button type="button" className="btn btn-primary btn-sm" onClick={handleSend}>Send</button>
+      </div>
+    </div>
+  );
+}
+
+function memberStatusLabel(status) {
+  if (status === 'accepted') return 'Active';
+  if (status === 'pending') return 'Pending';
+  if (status === 'declined') return 'Declined';
+  return status;
+}
+
+function memberStatusClass(status) {
+  if (status === 'accepted') return 'ms-accepted';
+  if (status === 'pending') return 'ms-pending';
+  return 'ms-declined';
+}
+function AssigneeSelect({ team, value, onChange, disabled }) {
+  if (!team.length) return null;
+  return (
+    <select className="assignee-select" value={value || ''} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
       <option value="">Unassigned</option>
       {team.map((m) => (
         <option key={m} value={m}>{m}</option>
@@ -166,7 +287,9 @@ function TaskItem({ task, team, projectId, onUpdate }) {
       )}
 
       {expanded && (
-        <div className="pd-subtask-add">
+        <>
+          <TaskComments projectId={projectId} taskId={task.id} />
+          <div className="pd-subtask-add">
           <input
             value={subInput}
             onChange={(e) => setSubInput(e.target.value)}
@@ -176,6 +299,7 @@ function TaskItem({ task, team, projectId, onUpdate }) {
           <AssigneeSelect team={team} value={subAssignee} onChange={setSubAssignee} />
           <button className="btn btn-secondary btn-sm" onClick={handleAddSub}><Plus size={12} /></button>
         </div>
+        </>
       )}
     </div>
   );
@@ -184,12 +308,13 @@ function TaskItem({ task, team, projectId, onUpdate }) {
 export default function ProjectDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('tasks');
   const [taskInput, setTaskInput] = useState('');
   const [taskAssignee, setTaskAssignee] = useState('');
-  const [teamInput, setTeamInput] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
   const [tableInput, setTableInput] = useState('');
   const [highlightTableId, setHighlightTableId] = useState(null);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -209,7 +334,10 @@ export default function ProjectDetailPage() {
 
   useEffect(() => { fetchProject(); }, [fetchProject]);
 
-  const team = project?.team?.length ? project.team : (project?.assignees || []);
+  const team = project?.team || [];
+  const members = project?.members || [];
+  const isOwner = project?.isOwner !== false;
+  const myPending = members.find((m) => m.email === user?.email && m.status === 'pending');
 
   const saveField = async (patch) => {
     try {
@@ -231,13 +359,27 @@ export default function ProjectDetailPage() {
     } catch { toast.error('Failed'); }
   };
 
-  const handleAddTeam = async () => {
-    if (!teamInput.trim()) return;
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) return;
     try {
-      const updated = await addTeamMember(id, teamInput.trim());
+      const updated = await inviteProjectMember(id, inviteEmail.trim());
       setProject(updated);
-      setTeamInput('');
-    } catch { toast.error('Failed'); }
+      setInviteEmail('');
+      toast.success('Invitation sent');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to invite');
+    }
+  };
+
+  const handleAcceptMyInvite = async () => {
+    if (!myPending) return;
+    try {
+      const updated = await acceptProjectInvite(myPending._id);
+      setProject(updated);
+      toast.success('You joined the project');
+    } catch {
+      toast.error('Failed to accept');
+    }
   };
 
   const handleAddTable = async (templateOrName) => {
@@ -358,6 +500,7 @@ export default function ProjectDetailPage() {
             toast.success('Deleted');
             navigate('/projects');
           }}
+          style={{ display: isOwner ? undefined : 'none' }}
         >
           <Trash2 size={13} /> Delete
         </button>
@@ -367,7 +510,8 @@ export default function ProjectDetailPage() {
         {[
           { id: 'tasks', icon: CheckSquare, label: `Tasks (${taskCount})` },
           { id: 'tables', icon: Database, label: `Data Tables (${(project.dataTables || []).length})` },
-          { id: 'team', icon: Users, label: `Team (${team.length})` },
+          { id: 'team', icon: Users, label: `Team (${members.length})` },
+          { id: 'chat', icon: MessageSquare, label: 'Chat' },
         ].map(({ id: tabId, icon: Icon, label }) => (
           <button
             key={tabId}
@@ -459,44 +603,80 @@ export default function ProjectDetailPage() {
 
         {tab === 'team' && (
           <div className="pd-team-panel">
-            <p className="pd-hint">Add team members here, then assign tasks and subtasks to them.</p>
-            <div className="pd-team-add">
-              <input
-                value={teamInput}
-                onChange={(e) => setTeamInput(e.target.value)}
-                placeholder="Team member name..."
-                onKeyDown={(e) => e.key === 'Enter' && handleAddTeam()}
-              />
-              <button className="btn btn-primary btn-sm" onClick={handleAddTeam}>
-                <Plus size={14} /> Add Member
-              </button>
-            </div>
-            {team.length === 0 ? (
+            {myPending && (
+              <div className="pd-invite-banner">
+                <p>You have been invited to this project.</p>
+                <button className="btn btn-primary btn-sm" onClick={handleAcceptMyInvite}>Accept invitation</button>
+              </div>
+            )}
+            {isOwner && (
+              <>
+                <p className="pd-hint">Invite verified My Notion members by Gmail. They must accept before you can assign tasks.</p>
+                <div className="pd-team-add">
+                  <Mail size={16} className="pd-input-icon" />
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="teammate@gmail.com"
+                    onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
+                  />
+                  <button className="btn btn-primary btn-sm" onClick={handleInvite}>
+                    <Plus size={14} /> Send Invite
+                  </button>
+                </div>
+              </>
+            )}
+            {members.length === 0 ? (
               <div className="pd-empty">
                 <User size={36} strokeWidth={1} />
-                <p>No team members yet. Add yourself or teammates to assign tasks.</p>
+                <p>No team members yet. Invite collaborators by email.</p>
               </div>
             ) : (
-              <ul className="pd-team-list">
-                {team.map((member) => (
-                  <li key={member} className="pd-team-member">
-                    <span className="pd-team-avatar">{member.charAt(0).toUpperCase()}</span>
-                    <span>{member}</span>
-                    <button
-                      className="pd-icon-btn danger"
-                      onClick={async () => {
-                        const updated = await removeTeamMember(id, member);
-                        setProject(updated);
-                      }}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <div className="pd-members-table-wrap">
+                <table className="pd-members-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Status</th>
+                      <th>Invited</th>
+                      {isOwner && <th />}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {members.map((m) => (
+                      <tr key={m._id}>
+                        <td>
+                          <span className="pd-team-avatar-inline">{(m.name || m.email).charAt(0).toUpperCase()}</span>
+                          {m.name || '—'}
+                        </td>
+                        <td>{m.email}</td>
+                        <td><span className={`pd-member-status ${memberStatusClass(m.status)}`}>{memberStatusLabel(m.status)}</span></td>
+                        <td>{m.createdAt ? format(new Date(m.createdAt), 'MMM d, yyyy') : '—'}</td>
+                        {isOwner && (
+                          <td>
+                            <button
+                              className="pd-icon-btn danger"
+                              onClick={async () => {
+                                const updated = await removeProjectMember(id, m._id);
+                                setProject(updated);
+                              }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}
+
+        {tab === 'chat' && <ProjectChat projectId={id} />}
       </div>
     </div>
   );

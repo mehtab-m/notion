@@ -12,4 +12,20 @@ function num(val, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-module.exports = { cleanBody, num };
+function parseDate(val) {
+  if (val === '' || val == null) return undefined;
+  const d = new Date(val);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+function prepareGoalData(body) {
+  const data = cleanBody(body);
+  const targetDate = parseDate(data.targetDate);
+  if (targetDate) data.targetDate = targetDate;
+  else delete data.targetDate;
+  if (data.progress != null) data.progress = num(data.progress, 0);
+  if (!data.milestones) data.milestones = [];
+  return data;
+}
+
+module.exports = { cleanBody, num, parseDate, prepareGoalData };
