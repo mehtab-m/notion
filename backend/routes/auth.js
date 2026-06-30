@@ -56,10 +56,17 @@ router.post('/signup', async (req, res) => {
       });
     }
 
-    await sendVerificationEmail(normalizedEmail, name.trim(), code);
-    res.status(201).json({ message: 'Confirmation code sent to your email', email: normalizedEmail });
+    res.status(201).json({
+      message: 'Account created. Check your email for the confirmation code.',
+      email: normalizedEmail,
+    });
+
+    sendVerificationEmail(normalizedEmail, name.trim(), code).then((result) => {
+      if (!result.sent) console.warn('Signup email not delivered:', result.reason);
+    });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error('Signup error:', err);
+    res.status(400).json({ error: err.message || 'Signup failed' });
   }
 });
 
@@ -110,9 +117,13 @@ router.post('/resend', async (req, res) => {
         verificationExpires: new Date(Date.now() + 15 * 60 * 1000),
       },
     });
-    await sendVerificationEmail(user.email, user.name, code);
     res.json({ message: 'New code sent' });
+
+    sendVerificationEmail(user.email, user.name, code).then((result) => {
+      if (!result.sent) console.warn('Resend email not delivered:', result.reason);
+    });
   } catch (err) {
+    console.error('Resend error:', err);
     res.status(400).json({ error: err.message });
   }
 });

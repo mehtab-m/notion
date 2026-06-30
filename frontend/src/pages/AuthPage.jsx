@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Grid2x2, Mail, Lock, User, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -9,41 +9,70 @@ export default function AuthPage() {
   const { login: authLogin } = useAuth();
   const [mode, setMode] = useState('login'); // login | signup | verify
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState('');
   const [form, setForm] = useState({ name: '', email: '', password: '', code: '' });
+  const loadingTimers = useRef([]);
 
   const set = (field) => (e) => setForm((p) => ({ ...p, [field]: e.target.value }));
 
+  const startLoading = (initialMsg) => {
+    loadingTimers.current.forEach(clearTimeout);
+    loadingTimers.current = [];
+    setLoading(true);
+    setLoadingMsg(initialMsg);
+    loadingTimers.current.push(
+      setTimeout(() => setLoadingMsg('Connecting to server…'), 4000),
+      setTimeout(() => setLoadingMsg('Server may be waking up — first request can take up to 60s…'), 12000),
+      setTimeout(() => setLoadingMsg('Still working, almost there…'), 35000),
+    );
+  };
+
+  const stopLoading = () => {
+    loadingTimers.current.forEach(clearTimeout);
+    loadingTimers.current = [];
+    setLoading(false);
+    setLoadingMsg('');
+  };
+
+  useEffect(() => () => loadingTimers.current.forEach(clearTimeout), []);
+
+  const authError = (err, fallback) => {
+    if (err.code === 'ECONNABORTED') return 'Request timed out. The server may be starting — try again in a moment.';
+    if (!err.response) return 'Cannot reach server. Check your connection or try again shortly.';
+    return err.response?.data?.error || fallback;
+  };
+
   const handleSignup = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    startLoading('Creating account…');
     try {
       await signup({ name: form.name, email: form.email, password: form.password });
-      toast.success('Check your email for the confirmation code');
+      toast.success('Account created — check your email for the code');
       setMode('verify');
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Signup failed');
+      toast.error(authError(err, 'Signup failed'));
     } finally {
-      setLoading(false);
+      stopLoading();
     }
   };
 
   const handleVerify = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    startLoading('Verifying…');
     try {
       const { token, user } = await verifyEmail({ email: form.email, code: form.code });
       authLogin(token, user);
       toast.success('Welcome!');
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Verification failed');
+      toast.error(authError(err, 'Verification failed'));
     } finally {
-      setLoading(false);
+      stopLoading();
     }
   };
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    startLoading('Logging in…');
     try {
       const { token, user } = await login({ email: form.email, password: form.password });
       authLogin(token, user);
@@ -54,10 +83,10 @@ export default function AuthPage() {
         toast.error('Please verify your email first');
         setMode('verify');
       } else {
-        toast.error(data?.error || 'Login failed');
+        toast.error(authError(err, 'Login failed'));
       }
     } finally {
-      setLoading(false);
+      stopLoading();
     }
   };
 
@@ -99,8 +128,9 @@ export default function AuthPage() {
               <input type="password" placeholder="Password (min 6 chars)" value={form.password} onChange={set('password')} minLength={6} required />
             </div>
             <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
-              {loading ? 'Creating...' : 'Create account'}
+              {loading ? loadingMsg || 'Creating…' : 'Create account'}
             </button>
+            {loading && <p className="auth-loading-hint">{loadingMsg}</p>}
           </form>
         )}
 
@@ -116,8 +146,9 @@ export default function AuthPage() {
               <input placeholder="Confirmation code" value={form.code} onChange={set('code')} maxLength={6} required autoFocus />
             </div>
             <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
-              {loading ? 'Verifying...' : 'Verify & continue'}
+              {loading ? loadingMsg || 'Verifying…' : 'Verify & continue'}
             </button>
+            {loading && <p className="auth-loading-hint">{loadingMsg}</p>}
             <button type="button" className="auth-link-btn" onClick={handleResend}>Resend code</button>
           </form>
         )}
@@ -133,8 +164,9 @@ export default function AuthPage() {
               <input type="password" placeholder="Password" value={form.password} onChange={set('password')} required />
             </div>
             <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
-              {loading ? 'Logging in...' : 'Log in'}
+              {loading ? loadingMsg || 'Logging in…' : 'Log in'}
             </button>
+            {loading && <p className="auth-loading-hint">{loadingMsg}</p>}
             <p className="auth-footer-note">Session stays active for 7 days</p>
           </form>
         )}

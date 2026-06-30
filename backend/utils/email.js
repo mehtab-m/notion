@@ -1,5 +1,7 @@
 const nodemailer = require('nodemailer');
 
+const EMAIL_TIMEOUT_MS = 12000;
+
 function getTransporter() {
   if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
     return null;
@@ -10,20 +12,34 @@ function getTransporter() {
       user: process.env.GMAIL_USER,
       pass: process.env.GMAIL_APP_PASSWORD,
     },
+    connectionTimeout: EMAIL_TIMEOUT_MS,
+    greetingTimeout: EMAIL_TIMEOUT_MS,
+    socketTimeout: EMAIL_TIMEOUT_MS,
   });
+}
+
+function withTimeout(promise, ms = EMAIL_TIMEOUT_MS) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Email delivery timed out')), ms);
+    }),
+  ]);
 }
 
 async function sendVerificationEmail(to, name, code) {
   const transporter = getTransporter();
   if (!transporter) {
     console.warn('Gmail not configured — verification code:', code);
-    return;
+    return { sent: false, reason: 'not_configured' };
   }
-  await transporter.sendMail({
-    from: `"My Notion" <${process.env.GMAIL_USER}>`,
-    to,
-    subject: 'Your My Notion confirmation code',
-    html: `
+  try {
+    await withTimeout(
+      transporter.sendMail({
+        from: `"My Notion" <${process.env.GMAIL_USER}>`,
+        to,
+        subject: 'Your My Notion confirmation code',
+        html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2>Welcome, ${name}!</h2>
         <p>Your confirmation code is:</p>
@@ -32,7 +48,13 @@ async function sendVerificationEmail(to, name, code) {
         <p style="color:#888;font-size:12px">If you didn't sign up, ignore this email.</p>
       </div>
     `,
-  });
+      })
+    );
+    return { sent: true };
+  } catch (err) {
+    console.error('Verification email failed:', err.message);
+    return { sent: false, reason: err.message };
+  }
 }
 
 async function sendProjectInviteEmail(to, inviterName, projectTitle, projectId) {
@@ -41,13 +63,15 @@ async function sendProjectInviteEmail(to, inviterName, projectTitle, projectId) 
   const link = `${frontend}/projects/${projectId}?invite=pending`;
   if (!transporter) {
     console.warn('Gmail not configured — project invite link:', link);
-    return;
+    return { sent: false };
   }
-  await transporter.sendMail({
-    from: `"My Notion" <${process.env.GMAIL_USER}>`,
-    to,
-    subject: `${inviterName} invited you to join "${projectTitle}"`,
-    html: `
+  try {
+    await withTimeout(
+      transporter.sendMail({
+        from: `"My Notion" <${process.env.GMAIL_USER}>`,
+        to,
+        subject: `${inviterName} invited you to join "${projectTitle}"`,
+        html: `
       <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
         <h2>Project invitation</h2>
         <p><strong>${inviterName}</strong> invited you to collaborate on <strong>${projectTitle}</strong> in My Notion.</p>
@@ -56,7 +80,13 @@ async function sendProjectInviteEmail(to, inviterName, projectTitle, projectId) 
         <p style="color:#888;font-size:12px">You must be a registered My Notion member to join.</p>
       </div>
     `,
-  });
+      })
+    );
+    return { sent: true };
+  } catch (err) {
+    console.error('Project invite email failed:', err.message);
+    return { sent: false };
+  }
 }
 
 module.exports = { sendVerificationEmail, sendProjectInviteEmail };
