@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 export default function useApi(fetchFn) {
+  const { user } = useAuth();
+  const userId = user?._id;
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const fetch = useCallback(async () => {
+    if (!userId) return;
     setLoading(true);
     setError(null);
     try {
@@ -16,7 +20,7 @@ export default function useApi(fetchFn) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchFn, userId]);
 
   useEffect(() => {
     fetch();

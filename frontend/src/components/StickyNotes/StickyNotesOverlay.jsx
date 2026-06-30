@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Pin, X, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getStickyNotes, createStickyNote, updateStickyNote, deleteStickyNote } from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 import './StickyNotesOverlay.css';
 
 const COLORS = ['yellow', 'pink', 'blue', 'green', 'purple', 'orange'];
@@ -115,18 +116,23 @@ function FloatingSticky({ note, onUpdate, onDelete, zIndex, onFocus }) {
 }
 
 export default function StickyNotesOverlay() {
+  const { user } = useAuth();
   const [notes, setNotes] = useState([]);
   const [topZ, setTopZ] = useState({});
   const zCounter = useRef(200);
 
   const fetchNotes = useCallback(async () => {
+    if (!user?._id) {
+      setNotes([]);
+      return;
+    }
     try {
       const data = await getStickyNotes();
       setNotes(data);
     } catch {
-      /* silent */
+      setNotes([]);
     }
-  }, []);
+  }, [user?._id]);
 
   useEffect(() => { fetchNotes(); }, [fetchNotes]);
 

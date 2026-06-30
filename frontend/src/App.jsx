@@ -76,7 +76,7 @@ function AppShell() {
 }
 
 export default function App() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
     return (
@@ -95,5 +95,5 @@ export default function App() {
     );
   }
 
-  return <AppShell />;
+  return <AppShell key={user._id} />;
 }

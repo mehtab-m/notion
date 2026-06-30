@@ -1,21 +1,23 @@
-const { Resend } = require('resend');
+const brevo = require('@getbrevo/brevo');
 
 const EMAIL_TIMEOUT_MS = 12000;
 
-let resendClient = null;
+let emailApi = null;
 
 function getClient() {
-  if (!process.env.RESEND_API_KEY) return null;
-  if (!resendClient) {
-    resendClient = new Resend(process.env.RESEND_API_KEY);
+  if (!process.env.BREVO_API_KEY) return null;
+  if (!emailApi) {
+    emailApi = new brevo.TransactionalEmailsApi();
+    emailApi.setApiKey(
+      brevo.TransactionalEmailsApiApiKeys.apiKey,
+      process.env.BREVO_API_KEY
+    );
   }
-  return resendClient;
+  return emailApi;
 }
 
-function getFrom() {
-  const from = process.env.RESEND_FROM_EMAIL?.trim();
-  if (!from) return null;
-  return `My Notion <${from}>`;
+function getFromEmail() {
+  return process.env.BREVO_FROM_EMAIL?.trim() || null;
 }
 
 function withTimeout(promise, ms = EMAIL_TIMEOUT_MS) {
@@ -27,38 +29,39 @@ function withTimeout(promise, ms = EMAIL_TIMEOUT_MS) {
   ]);
 }
 
+function getErrorMessage(err) {
+  if (err?.body?.message) return err.body.message;
+  if (typeof err?.body === 'string') return err.body;
+  return err?.message || 'Unknown error';
+}
+
 async function sendEmail({ to, subject, html }) {
   const client = getClient();
-  const from = getFrom();
+  const fromEmail = getFromEmail();
 
   if (!client) {
-    console.warn('Resend not configured — email not sent to', to);
+    console.warn('Brevo not configured — email not sent to', to);
     return { sent: false, reason: 'not_configured' };
   }
-  if (!from) {
-    console.warn('RESEND_FROM_EMAIL not set — email not sent');
+  if (!fromEmail) {
+    console.warn('BREVO_FROM_EMAIL not set — email not sent');
     return { sent: false, reason: 'from_not_configured' };
   }
 
   try {
-    const { error } = await withTimeout(
-      client.emails.send({
-        from,
-        to: [to],
+    await withTimeout(
+      client.sendTransacEmail({
         subject,
-        html,
+        htmlContent: html,
+        sender: { name: 'My Notion', email: fromEmail },
+        to: [{ email: to }],
       })
     );
-
-    if (error) {
-      console.error('Resend email failed:', error.message);
-      return { sent: false, reason: error.message };
-    }
-
     return { sent: true };
   } catch (err) {
-    console.error('Resend email failed:', err.message);
-    return { sent: false, reason: err.message };
+    const msg = getErrorMessage(err);
+    console.error('Brevo email failed:', msg);
+    return { sent: false, reason: msg };
   }
 }
 

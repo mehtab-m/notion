@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
+const { accessibleProjectsWhere } = require('../utils/projectAccess');
 const { serialize } = require('../utils/serialize');
 
 router.get('/stats', async (req, res) => {
@@ -11,7 +12,7 @@ router.get('/stats', async (req, res) => {
       prisma.book.findMany({ where: filter }),
       prisma.goal.findMany({ where: filter }),
       prisma.habit.findMany({ where: filter }),
-      prisma.project.findMany({ where: filter }),
+      prisma.project.findMany({ where: accessibleProjectsWhere(req.user) }),
     ]);
 
     const bookProgress = books.map((b) => ({

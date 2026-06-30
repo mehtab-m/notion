@@ -1,22 +1,20 @@
 const prisma = require('../lib/prisma');
 
+/** Projects the user owns or has accepted an invite to */
+function accessibleProjectsWhere(user) {
+  return {
+    OR: [
+      { userId: user.id },
+      { members: { some: { userId: user.id, status: 'accepted' } } },
+    ],
+  };
+}
+
 async function findAccessibleProject(projectId, user) {
   return prisma.project.findFirst({
     where: {
       id: projectId,
-      OR: [
-        { userId: user.id },
-        {
-          members: {
-            some: {
-              OR: [
-                { userId: user.id, status: 'accepted' },
-                { email: user.email, status: { in: ['pending', 'accepted'] } },
-              ],
-            },
-          },
-        },
-      ],
+      ...accessibleProjectsWhere(user),
     },
     include: {
       members: { orderBy: { createdAt: 'asc' } },
@@ -43,4 +41,9 @@ function acceptedAssignees(project) {
   return [...new Set(names)];
 }
 
-module.exports = { findAccessibleProject, findOwnedProject, acceptedAssignees };
+module.exports = {
+  accessibleProjectsWhere,
+  findAccessibleProject,
+  findOwnedProject,
+  acceptedAssignees,
+};

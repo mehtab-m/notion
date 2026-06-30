@@ -5,7 +5,7 @@ const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
 const { cleanBody } = require('../utils/body');
 const { serialize, serializeTablePart } = require('../utils/serialize');
-const { findAccessibleProject, findOwnedProject, acceptedAssignees } = require('../utils/projectAccess');
+const { findAccessibleProject, findOwnedProject, acceptedAssignees, accessibleProjectsWhere } = require('../utils/projectAccess');
 const { sendProjectInviteEmail } = require('../utils/email');
 
 function calcProgress(tasks) {
@@ -131,12 +131,7 @@ router.post('/invitations/:memberId/decline', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const projects = await prisma.project.findMany({
-      where: {
-        OR: [
-          { userId: req.user.id },
-          { members: { some: { userId: req.user.id, status: 'accepted' } } },
-        ],
-      },
+      where: accessibleProjectsWhere(req.user),
       include: { members: true, user: { select: { id: true, name: true, email: true } } },
       orderBy: { updatedAt: 'desc' },
     });

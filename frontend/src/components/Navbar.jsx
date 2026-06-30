@@ -35,7 +35,12 @@ export default function Navbar({ title, onMenuClick }) {
       </div>
 
       <div className="navbar-right">
-        {user && <span className="navbar-user">{user.name}</span>}
+        {user && (
+          <div className="navbar-user-info" title={user.email}>
+            <span className="navbar-user">{user.name}</span>
+            <span className="navbar-user-email">{user.email}</span>
+          </div>
+        )}
         <span className="navbar-greeting">{getGreeting()} 👋</span>
 
         <button

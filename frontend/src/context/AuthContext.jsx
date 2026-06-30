@@ -11,6 +11,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     setUser(null);
+    window.location.href = '/';
   }, []);
 
   const login = useCallback((token, userData) => {
