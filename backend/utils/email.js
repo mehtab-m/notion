@@ -1,21 +1,21 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
 const EMAIL_TIMEOUT_MS = 12000;
 
-function getTransporter() {
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-    return null;
+let resendClient = null;
+
+function getClient() {
+  if (!process.env.RESEND_API_KEY) return null;
+  if (!resendClient) {
+    resendClient = new Resend(process.env.RESEND_API_KEY);
   }
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
-    connectionTimeout: EMAIL_TIMEOUT_MS,
-    greetingTimeout: EMAIL_TIMEOUT_MS,
-    socketTimeout: EMAIL_TIMEOUT_MS,
-  });
+  return resendClient;
+}
+
+function getFrom() {
+  const from = process.env.RESEND_FROM_EMAIL?.trim();
+  if (!from) return null;
+  return `My Notion <${from}>`;
 }
 
 function withTimeout(promise, ms = EMAIL_TIMEOUT_MS) {
@@ -27,19 +27,46 @@ function withTimeout(promise, ms = EMAIL_TIMEOUT_MS) {
   ]);
 }
 
-async function sendVerificationEmail(to, name, code) {
-  const transporter = getTransporter();
-  if (!transporter) {
-    console.warn('Gmail not configured — verification code:', code);
+async function sendEmail({ to, subject, html }) {
+  const client = getClient();
+  const from = getFrom();
+
+  if (!client) {
+    console.warn('Resend not configured — email not sent to', to);
     return { sent: false, reason: 'not_configured' };
   }
+  if (!from) {
+    console.warn('RESEND_FROM_EMAIL not set — email not sent');
+    return { sent: false, reason: 'from_not_configured' };
+  }
+
   try {
-    await withTimeout(
-      transporter.sendMail({
-        from: `"My Notion" <${process.env.GMAIL_USER}>`,
-        to,
-        subject: 'Your My Notion confirmation code',
-        html: `
+    const { error } = await withTimeout(
+      client.emails.send({
+        from,
+        to: [to],
+        subject,
+        html,
+      })
+    );
+
+    if (error) {
+      console.error('Resend email failed:', error.message);
+      return { sent: false, reason: error.message };
+    }
+
+    return { sent: true };
+  } catch (err) {
+    console.error('Resend email failed:', err.message);
+    return { sent: false, reason: err.message };
+  }
+}
+
+async function sendVerificationEmail(to, name, code) {
+  return sendEmail({
+    to,
+    subject: 'Your My Notion confirmation code',
+    html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2>Welcome, ${name}!</h2>
         <p>Your confirmation code is:</p>
@@ -48,30 +75,16 @@ async function sendVerificationEmail(to, name, code) {
         <p style="color:#888;font-size:12px">If you didn't sign up, ignore this email.</p>
       </div>
     `,
-      })
-    );
-    return { sent: true };
-  } catch (err) {
-    console.error('Verification email failed:', err.message);
-    return { sent: false, reason: err.message };
-  }
+  });
 }
 
 async function sendProjectInviteEmail(to, inviterName, projectTitle, projectId) {
-  const transporter = getTransporter();
   const frontend = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
   const link = `${frontend}/projects/${projectId}?invite=pending`;
-  if (!transporter) {
-    console.warn('Gmail not configured — project invite link:', link);
-    return { sent: false };
-  }
-  try {
-    await withTimeout(
-      transporter.sendMail({
-        from: `"My Notion" <${process.env.GMAIL_USER}>`,
-        to,
-        subject: `${inviterName} invited you to join "${projectTitle}"`,
-        html: `
+  return sendEmail({
+    to,
+    subject: `${inviterName} invited you to join "${projectTitle}"`,
+    html: `
       <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
         <h2>Project invitation</h2>
         <p><strong>${inviterName}</strong> invited you to collaborate on <strong>${projectTitle}</strong> in My Notion.</p>
@@ -80,13 +93,7 @@ async function sendProjectInviteEmail(to, inviterName, projectTitle, projectId) 
         <p style="color:#888;font-size:12px">You must be a registered My Notion member to join.</p>
       </div>
     `,
-      })
-    );
-    return { sent: true };
-  } catch (err) {
-    console.error('Project invite email failed:', err.message);
-    return { sent: false };
-  }
+  });
 }
 
 module.exports = { sendVerificationEmail, sendProjectInviteEmail };
