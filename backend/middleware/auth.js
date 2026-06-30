@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const prisma = require('../lib/prisma');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 const JWT_EXPIRES = '7d';
@@ -15,7 +15,10 @@ async function authMiddleware(req, res, next) {
   }
   try {
     const decoded = jwt.verify(header.slice(7), JWT_SECRET);
-    const user = await User.findById(decoded.userId).select('-password');
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { id: true, name: true, email: true, isVerified: true },
+    });
     if (!user) return res.status(401).json({ error: 'User not found' });
     if (!user.isVerified) return res.status(403).json({ error: 'Email not verified' });
     req.user = user;

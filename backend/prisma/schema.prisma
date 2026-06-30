@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String    @id @default(cuid())
+  name                String
+  email               String    @unique
+  password            String
+  isVerified          Boolean   @default(false)
+  verificationCode    String?
+  verificationExpires DateTime?
+  resetCode           String?
+  resetExpires        DateTime?
+  createdAt           DateTime  @default(now())
+
+  projects    Project[]
+  books       Book[]
+  notes       Note[]
+  shows       Show[]
+  tables      Spreadsheet[]
+  habits      Habit[]
+  goals       Goal[]
+  stickyNotes StickyNote[]
+}
+
+model Project {
+  id          String    @id @default(cuid())
+  title       String
+  description String    @default("")
+  status      String    @default("active")
+  priority    String    @default("medium")
+  progress    Int       @default(0)
+  dueDate     DateTime?
+  tags        String[]  @default([])
+  tasks       Json      @default("[]")
+  dataTables  Json      @default("[]")
+  team        String[]  @default([])
+  assignees   String[]  @default([])
+  color       String    @default("")
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Book {
+  id          String    @id @default(cuid())
+  title       String
+  author      String
+  status      String    @default("want-to-read")
+  currentPage Int       @default(0)
+  totalPages  Int       @default(0)
+  rating      Float     @default(0)
+  genre       String?
+  notes       String?
+  coverImage  String?
+  notebookId  String?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Note {
+  id         String   @id @default(cuid())
+  title      String
+  content    String   @default("")
+  folder     String   @default("General")
+  tags       String[] @default([])
+  pinned     Boolean  @default(false)
+  color      String   @default("")
+  isNotebook Boolean  @default(false)
+  parentId   String?
+  notebookId String?
+  bookId     String?
+  blocks     Json     @default("[]")
+  order      Int      @default(0)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+  @@index([notebookId])
+}
+
+model Show {
+  id             String   @id @default(cuid())
+  title          String
+  platform       String   @default("Other")
+  status         String   @default("want-to-watch")
+  currentSeason  Int      @default(1)
+  currentEpisode Int      @default(0)
+  totalSeasons   Int      @default(1)
+  rating         Float    @default(0)
+  genre          String?
+  notes          String?
+  posterImage    String?
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Spreadsheet {
+  id        String   @id @default(cuid())
+  name      String
+  columns   Json     @default("[]")
+  rows      Json     @default("[]")
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("tables")
+}
+
+model Habit {
+  id             String   @id @default(cuid())
+  name           String
+  description    String   @default("")
+  icon           String   @default("✅")
+  color          String   @default("var(--accent)")
+  frequency      String   @default("daily")
+  completedDates String[] @default([])
+  streak         Int      @default(0)
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Goal {
+  id          String    @id @default(cuid())
+  title       String
+  description String    @default("")
+  category    String    @default("personal")
+  status      String    @default("not-started")
+  targetDate  DateTime?
+  progress    Int       @default(0)
+  milestones  Json      @default("[]")
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model StickyNote {
+  id        String   @id @default(cuid())
+  content   String   @default("")
+  color     String   @default("yellow")
+  pinned    Boolean  @default(false)
+  posX      Float    @default(0)
+  posY      Float    @default(0)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}

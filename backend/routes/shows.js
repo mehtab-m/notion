@@ -1,13 +1,28 @@
 const express = require('express');
 const router = express.Router();
-const Show = require('../models/Show');
+const prisma = require('../lib/prisma');
 const upload = require('../middleware/upload');
 const { owned } = require('../utils/scope');
+const { cleanBody, num } = require('../utils/body');
+const { serialize } = require('../utils/serialize');
+
+function showData(body, file) {
+  const data = cleanBody(body);
+  if (file) data.posterImage = '/uploads/' + file.filename;
+  if (data.currentSeason != null) data.currentSeason = num(data.currentSeason, 1);
+  if (data.currentEpisode != null) data.currentEpisode = num(data.currentEpisode, 0);
+  if (data.totalSeasons != null) data.totalSeasons = num(data.totalSeasons, 1);
+  if (data.rating != null) data.rating = num(data.rating, 0);
+  return data;
+}
 
 router.get('/', async (req, res) => {
   try {
-    const shows = await Show.find(owned(req)).sort({ createdAt: -1 });
-    res.json(shows);
+    const shows = await prisma.show.findMany({
+      where: owned(req),
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(serialize(shows));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -15,10 +30,10 @@ router.get('/', async (req, res) => {
 
 router.post('/', upload.single('posterImage'), async (req, res) => {
   try {
-    const data = { ...req.body, userId: req.user._id };
-    if (req.file) data.posterImage = '/uploads/' + req.file.filename;
-    const saved = await new Show(data).save();
-    res.status(201).json(saved);
+    const saved = await prisma.show.create({
+      data: { ...showData(req.body, req.file), userId: req.user.id },
+    });
+    res.status(201).json(serialize(saved));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -26,9 +41,11 @@ router.post('/', upload.single('posterImage'), async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const show = await Show.findOne(owned(req, { _id: req.params.id }));
+    const show = await prisma.show.findFirst({
+      where: owned(req, { _id: req.params.id }),
+    });
     if (!show) return res.status(404).json({ error: 'Show not found' });
-    res.json(show);
+    res.json(serialize(show));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -36,14 +53,15 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', upload.single('posterImage'), async (req, res) => {
   try {
-    const data = { ...req.body };
-    if (req.file) data.posterImage = '/uploads/' + req.file.filename;
-    const updated = await Show.findOneAndUpdate(owned(req, { _id: req.params.id }), data, {
-      new: true,
-      runValidators: true,
+    const existing = await prisma.show.findFirst({
+      where: owned(req, { _id: req.params.id }),
     });
-    if (!updated) return res.status(404).json({ error: 'Show not found' });
-    res.json(updated);
+    if (!existing) return res.status(404).json({ error: 'Show not found' });
+    const updated = await prisma.show.update({
+      where: { id: existing.id },
+      data: showData(req.body, req.file),
+    });
+    res.json(serialize(updated));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -51,8 +69,11 @@ router.put('/:id', upload.single('posterImage'), async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    const deleted = await Show.findOneAndDelete(owned(req, { _id: req.params.id }));
-    if (!deleted) return res.status(404).json({ error: 'Show not found' });
+    const existing = await prisma.show.findFirst({
+      where: owned(req, { _id: req.params.id }),
+    });
+    if (!existing) return res.status(404).json({ error: 'Show not found' });
+    await prisma.show.delete({ where: { id: existing.id } });
     res.json({ message: 'Show deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

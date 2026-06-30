@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
-const Project = require('../models/Project');
+const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
+const { cleanBody } = require('../utils/body');
+const { serialize } = require('../utils/serialize');
 
 function calcProgress(tasks) {
   const items = [];
@@ -15,262 +17,32 @@ function calcProgress(tasks) {
   return Math.round((done / items.length) * 100);
 }
 
-// GET all projects
-router.get('/', async (req, res) => {
-  try {
-    const projects = await Project.find(owned(req)).sort({ createdAt: -1 });
-    res.json(projects);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+async function loadProject(req, id) {
+  return prisma.project.findFirst({ where: owned(req, { _id: id }) });
+}
 
-// POST create project
-router.post('/', async (req, res) => {
-  try {
-    const project = new Project({ ...req.body, userId: req.user._id });
-    const saved = await project.save();
-    res.status(201).json(saved);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
+async function saveProject(project, data) {
+  const updated = await prisma.project.update({
+    where: { id: project.id },
+    data,
+  });
+  return updated;
+}
 
-// GET single project
-router.get('/:id', async (req, res) => {
-  try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
-    if (!project) return res.status(404).json({ error: 'Project not found' });
-    res.json(project);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+function getTasks(project) {
+  return Array.isArray(project.tasks) ? [...project.tasks] : [];
+}
 
-// PUT update project
-router.put('/:id', async (req, res) => {
-  try {
-    const updated = await Project.findOneAndUpdate(
-      owned(req, { _id: req.params.id }),
-      { ...req.body, updatedAt: Date.now() },
-      { new: true, runValidators: true }
-    );
-    if (!updated) return res.status(404).json({ error: 'Project not found' });
-    res.json(updated);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
+function getDataTables(project) {
+  return Array.isArray(project.dataTables) ? [...project.dataTables] : [];
+}
 
-// DELETE project
-router.delete('/:id', async (req, res) => {
-  try {
-    const deleted = await Project.findOneAndDelete(owned(req, { _id: req.params.id }));
-    if (!deleted) return res.status(404).json({ error: 'Project not found' });
-    res.json({ message: 'Project deleted' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── Team ─────────────────────────────────────────────────
-router.post('/:id/team', async (req, res) => {
-  try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
-    if (!project) return res.status(404).json({ error: 'Project not found' });
-    const name = (req.body.name || '').trim();
-    if (!name) return res.status(400).json({ error: 'Name is required' });
-    if (!project.team) project.team = [];
-    if (!project.team.includes(name)) project.team.push(name);
-    project.updatedAt = Date.now();
-    project.markModified('team');
-    await project.save();
-    res.json(project);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-router.delete('/:id/team/:name', async (req, res) => {
-  try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
-    if (!project) return res.status(404).json({ error: 'Project not found' });
-    project.team = (project.team || []).filter((m) => m !== decodeURIComponent(req.params.name));
-    project.updatedAt = Date.now();
-    project.markModified('team');
-    await project.save();
-    res.json(project);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── Tasks ────────────────────────────────────────────────
-router.post('/:id/tasks', async (req, res) => {
-  try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
-    if (!project) return res.status(404).json({ error: 'Project not found' });
-    const text = (req.body.text || '').trim();
-    if (!text) return res.status(400).json({ error: 'Task text is required' });
-    const task = {
-      id: uuidv4(),
-      text,
-      done: false,
-      assignee: req.body.assignee || '',
-      subtasks: [],
-    };
-    project.tasks.push(task);
-    project.progress = calcProgress(project.tasks);
-    project.updatedAt = Date.now();
-    project.markModified('tasks');
-    await project.save();
-    res.status(201).json(project);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-router.put('/:id/tasks/:taskId', async (req, res) => {
-  try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
-    if (!project) return res.status(404).json({ error: 'Project not found' });
-    const task = project.tasks.find((t) => t.id === req.params.taskId);
-    if (!task) return res.status(404).json({ error: 'Task not found' });
-    if (req.body.text !== undefined) task.text = req.body.text;
-    if (req.body.assignee !== undefined) task.assignee = req.body.assignee;
-    if (req.body.done !== undefined) task.done = req.body.done;
-    project.progress = calcProgress(project.tasks);
-    project.updatedAt = Date.now();
-    project.markModified('tasks');
-    await project.save();
-    res.json(project);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-router.post('/:id/tasks/:taskId/toggle', async (req, res) => {
-  try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
-    if (!project) return res.status(404).json({ error: 'Project not found' });
-    const task = project.tasks.find((t) => t.id === req.params.taskId);
-    if (!task) return res.status(404).json({ error: 'Task not found' });
-    task.done = !task.done;
-    project.progress = calcProgress(project.tasks);
-    project.updatedAt = Date.now();
-    project.markModified('tasks');
-    await project.save();
-    res.json(project);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.delete('/:id/tasks/:taskId', async (req, res) => {
-  try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
-    if (!project) return res.status(404).json({ error: 'Project not found' });
-    project.tasks = project.tasks.filter((t) => t.id !== req.params.taskId);
-    project.progress = calcProgress(project.tasks);
-    project.updatedAt = Date.now();
-    project.markModified('tasks');
-    await project.save();
-    res.json(project);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── Subtasks ─────────────────────────────────────────────
-router.post('/:id/tasks/:taskId/subtasks', async (req, res) => {
-  try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
-    if (!project) return res.status(404).json({ error: 'Project not found' });
-    const task = project.tasks.find((t) => t.id === req.params.taskId);
-    if (!task) return res.status(404).json({ error: 'Task not found' });
-    const text = (req.body.text || '').trim();
-    if (!text) return res.status(400).json({ error: 'Subtask text is required' });
-    if (!task.subtasks) task.subtasks = [];
-    task.subtasks.push({
-      id: uuidv4(),
-      text,
-      done: false,
-      assignee: req.body.assignee || '',
-    });
-    project.progress = calcProgress(project.tasks);
-    project.updatedAt = Date.now();
-    project.markModified('tasks');
-    await project.save();
-    res.status(201).json(project);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-router.post('/:id/tasks/:taskId/subtasks/:subId/toggle', async (req, res) => {
-  try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
-    if (!project) return res.status(404).json({ error: 'Project not found' });
-    const task = project.tasks.find((t) => t.id === req.params.taskId);
-    if (!task) return res.status(404).json({ error: 'Task not found' });
-    const sub = (task.subtasks || []).find((s) => s.id === req.params.subId);
-    if (!sub) return res.status(404).json({ error: 'Subtask not found' });
-    sub.done = !sub.done;
-    project.progress = calcProgress(project.tasks);
-    project.updatedAt = Date.now();
-    project.markModified('tasks');
-    await project.save();
-    res.json(project);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.put('/:id/tasks/:taskId/subtasks/:subId', async (req, res) => {
-  try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
-    if (!project) return res.status(404).json({ error: 'Project not found' });
-    const task = project.tasks.find((t) => t.id === req.params.taskId);
-    if (!task) return res.status(404).json({ error: 'Task not found' });
-    const sub = (task.subtasks || []).find((s) => s.id === req.params.subId);
-    if (!sub) return res.status(404).json({ error: 'Subtask not found' });
-    if (req.body.text !== undefined) sub.text = req.body.text;
-    if (req.body.assignee !== undefined) sub.assignee = req.body.assignee;
-    if (req.body.done !== undefined) sub.done = req.body.done;
-    project.progress = calcProgress(project.tasks);
-    project.updatedAt = Date.now();
-    project.markModified('tasks');
-    await project.save();
-    res.json(project);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-router.delete('/:id/tasks/:taskId/subtasks/:subId', async (req, res) => {
-  try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
-    if (!project) return res.status(404).json({ error: 'Project not found' });
-    const task = project.tasks.find((t) => t.id === req.params.taskId);
-    if (!task) return res.status(404).json({ error: 'Task not found' });
-    task.subtasks = (task.subtasks || []).filter((s) => s.id !== req.params.subId);
-    project.progress = calcProgress(project.tasks);
-    project.updatedAt = Date.now();
-    project.markModified('tasks');
-    await project.save();
-    res.json(project);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── Data tables (full dynamic tables, same as main Tables) ─
 function getProjectTable(project, tableId) {
-  const table = (project.dataTables || []).find((t) => t.id === tableId);
+  const tables = getDataTables(project);
+  const table = tables.find((t) => t.id === tableId);
   if (!table) return null;
   if (!table.columns) table.columns = [];
   if (!table.rows) table.rows = [];
-  // Migrate legacy key-value rows
   if (table.rows.length > 0 && table.rows[0].key !== undefined && table.rows[0].data === undefined) {
     if (table.columns.length === 0) {
       const keyCol = { id: uuidv4(), name: 'Key', type: 'text', options: [] };
@@ -287,9 +59,236 @@ function getProjectTable(project, tableId) {
   return table;
 }
 
+router.get('/', async (req, res) => {
+  try {
+    const projects = await prisma.project.findMany({
+      where: owned(req),
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(serialize(projects));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/', async (req, res) => {
+  try {
+    const body = cleanBody(req.body);
+    const saved = await prisma.project.create({
+      data: {
+        ...body,
+        tasks: body.tasks || [],
+        dataTables: body.dataTables || [],
+        userId: req.user.id,
+      },
+    });
+    res.status(201).json(serialize(saved));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.get('/:id', async (req, res) => {
+  try {
+    const project = await loadProject(req, req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    res.json(serialize(project));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/:id', async (req, res) => {
+  try {
+    const existing = await loadProject(req, req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Project not found' });
+    const updated = await saveProject(existing, cleanBody(req.body));
+    res.json(serialize(updated));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.delete('/:id', async (req, res) => {
+  try {
+    const existing = await loadProject(req, req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Project not found' });
+    await prisma.project.delete({ where: { id: existing.id } });
+    res.json({ message: 'Project deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:id/team', async (req, res) => {
+  try {
+    const project = await loadProject(req, req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const name = (req.body.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'Name is required' });
+    const team = [...(project.team || [])];
+    if (!team.includes(name)) team.push(name);
+    const updated = await saveProject(project, { team });
+    res.json(serialize(updated));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.delete('/:id/team/:name', async (req, res) => {
+  try {
+    const project = await loadProject(req, req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const team = (project.team || []).filter((m) => m !== decodeURIComponent(req.params.name));
+    const updated = await saveProject(project, { team });
+    res.json(serialize(updated));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:id/tasks', async (req, res) => {
+  try {
+    const project = await loadProject(req, req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const text = (req.body.text || '').trim();
+    if (!text) return res.status(400).json({ error: 'Task text is required' });
+    const tasks = getTasks(project);
+    tasks.push({
+      id: uuidv4(),
+      text,
+      done: false,
+      assignee: req.body.assignee || '',
+      subtasks: [],
+    });
+    const updated = await saveProject(project, { tasks, progress: calcProgress(tasks) });
+    res.status(201).json(serialize(updated));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.put('/:id/tasks/:taskId', async (req, res) => {
+  try {
+    const project = await loadProject(req, req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const tasks = getTasks(project);
+    const task = tasks.find((t) => t.id === req.params.taskId);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    if (req.body.text !== undefined) task.text = req.body.text;
+    if (req.body.assignee !== undefined) task.assignee = req.body.assignee;
+    if (req.body.done !== undefined) task.done = req.body.done;
+    const updated = await saveProject(project, { tasks, progress: calcProgress(tasks) });
+    res.json(serialize(updated));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/:id/tasks/:taskId/toggle', async (req, res) => {
+  try {
+    const project = await loadProject(req, req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const tasks = getTasks(project);
+    const task = tasks.find((t) => t.id === req.params.taskId);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    task.done = !task.done;
+    const updated = await saveProject(project, { tasks, progress: calcProgress(tasks) });
+    res.json(serialize(updated));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/:id/tasks/:taskId', async (req, res) => {
+  try {
+    const project = await loadProject(req, req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const tasks = getTasks(project).filter((t) => t.id !== req.params.taskId);
+    const updated = await saveProject(project, { tasks, progress: calcProgress(tasks) });
+    res.json(serialize(updated));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:id/tasks/:taskId/subtasks', async (req, res) => {
+  try {
+    const project = await loadProject(req, req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const tasks = getTasks(project);
+    const task = tasks.find((t) => t.id === req.params.taskId);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    const text = (req.body.text || '').trim();
+    if (!text) return res.status(400).json({ error: 'Subtask text is required' });
+    if (!task.subtasks) task.subtasks = [];
+    task.subtasks.push({
+      id: uuidv4(),
+      text,
+      done: false,
+      assignee: req.body.assignee || '',
+    });
+    const updated = await saveProject(project, { tasks, progress: calcProgress(tasks) });
+    res.status(201).json(serialize(updated));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/:id/tasks/:taskId/subtasks/:subId/toggle', async (req, res) => {
+  try {
+    const project = await loadProject(req, req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const tasks = getTasks(project);
+    const task = tasks.find((t) => t.id === req.params.taskId);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    const sub = (task.subtasks || []).find((s) => s.id === req.params.subId);
+    if (!sub) return res.status(404).json({ error: 'Subtask not found' });
+    sub.done = !sub.done;
+    const updated = await saveProject(project, { tasks, progress: calcProgress(tasks) });
+    res.json(serialize(updated));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/:id/tasks/:taskId/subtasks/:subId', async (req, res) => {
+  try {
+    const project = await loadProject(req, req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const tasks = getTasks(project);
+    const task = tasks.find((t) => t.id === req.params.taskId);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    const sub = (task.subtasks || []).find((s) => s.id === req.params.subId);
+    if (!sub) return res.status(404).json({ error: 'Subtask not found' });
+    if (req.body.text !== undefined) sub.text = req.body.text;
+    if (req.body.assignee !== undefined) sub.assignee = req.body.assignee;
+    if (req.body.done !== undefined) sub.done = req.body.done;
+    const updated = await saveProject(project, { tasks, progress: calcProgress(tasks) });
+    res.json(serialize(updated));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.delete('/:id/tasks/:taskId/subtasks/:subId', async (req, res) => {
+  try {
+    const project = await loadProject(req, req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const tasks = getTasks(project);
+    const task = tasks.find((t) => t.id === req.params.taskId);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    task.subtasks = (task.subtasks || []).filter((s) => s.id !== req.params.subId);
+    const updated = await saveProject(project, { tasks, progress: calcProgress(tasks) });
+    res.json(serialize(updated));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/:id/tables', async (req, res) => {
   try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
+    const project = await loadProject(req, req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
     const name = (req.body.name || '').trim();
     if (!name) return res.status(400).json({ error: 'Table name is required' });
@@ -299,12 +298,10 @@ router.post('/:id/tables', async (req, res) => {
       type: c.type || 'text',
       options: c.options || [],
     }));
-    if (!project.dataTables) project.dataTables = [];
-    project.dataTables.push({ id: uuidv4(), name, columns: cols, rows: [] });
-    project.updatedAt = Date.now();
-    project.markModified('dataTables');
-    await project.save();
-    res.status(201).json(project);
+    const dataTables = getDataTables(project);
+    dataTables.push({ id: uuidv4(), name, columns: cols, rows: [] });
+    const updated = await saveProject(project, { dataTables });
+    res.status(201).json(serialize(updated));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -312,15 +309,14 @@ router.post('/:id/tables', async (req, res) => {
 
 router.put('/:id/tables/:tableId', async (req, res) => {
   try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
+    const project = await loadProject(req, req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
-    const table = getProjectTable(project, req.params.tableId);
+    const dataTables = getDataTables(project);
+    const table = getProjectTable({ dataTables }, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });
     if (req.body.name) table.name = req.body.name.trim();
-    project.updatedAt = Date.now();
-    project.markModified('dataTables');
-    await project.save();
-    res.json(project);
+    const updated = await saveProject(project, { dataTables });
+    res.json(serialize(updated));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -328,13 +324,11 @@ router.put('/:id/tables/:tableId', async (req, res) => {
 
 router.delete('/:id/tables/:tableId', async (req, res) => {
   try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
+    const project = await loadProject(req, req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
-    project.dataTables = (project.dataTables || []).filter((t) => t.id !== req.params.tableId);
-    project.updatedAt = Date.now();
-    project.markModified('dataTables');
-    await project.save();
-    res.json(project);
+    const dataTables = getDataTables(project).filter((t) => t.id !== req.params.tableId);
+    const updated = await saveProject(project, { dataTables });
+    res.json(serialize(updated));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -342,16 +336,15 @@ router.delete('/:id/tables/:tableId', async (req, res) => {
 
 router.post('/:id/tables/:tableId/rows', async (req, res) => {
   try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
+    const project = await loadProject(req, req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
-    const table = getProjectTable(project, req.params.tableId);
+    const dataTables = getDataTables(project);
+    const table = getProjectTable({ dataTables }, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });
     const newRow = { id: uuidv4(), data: req.body.data || {} };
     table.rows.push(newRow);
-    project.updatedAt = Date.now();
-    project.markModified('dataTables');
-    await project.save();
-    res.status(201).json(newRow);
+    await saveProject(project, { dataTables });
+    res.status(201).json(serialize(newRow));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -359,17 +352,16 @@ router.post('/:id/tables/:tableId/rows', async (req, res) => {
 
 router.put('/:id/tables/:tableId/rows/:rowId', async (req, res) => {
   try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
+    const project = await loadProject(req, req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
-    const table = getProjectTable(project, req.params.tableId);
+    const dataTables = getDataTables(project);
+    const table = getProjectTable({ dataTables }, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });
     const row = table.rows.find((r) => r.id === req.params.rowId);
     if (!row) return res.status(404).json({ error: 'Row not found' });
     row.data = req.body.data;
-    project.updatedAt = Date.now();
-    project.markModified('dataTables');
-    await project.save();
-    res.json(row);
+    await saveProject(project, { dataTables });
+    res.json(serialize(row));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -377,14 +369,13 @@ router.put('/:id/tables/:tableId/rows/:rowId', async (req, res) => {
 
 router.delete('/:id/tables/:tableId/rows/:rowId', async (req, res) => {
   try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
+    const project = await loadProject(req, req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
-    const table = getProjectTable(project, req.params.tableId);
+    const dataTables = getDataTables(project);
+    const table = getProjectTable({ dataTables }, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });
     table.rows = table.rows.filter((r) => r.id !== req.params.rowId);
-    project.updatedAt = Date.now();
-    project.markModified('dataTables');
-    await project.save();
+    await saveProject(project, { dataTables });
     res.json({ message: 'Row deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -393,9 +384,10 @@ router.delete('/:id/tables/:tableId/rows/:rowId', async (req, res) => {
 
 router.post('/:id/tables/:tableId/columns', async (req, res) => {
   try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
+    const project = await loadProject(req, req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
-    const table = getProjectTable(project, req.params.tableId);
+    const dataTables = getDataTables(project);
+    const table = getProjectTable({ dataTables }, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });
     const newCol = {
       id: uuidv4(),
@@ -404,10 +396,8 @@ router.post('/:id/tables/:tableId/columns', async (req, res) => {
       options: req.body.options || [],
     };
     table.columns.push(newCol);
-    project.updatedAt = Date.now();
-    project.markModified('dataTables');
-    await project.save();
-    res.status(201).json(newCol);
+    await saveProject(project, { dataTables });
+    res.status(201).json(serialize(newCol));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -415,17 +405,16 @@ router.post('/:id/tables/:tableId/columns', async (req, res) => {
 
 router.put('/:id/tables/:tableId/columns/:colId', async (req, res) => {
   try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
+    const project = await loadProject(req, req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
-    const table = getProjectTable(project, req.params.tableId);
+    const dataTables = getDataTables(project);
+    const table = getProjectTable({ dataTables }, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });
     const colIndex = table.columns.findIndex((c) => c.id === req.params.colId);
     if (colIndex === -1) return res.status(404).json({ error: 'Column not found' });
     table.columns[colIndex] = { ...table.columns[colIndex], ...req.body };
-    project.updatedAt = Date.now();
-    project.markModified('dataTables');
-    await project.save();
-    res.json(table.columns[colIndex]);
+    await saveProject(project, { dataTables });
+    res.json(serialize(table.columns[colIndex]));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -433,9 +422,10 @@ router.put('/:id/tables/:tableId/columns/:colId', async (req, res) => {
 
 router.delete('/:id/tables/:tableId/columns/:colId', async (req, res) => {
   try {
-    const project = await Project.findOne(owned(req, { _id: req.params.id }));
+    const project = await loadProject(req, req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
-    const table = getProjectTable(project, req.params.tableId);
+    const dataTables = getDataTables(project);
+    const table = getProjectTable({ dataTables }, req.params.tableId);
     if (!table) return res.status(404).json({ error: 'Table not found' });
     table.columns = table.columns.filter((c) => c.id !== req.params.colId);
     table.rows = table.rows.map((row) => {
@@ -443,9 +433,7 @@ router.delete('/:id/tables/:tableId/columns/:colId', async (req, res) => {
       delete newData[req.params.colId];
       return { id: row.id, data: newData };
     });
-    project.updatedAt = Date.now();
-    project.markModified('dataTables');
-    await project.save();
+    await saveProject(project, { dataTables });
     res.json({ message: 'Column deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

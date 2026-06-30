@@ -1,8 +1,8 @@
 require('dotenv').config();
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const prisma = require('./lib/prisma');
 
 const authRouter = require('./routes/auth');
 const { authMiddleware } = require('./middleware/auth');
@@ -21,7 +21,7 @@ const PORT = process.env.PORT || 5000;
 
 const allowedOrigins = [
   'http://localhost:5173',
-  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL?.replace(/\/$/, ''),
 ].filter(Boolean);
 
 app.use(cors({ origin: allowedOrigins, credentials: true }));
@@ -29,10 +29,8 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Public auth routes
 app.use('/api/auth', authRouter);
 
-// Protected API routes
 app.use('/api', authMiddleware);
 app.use('/api/projects', projectsRouter);
 app.use('/api/books', booksRouter);
@@ -44,15 +42,22 @@ app.use('/api/habits', habitsRouter);
 app.use('/api/goals', goalsRouter);
 app.use('/api/dashboard', dashboardRouter);
 
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log('MongoDB connected');
+async function start() {
+  try {
+    await prisma.$connect();
+    console.log('PostgreSQL connected via Prisma');
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
-  })
-  .catch((err) => {
-    console.error('MongoDB connection error:', err);
+  } catch (err) {
+    console.error('Database connection error:', err);
     process.exit(1);
-  });
+  }
+}
+
+process.on('SIGINT', async () => {
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+start();

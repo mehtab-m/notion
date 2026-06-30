@@ -1,13 +1,18 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const User = require('../models/User');
+const prisma = require('../lib/prisma');
 const { signToken, authMiddleware } = require('../middleware/auth');
 const { sendVerificationEmail } = require('../utils/email');
+const { serialize } = require('../utils/serialize');
 
 const router = express.Router();
 
 function generateCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function publicUser(user) {
+  return { _id: user.id, name: user.name, email: user.email };
 }
 
 // POST /api/auth/signup
@@ -20,7 +25,8 @@ router.post('/signup', async (req, res) => {
     if (password.length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
-    const existing = await User.findOne({ email: email.toLowerCase().trim() });
+    const normalizedEmail = email.toLowerCase().trim();
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existing?.isVerified) {
       return res.status(400).json({ error: 'Email already registered. Please log in.' });
     }
@@ -29,23 +35,29 @@ router.post('/signup', async (req, res) => {
     const expires = new Date(Date.now() + 15 * 60 * 1000);
 
     if (existing) {
-      existing.name = name.trim();
-      existing.password = hashed;
-      existing.verificationCode = code;
-      existing.verificationExpires = expires;
-      await existing.save();
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          name: name.trim(),
+          password: hashed,
+          verificationCode: code,
+          verificationExpires: expires,
+        },
+      });
     } else {
-      await User.create({
-        name: name.trim(),
-        email: email.toLowerCase().trim(),
-        password: hashed,
-        verificationCode: code,
-        verificationExpires: expires,
+      await prisma.user.create({
+        data: {
+          name: name.trim(),
+          email: normalizedEmail,
+          password: hashed,
+          verificationCode: code,
+          verificationExpires: expires,
+        },
       });
     }
 
-    await sendVerificationEmail(email.toLowerCase().trim(), name.trim(), code);
-    res.status(201).json({ message: 'Confirmation code sent to your email', email: email.toLowerCase().trim() });
+    await sendVerificationEmail(normalizedEmail, name.trim(), code);
+    res.status(201).json({ message: 'Confirmation code sent to your email', email: normalizedEmail });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -57,26 +69,26 @@ router.post('/verify', async (req, res) => {
     const { email, code } = req.body;
     if (!email || !code) return res.status(400).json({ error: 'Email and code are required' });
 
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
     if (!user) return res.status(404).json({ error: 'User not found' });
     if (user.isVerified) {
-      const token = signToken(user._id);
-      return res.json({ token, user: { _id: user._id, name: user.name, email: user.email } });
+      const token = signToken(user.id);
+      return res.json({ token, user: publicUser(user) });
     }
     if (user.verificationCode !== code.trim()) {
       return res.status(400).json({ error: 'Invalid confirmation code' });
     }
-    if (user.verificationExpires < new Date()) {
+    if (!user.verificationExpires || user.verificationExpires < new Date()) {
       return res.status(400).json({ error: 'Code expired. Request a new one.' });
     }
 
-    user.isVerified = true;
-    user.verificationCode = null;
-    user.verificationExpires = null;
-    await user.save();
+    const verified = await prisma.user.update({
+      where: { id: user.id },
+      data: { isVerified: true, verificationCode: null, verificationExpires: null },
+    });
 
-    const token = signToken(user._id);
-    res.json({ token, user: { _id: user._id, name: user.name, email: user.email } });
+    const token = signToken(verified.id);
+    res.json({ token, user: publicUser(verified) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -86,14 +98,18 @@ router.post('/verify', async (req, res) => {
 router.post('/resend', async (req, res) => {
   try {
     const { email } = req.body;
-    const user = await User.findOne({ email: email?.toLowerCase().trim() });
+    const user = await prisma.user.findUnique({ where: { email: email?.toLowerCase().trim() } });
     if (!user) return res.status(404).json({ error: 'User not found' });
     if (user.isVerified) return res.status(400).json({ error: 'Already verified. Please log in.' });
 
     const code = generateCode();
-    user.verificationCode = code;
-    user.verificationExpires = new Date(Date.now() + 15 * 60 * 1000);
-    await user.save();
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        verificationCode: code,
+        verificationExpires: new Date(Date.now() + 15 * 60 * 1000),
+      },
+    });
     await sendVerificationEmail(user.email, user.name, code);
     res.json({ message: 'New code sent' });
   } catch (err) {
@@ -107,7 +123,7 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
 
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
     if (!user) return res.status(401).json({ error: 'Invalid email or password' });
     if (!user.isVerified) {
       return res.status(403).json({ error: 'Email not verified', needsVerification: true, email: user.email });
@@ -115,8 +131,8 @@ router.post('/login', async (req, res) => {
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ error: 'Invalid email or password' });
 
-    const token = signToken(user._id);
-    res.json({ token, user: { _id: user._id, name: user.name, email: user.email } });
+    const token = signToken(user.id);
+    res.json({ token, user: publicUser(user) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -124,7 +140,7 @@ router.post('/login', async (req, res) => {
 
 // GET /api/auth/me
 router.get('/me', authMiddleware, (req, res) => {
-  res.json({ user: { _id: req.user._id, name: req.user.name, email: req.user.email } });
+  res.json({ user: publicUser(req.user) });
 });
 
 module.exports = router;

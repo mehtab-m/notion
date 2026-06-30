@@ -1,23 +1,21 @@
 const express = require('express');
 const router = express.Router();
-const Book = require('../models/Book');
-const Goal = require('../models/Goal');
-const Habit = require('../models/Habit');
-const Project = require('../models/Project');
+const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
+const { serialize } = require('../utils/serialize');
 
 router.get('/stats', async (req, res) => {
   try {
     const filter = owned(req);
     const [books, goals, habits, projects] = await Promise.all([
-      Book.find(filter),
-      Goal.find(filter),
-      Habit.find(filter),
-      Project.find(filter),
+      prisma.book.findMany({ where: filter }),
+      prisma.goal.findMany({ where: filter }),
+      prisma.habit.findMany({ where: filter }),
+      prisma.project.findMany({ where: filter }),
     ]);
 
     const bookProgress = books.map((b) => ({
-      _id: b._id,
+      _id: b.id,
       title: b.title,
       author: b.author,
       status: b.status,
@@ -28,7 +26,7 @@ router.get('/stats', async (req, res) => {
     }));
 
     const goalProgress = goals.map((g) => ({
-      _id: g._id,
+      _id: g.id,
       title: g.title,
       category: g.category,
       status: g.status,
@@ -36,7 +34,7 @@ router.get('/stats', async (req, res) => {
     }));
 
     const habitStats = habits.map((h) => ({
-      _id: h._id,
+      _id: h.id,
       name: h.name,
       streak: h.streak,
       completedCount: (h.completedDates || []).length,
@@ -46,7 +44,7 @@ router.get('/stats', async (req, res) => {
     const projectProgress = projects
       .filter((p) => p.status === 'active')
       .map((p) => ({
-        _id: p._id,
+        _id: p.id,
         title: p.title,
         progress: p.progress,
         priority: p.priority,
@@ -66,20 +64,22 @@ router.get('/stats', async (req, res) => {
       abandoned: goals.filter((g) => g.status === 'abandoned').length,
     };
 
-    res.json({
-      bookProgress,
-      goalProgress,
-      habitStats,
-      projectProgress,
-      booksByStatus,
-      goalsByStatus,
-      totals: {
-        books: books.length,
-        goals: goals.length,
-        habits: habits.length,
-        projects: projects.length,
-      },
-    });
+    res.json(
+      serialize({
+        bookProgress,
+        goalProgress,
+        habitStats,
+        projectProgress,
+        booksByStatus,
+        goalsByStatus,
+        totals: {
+          books: books.length,
+          goals: goals.length,
+          habits: habits.length,
+          projects: projects.length,
+        },
+      })
+    );
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

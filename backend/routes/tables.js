@@ -1,29 +1,36 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
-const Table = require('../models/Table');
+const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
+const { cleanBody } = require('../utils/body');
+const { serialize } = require('../utils/serialize');
 
-async function loadTable(req, res) {
-  const table = await Table.findOne(owned(req, { _id: req.params.id }));
-  if (!table) {
-    res.status(404).json({ error: 'Table not found' });
-    return null;
-  }
-  return table;
+async function loadTable(req) {
+  return prisma.spreadsheet.findFirst({
+    where: owned(req, { _id: req.params.id }),
+  });
 }
 
 router.get('/', async (req, res) => {
   try {
-    const tables = await Table.find(owned(req), 'name createdAt columns rows').sort({ createdAt: -1 });
-    const result = tables.map((t) => ({
-      _id: t._id,
-      name: t.name,
-      createdAt: t.createdAt,
-      columnCount: t.columns.length,
-      rowCount: t.rows.length,
-    }));
-    res.json(result);
+    const tables = await prisma.spreadsheet.findMany({
+      where: owned(req),
+      select: { id: true, name: true, createdAt: true, columns: true, rows: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    const result = tables.map((t) => {
+      const cols = Array.isArray(t.columns) ? t.columns : [];
+      const rows = Array.isArray(t.rows) ? t.rows : [];
+      return {
+        _id: t.id,
+        name: t.name,
+        createdAt: t.createdAt,
+        columnCount: cols.length,
+        rowCount: rows.length,
+      };
+    });
+    res.json(serialize(result));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -38,8 +45,10 @@ router.post('/', async (req, res) => {
       type: c.type || 'text',
       options: c.options || [],
     }));
-    const saved = await new Table({ name, columns: cols, rows: [], userId: req.user._id }).save();
-    res.status(201).json(saved);
+    const saved = await prisma.spreadsheet.create({
+      data: { name, columns: cols, rows: [], userId: req.user.id },
+    });
+    res.status(201).json(serialize(saved));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -47,9 +56,9 @@ router.post('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const table = await Table.findOne(owned(req, { _id: req.params.id }));
+    const table = await loadTable(req);
     if (!table) return res.status(404).json({ error: 'Table not found' });
-    res.json(table);
+    res.json(serialize(table));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -57,13 +66,13 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const updated = await Table.findOneAndUpdate(
-      owned(req, { _id: req.params.id }),
-      { ...req.body, updatedAt: Date.now() },
-      { new: true, runValidators: true }
-    );
-    if (!updated) return res.status(404).json({ error: 'Table not found' });
-    res.json(updated);
+    const existing = await loadTable(req);
+    if (!existing) return res.status(404).json({ error: 'Table not found' });
+    const updated = await prisma.spreadsheet.update({
+      where: { id: existing.id },
+      data: cleanBody(req.body),
+    });
+    res.json(serialize(updated));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -71,8 +80,9 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    const deleted = await Table.findOneAndDelete(owned(req, { _id: req.params.id }));
-    if (!deleted) return res.status(404).json({ error: 'Table not found' });
+    const existing = await loadTable(req);
+    if (!existing) return res.status(404).json({ error: 'Table not found' });
+    await prisma.spreadsheet.delete({ where: { id: existing.id } });
     res.json({ message: 'Table deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -81,13 +91,16 @@ router.delete('/:id', async (req, res) => {
 
 router.post('/:id/rows', async (req, res) => {
   try {
-    const table = await loadTable(req, res);
-    if (!table) return;
+    const table = await loadTable(req);
+    if (!table) return res.status(404).json({ error: 'Table not found' });
+    const rows = Array.isArray(table.rows) ? [...table.rows] : [];
     const newRow = { id: uuidv4(), data: req.body.data || {} };
-    table.rows.push(newRow);
-    table.updatedAt = Date.now();
-    await table.save();
-    res.status(201).json(newRow);
+    rows.push(newRow);
+    await prisma.spreadsheet.update({
+      where: { id: table.id },
+      data: { rows },
+    });
+    res.status(201).json(serialize(newRow));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -95,15 +108,17 @@ router.post('/:id/rows', async (req, res) => {
 
 router.put('/:id/rows/:rowId', async (req, res) => {
   try {
-    const table = await loadTable(req, res);
-    if (!table) return;
-    const rowIndex = table.rows.findIndex((r) => r.id === req.params.rowId);
+    const table = await loadTable(req);
+    if (!table) return res.status(404).json({ error: 'Table not found' });
+    const rows = Array.isArray(table.rows) ? [...table.rows] : [];
+    const rowIndex = rows.findIndex((r) => r.id === req.params.rowId);
     if (rowIndex === -1) return res.status(404).json({ error: 'Row not found' });
-    table.rows[rowIndex].data = req.body.data;
-    table.markModified('rows');
-    table.updatedAt = Date.now();
-    await table.save();
-    res.json(table.rows[rowIndex]);
+    rows[rowIndex] = { ...rows[rowIndex], data: req.body.data };
+    await prisma.spreadsheet.update({
+      where: { id: table.id },
+      data: { rows },
+    });
+    res.json(serialize(rows[rowIndex]));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -111,11 +126,15 @@ router.put('/:id/rows/:rowId', async (req, res) => {
 
 router.delete('/:id/rows/:rowId', async (req, res) => {
   try {
-    const table = await loadTable(req, res);
-    if (!table) return;
-    table.rows = table.rows.filter((r) => r.id !== req.params.rowId);
-    table.updatedAt = Date.now();
-    await table.save();
+    const table = await loadTable(req);
+    if (!table) return res.status(404).json({ error: 'Table not found' });
+    const rows = (Array.isArray(table.rows) ? table.rows : []).filter(
+      (r) => r.id !== req.params.rowId
+    );
+    await prisma.spreadsheet.update({
+      where: { id: table.id },
+      data: { rows },
+    });
     res.json({ message: 'Row deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -124,18 +143,21 @@ router.delete('/:id/rows/:rowId', async (req, res) => {
 
 router.post('/:id/columns', async (req, res) => {
   try {
-    const table = await loadTable(req, res);
-    if (!table) return;
+    const table = await loadTable(req);
+    if (!table) return res.status(404).json({ error: 'Table not found' });
+    const columns = Array.isArray(table.columns) ? [...table.columns] : [];
     const newCol = {
       id: uuidv4(),
       name: req.body.name,
       type: req.body.type || 'text',
       options: req.body.options || [],
     };
-    table.columns.push(newCol);
-    table.updatedAt = Date.now();
-    await table.save();
-    res.status(201).json(newCol);
+    columns.push(newCol);
+    await prisma.spreadsheet.update({
+      where: { id: table.id },
+      data: { columns },
+    });
+    res.status(201).json(serialize(newCol));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -143,15 +165,17 @@ router.post('/:id/columns', async (req, res) => {
 
 router.put('/:id/columns/:colId', async (req, res) => {
   try {
-    const table = await loadTable(req, res);
-    if (!table) return;
-    const colIndex = table.columns.findIndex((c) => c.id === req.params.colId);
+    const table = await loadTable(req);
+    if (!table) return res.status(404).json({ error: 'Table not found' });
+    const columns = Array.isArray(table.columns) ? [...table.columns] : [];
+    const colIndex = columns.findIndex((c) => c.id === req.params.colId);
     if (colIndex === -1) return res.status(404).json({ error: 'Column not found' });
-    table.columns[colIndex] = { ...table.columns[colIndex].toObject(), ...req.body };
-    table.markModified('columns');
-    table.updatedAt = Date.now();
-    await table.save();
-    res.json(table.columns[colIndex]);
+    columns[colIndex] = { ...columns[colIndex], ...req.body };
+    await prisma.spreadsheet.update({
+      where: { id: table.id },
+      data: { columns },
+    });
+    res.json(serialize(columns[colIndex]));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -159,17 +183,20 @@ router.put('/:id/columns/:colId', async (req, res) => {
 
 router.delete('/:id/columns/:colId', async (req, res) => {
   try {
-    const table = await loadTable(req, res);
-    if (!table) return;
-    table.columns = table.columns.filter((c) => c.id !== req.params.colId);
-    table.rows = table.rows.map((row) => {
-      const newData = { ...row.data };
+    const table = await loadTable(req);
+    if (!table) return res.status(404).json({ error: 'Table not found' });
+    const columns = (Array.isArray(table.columns) ? table.columns : []).filter(
+      (c) => c.id !== req.params.colId
+    );
+    const rows = (Array.isArray(table.rows) ? table.rows : []).map((row) => {
+      const newData = { ...(row.data || {}) };
       delete newData[req.params.colId];
       return { id: row.id, data: newData };
     });
-    table.markModified('rows');
-    table.updatedAt = Date.now();
-    await table.save();
+    await prisma.spreadsheet.update({
+      where: { id: table.id },
+      data: { columns, rows },
+    });
     res.json({ message: 'Column deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

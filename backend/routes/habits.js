@@ -1,12 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const Habit = require('../models/Habit');
+const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
+const { cleanBody } = require('../utils/body');
+const { serialize } = require('../utils/serialize');
 
 router.get('/', async (req, res) => {
   try {
-    const habits = await Habit.find(owned(req)).sort({ createdAt: -1 });
-    res.json(habits);
+    const habits = await prisma.habit.findMany({
+      where: owned(req),
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(serialize(habits));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -14,8 +19,10 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const saved = await new Habit({ ...req.body, userId: req.user._id }).save();
-    res.status(201).json(saved);
+    const saved = await prisma.habit.create({
+      data: { ...cleanBody(req.body), userId: req.user.id },
+    });
+    res.status(201).json(serialize(saved));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -23,13 +30,15 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const updated = await Habit.findOneAndUpdate(
-      owned(req, { _id: req.params.id }),
-      req.body,
-      { new: true, runValidators: true }
-    );
-    if (!updated) return res.status(404).json({ error: 'Habit not found' });
-    res.json(updated);
+    const existing = await prisma.habit.findFirst({
+      where: owned(req, { _id: req.params.id }),
+    });
+    if (!existing) return res.status(404).json({ error: 'Habit not found' });
+    const updated = await prisma.habit.update({
+      where: { id: existing.id },
+      data: cleanBody(req.body),
+    });
+    res.json(serialize(updated));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -38,12 +47,15 @@ router.put('/:id', async (req, res) => {
 router.post('/:id/toggle', async (req, res) => {
   try {
     const { date } = req.body;
-    const habit = await Habit.findOne(owned(req, { _id: req.params.id }));
+    const habit = await prisma.habit.findFirst({
+      where: owned(req, { _id: req.params.id }),
+    });
     if (!habit) return res.status(404).json({ error: 'Habit not found' });
-    const idx = habit.completedDates.indexOf(date);
-    if (idx >= 0) habit.completedDates.splice(idx, 1);
-    else habit.completedDates.push(date);
-    const sorted = [...habit.completedDates].sort((a, b) => (a > b ? -1 : 1));
+    const completedDates = [...habit.completedDates];
+    const idx = completedDates.indexOf(date);
+    if (idx >= 0) completedDates.splice(idx, 1);
+    else completedDates.push(date);
+    const sorted = [...completedDates].sort((a, b) => (a > b ? -1 : 1));
     let streak = 0;
     let cursor = new Date();
     cursor.setHours(0, 0, 0, 0);
@@ -51,12 +63,16 @@ router.post('/:id/toggle', async (req, res) => {
       const dt = new Date(d);
       dt.setHours(0, 0, 0, 0);
       const diff = Math.round((cursor - dt) / 86400000);
-      if (diff === 0 || diff === 1) { streak++; cursor = dt; }
-      else break;
+      if (diff === 0 || diff === 1) {
+        streak++;
+        cursor = dt;
+      } else break;
     }
-    habit.streak = streak;
-    await habit.save();
-    res.json(habit);
+    const updated = await prisma.habit.update({
+      where: { id: habit.id },
+      data: { completedDates, streak },
+    });
+    res.json(serialize(updated));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -64,8 +80,11 @@ router.post('/:id/toggle', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    const deleted = await Habit.findOneAndDelete(owned(req, { _id: req.params.id }));
-    if (!deleted) return res.status(404).json({ error: 'Habit not found' });
+    const existing = await prisma.habit.findFirst({
+      where: owned(req, { _id: req.params.id }),
+    });
+    if (!existing) return res.status(404).json({ error: 'Habit not found' });
+    await prisma.habit.delete({ where: { id: existing.id } });
     res.json({ message: 'Habit deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

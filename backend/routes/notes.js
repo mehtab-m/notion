@@ -1,18 +1,23 @@
 const express = require('express');
 const router = express.Router();
-const Note = require('../models/Note');
+const prisma = require('../lib/prisma');
 const upload = require('../middleware/upload');
 const { owned } = require('../utils/scope');
+const { cleanBody, num } = require('../utils/body');
+const { serialize } = require('../utils/serialize');
 
 router.get('/', async (req, res) => {
   try {
     const { notebookId, parentId, isNotebook } = req.query;
-    const filter = owned(req);
-    if (notebookId) filter.notebookId = notebookId;
-    if (parentId !== undefined) filter.parentId = parentId === 'null' ? null : parentId;
-    if (isNotebook !== undefined) filter.isNotebook = isNotebook === 'true';
-    const notes = await Note.find(filter).sort({ order: 1, pinned: -1, updatedAt: -1 });
-    res.json(notes);
+    const where = owned(req);
+    if (notebookId) where.notebookId = notebookId;
+    if (parentId !== undefined) where.parentId = parentId === 'null' ? null : parentId;
+    if (isNotebook !== undefined) where.isNotebook = isNotebook === 'true';
+    const notes = await prisma.note.findMany({
+      where,
+      orderBy: [{ order: 'asc' }, { pinned: 'desc' }, { updatedAt: 'desc' }],
+    });
+    res.json(serialize(notes));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -29,9 +34,16 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const note = new Note({ ...req.body, userId: req.user._id });
-    const saved = await note.save();
-    res.status(201).json(saved);
+    const body = cleanBody(req.body);
+    const saved = await prisma.note.create({
+      data: {
+        ...body,
+        blocks: body.blocks || [],
+        order: body.order != null ? num(body.order, 0) : 0,
+        userId: req.user.id,
+      },
+    });
+    res.status(201).json(serialize(saved));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -39,9 +51,11 @@ router.post('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const note = await Note.findOne(owned(req, { _id: req.params.id }));
+    const note = await prisma.note.findFirst({
+      where: owned(req, { _id: req.params.id }),
+    });
     if (!note) return res.status(404).json({ error: 'Note not found' });
-    res.json(note);
+    res.json(serialize(note));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -49,10 +63,15 @@ router.get('/:id', async (req, res) => {
 
 router.get('/:id/children', async (req, res) => {
   try {
-    const parent = await Note.findOne(owned(req, { _id: req.params.id }));
+    const parent = await prisma.note.findFirst({
+      where: owned(req, { _id: req.params.id }),
+    });
     if (!parent) return res.status(404).json({ error: 'Note not found' });
-    const children = await Note.find(owned(req, { parentId: req.params.id })).sort({ order: 1, updatedAt: -1 });
-    res.json(children);
+    const children = await prisma.note.findMany({
+      where: owned(req, { parentId: req.params.id }),
+      orderBy: [{ order: 'asc' }, { updatedAt: 'desc' }],
+    });
+    res.json(serialize(children));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -60,13 +79,15 @@ router.get('/:id/children', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const updated = await Note.findOneAndUpdate(
-      owned(req, { _id: req.params.id }),
-      { ...req.body, updatedAt: Date.now() },
-      { new: true, runValidators: true }
-    );
-    if (!updated) return res.status(404).json({ error: 'Note not found' });
-    res.json(updated);
+    const existing = await prisma.note.findFirst({
+      where: owned(req, { _id: req.params.id }),
+    });
+    if (!existing) return res.status(404).json({ error: 'Note not found' });
+    const updated = await prisma.note.update({
+      where: { id: existing.id },
+      data: cleanBody(req.body),
+    });
+    res.json(serialize(updated));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -74,13 +95,15 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    const note = await Note.findOne(owned(req, { _id: req.params.id }));
+    const note = await prisma.note.findFirst({
+      where: owned(req, { _id: req.params.id }),
+    });
     if (!note) return res.status(404).json({ error: 'Note not found' });
     if (note.isNotebook) {
-      await Note.deleteMany(owned(req, { notebookId: note._id }));
+      await prisma.note.deleteMany({ where: owned(req, { notebookId: note.id }) });
     }
-    await Note.deleteMany(owned(req, { parentId: note._id }));
-    await Note.findOneAndDelete(owned(req, { _id: req.params.id }));
+    await prisma.note.deleteMany({ where: owned(req, { parentId: note.id }) });
+    await prisma.note.delete({ where: { id: note.id } });
     res.json({ message: 'Note deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
