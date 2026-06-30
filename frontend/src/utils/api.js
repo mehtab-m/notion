@@ -2,8 +2,13 @@ import axios from 'axios';
 
 const TOKEN_KEY = 'auth_token';
 
+function resolveApiBase() {
+  const raw = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+  return raw.endsWith('/api') ? raw : `${raw}/api`;
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: resolveApiBase(),
 });
 
 api.interceptors.request.use((config) => {
@@ -160,4 +165,4 @@ export const toggleMilestone = (goalId, msId) =>
 // ── Dashboard ────────────────────────────────────────────
 export const getDashboardStats = () => api.get('/dashboard/stats').then((r) => r.data);
 
-export const getApiBase = () => import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+export const getApiBase = () => resolveApiBase().replace(/\/api$/, '') || 'http://localhost:5000';
