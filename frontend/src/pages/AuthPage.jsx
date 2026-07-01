@@ -138,7 +138,7 @@ export default function AuthPage({ redirectTo }) {
             <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
               {loading ? loadingMsg || 'Creating…' : 'Create account'}
             </button>
-            {loading && <p className="auth-loading-hint">{loadingMsg}</p>}
+            {/* {loading && <p className="auth-loading-hint">{loadingMsg}</p>} */}
           </form>
         )}
 
