@@ -5,6 +5,7 @@ import {
   Grid2x2, PenLine, StickyNote, Target, Flame, ChevronDown, ChevronRight, X,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import useMediaQuery, { MOBILE_QUERY } from '../hooks/useMediaQuery';
 import './Sidebar.css';
 
 const NAV_GROUPS = [
@@ -19,7 +20,7 @@ const NAV_GROUPS = [
   {
     label: 'PRODUCTIVITY',
     items: [
-      { to: '/projects', icon: FolderKanban, label: 'Projects' },
+      { to: '/projects', icon: FolderKanban, label: 'Projects', hideOnMobile: true },
       { to: '/goals', icon: Target, label: 'Goals' },
       { to: '/habits', icon: Flame, label: 'Habits' },
     ],
@@ -42,9 +43,15 @@ const NAV_GROUPS = [
 export default function Sidebar({ open, onClose }) {
   const today = format(new Date(), 'EEE, MMM d yyyy');
   const [collapsed, setCollapsed] = useState({});
+  const isMobile = useMediaQuery(MOBILE_QUERY);
 
   const toggleGroup = (label) =>
     setCollapsed((prev) => ({ ...prev, [label]: !prev[label] }));
+
+  const visibleGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !(isMobile && item.hideOnMobile)),
+  })).filter((group) => group.items.length > 0);
 
   return (
     <aside className={`sidebar ${open ? 'sidebar--open' : ''}`}>
@@ -57,7 +64,7 @@ export default function Sidebar({ open, onClose }) {
       </div>
 
       <nav className="sidebar-nav">
-        {NAV_GROUPS.map((group) => (
+        {visibleGroups.map((group) => (
           <div key={group.label} className="sidebar-group">
             <button
               className="sidebar-group-label"

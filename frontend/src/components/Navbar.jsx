@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Sun, Moon, Menu, LogOut } from 'lucide-react';
-import { useTheme } from '../context/ThemeContext';
+import { Search, Menu, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './Navbar.css';
 
@@ -13,7 +12,6 @@ function getGreeting() {
 
 export default function Navbar({ title, onMenuClick }) {
   const [searchVal, setSearchVal] = useState('');
-  const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
 
   return (
@@ -42,23 +40,6 @@ export default function Navbar({ title, onMenuClick }) {
           </div>
         )}
         <span className="navbar-greeting">{getGreeting()} 👋</span>
-
-        <button
-          className="theme-toggle"
-          onClick={toggleTheme}
-          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          aria-label="Toggle theme"
-        >
-          <span className="theme-toggle-track">
-            <span className="theme-toggle-thumb">
-              {theme === 'dark' ? (
-                <Moon size={12} strokeWidth={2.5} />
-              ) : (
-                <Sun size={12} strokeWidth={2.5} />
-              )}
-            </span>
-          </span>
-        </button>
 
         <button className="navbar-logout" onClick={logout} title="Log out">
           <LogOut size={16} />

@@ -3,7 +3,9 @@ import { Plus, Trash2, Flame, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format, subDays, eachDayOfInterval } from 'date-fns';
 import useApi from '../hooks/useApi';
+import useMediaQuery, { MOBILE_QUERY } from '../hooks/useMediaQuery';
 import { getHabits, createHabit, deleteHabit, toggleHabitDate } from '../utils/api';
+import ConfirmDialog from '../components/ConfirmDialog';
 import './HabitsPage.css';
 
 const EMOJIS = ['✅', '💪', '📚', '🏃', '💧', '🧘', '🥗', '😴', '✍️', '🎯', '🎸', '🌱'];
@@ -97,36 +99,54 @@ function HabitModal({ onClose, onSaved }) {
 }
 
 export default function HabitsPage() {
-  const { data: habits, loading, refetch } = useApi(getHabits);
+  const { data: habits, loading, setData, refetch } = useApi(getHabits);
   const [modalOpen, setModalOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
+  const isMobile = useMediaQuery(MOBILE_QUERY);
 
   const today = format(new Date(), 'yyyy-MM-dd');
-  const days = eachDayOfInterval({ start: subDays(new Date(), 13), end: new Date() });
+  const dayCount = isMobile ? 6 : 13;
+  const days = eachDayOfInterval({ start: subDays(new Date(), dayCount), end: new Date() });
 
   const handleToggle = useCallback(async (habitId, date) => {
+    setData((prev) => (prev || []).map((h) => {
+      if (h._id !== habitId) return h;
+      const dates = [...(h.completedDates || [])];
+      const idx = dates.indexOf(date);
+      if (idx >= 0) dates.splice(idx, 1);
+      else dates.push(date);
+      return { ...h, completedDates: dates };
+    }));
+
     try {
-      await toggleHabitDate(habitId, date);
-      refetch();
+      const updated = await toggleHabitDate(habitId, date);
+      setData((prev) => (prev || []).map((h) => (h._id === habitId ? updated : h)));
     } catch {
       toast.error('Failed to update habit');
+      refetch({ silent: true });
     }
-  }, [refetch]);
+  }, [setData, refetch]);
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this habit?')) return;
+    setData((prev) => (prev || []).filter((h) => h._id !== id));
     try {
       await deleteHabit(id);
       toast.success('Habit deleted');
-      refetch();
     } catch {
       toast.error('Failed to delete');
+      refetch({ silent: true });
     }
   };
 
   return (
     <div>
       <div className="page-header">
-        <h1>Habit Tracker</h1>
+        <div>
+          <h1>Habit Tracker</h1>
+          {isMobile && (
+            <p className="habits-mobile-hint">Showing last 7 days</p>
+          )}
+        </div>
         <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
           <Plus size={16} /> New Habit
         </button>
@@ -199,7 +219,7 @@ export default function HabitsPage() {
                   <td className="habit-actions-cell">
                     <button
                       className="card-action-btn danger"
-                      onClick={() => handleDelete(habit._id)}
+                      onClick={() => setDeleteId(habit._id)}
                       title="Delete habit"
                     >
                       <Trash2 size={13} />
@@ -213,8 +233,25 @@ export default function HabitsPage() {
       )}
 
       {modalOpen && (
-        <HabitModal onClose={() => setModalOpen(false)} onSaved={refetch} />
+        <HabitModal
+          onClose={() => setModalOpen(false)}
+          onSaved={() => refetch({ silent: true })}
+        />
       )}
+
+      <ConfirmDialog
+        open={!!deleteId}
+        title="Delete habit?"
+        message="This habit and all its tracking history will be permanently removed."
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => {
+          const id = deleteId;
+          setDeleteId(null);
+          handleDelete(id);
+        }}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 }

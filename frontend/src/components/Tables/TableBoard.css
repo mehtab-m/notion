@@ -96,6 +96,12 @@
   border-color: var(--accent);
 }
 
+.table-board-toggle--disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
 .table-board-title-btn {
   flex: 1;
   min-width: 0;

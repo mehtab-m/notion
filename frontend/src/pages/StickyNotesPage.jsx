@@ -1,8 +1,10 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Plus, Trash2, Pin, X } from 'lucide-react';
+import { Plus, Pin, Trash2, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useApi from '../hooks/useApi';
 import { getStickyNotes, createStickyNote, updateStickyNote, deleteStickyNote } from '../utils/api';
+import { useStickyNotesOverlay } from '../context/StickyNotesOverlayContext';
+import ConfirmDialog from '../components/ConfirmDialog';
 import './StickyNotesPage.css';
 
 const COLORS = ['yellow', 'pink', 'blue', 'green', 'purple', 'orange'];
@@ -16,9 +18,8 @@ const COLOR_MAP = {
   orange: { bg: '#ffedd5', text: '#7c2d12', border: '#fdba74' },
 };
 
-function StickyCard({ note, onUpdate, onDelete }) {
+function StickyCard({ note, onUpdate, onDeleteRequest, onShowOnScreen, isHiddenFromScreen }) {
   const [content, setContent] = useState(note.content || '');
-  const [editing, setEditing] = useState(false);
   const saveTimer = useRef(null);
   const c = COLOR_MAP[note.color] || COLOR_MAP.yellow;
 
@@ -32,9 +33,12 @@ function StickyCard({ note, onUpdate, onDelete }) {
 
   return (
     <div
-      className="sticky-card"
+      className={`sticky-card ${isHiddenFromScreen ? 'sticky-card--hidden' : ''}`}
       style={{ '--sticky-bg': c.bg, '--sticky-text': c.text, '--sticky-border': c.border }}
     >
+      {isHiddenFromScreen && (
+        <span className="sticky-hidden-badge">Hidden from screen</span>
+      )}
       <div className="sticky-card-header">
         <div className="sticky-colors">
           {COLORS.map((col) => (
@@ -48,6 +52,15 @@ function StickyCard({ note, onUpdate, onDelete }) {
           ))}
         </div>
         <div className="sticky-actions">
+          {isHiddenFromScreen && (
+            <button
+              className="sticky-show"
+              onClick={() => onShowOnScreen(note._id)}
+              title="Show on screen"
+            >
+              <Eye size={13} />
+            </button>
+          )}
           <button
             className={`sticky-pin ${note.pinned ? 'pinned' : ''}`}
             onClick={() => onUpdate(note._id, { pinned: !note.pinned })}
@@ -55,8 +68,8 @@ function StickyCard({ note, onUpdate, onDelete }) {
           >
             <Pin size={13} />
           </button>
-          <button className="sticky-delete" onClick={() => onDelete(note._id)} title="Delete">
-            <X size={13} />
+          <button className="sticky-delete" onClick={() => onDeleteRequest(note._id)} title="Delete">
+            <Trash2 size={13} />
           </button>
         </div>
       </div>
@@ -71,45 +84,47 @@ function StickyCard({ note, onUpdate, onDelete }) {
 }
 
 export default function StickyNotesPage() {
-  const { data: notes, loading, refetch } = useApi(getStickyNotes);
+  const { data: notes, loading, setData } = useApi(getStickyNotes);
   const [colorFilter, setColorFilter] = useState('all');
+  const [deleteId, setDeleteId] = useState(null);
+  const { isHiddenFromOverlay, showOnOverlay } = useStickyNotesOverlay();
 
   const handleAdd = async (color = 'yellow') => {
+    const x = 80 + Math.random() * (window.innerWidth - 350);
+    const y = 80 + Math.random() * (window.innerHeight - 300);
     try {
-      const x = 80 + Math.random() * (window.innerWidth - 350);
-      const y = 80 + Math.random() * (window.innerHeight - 300);
-      await createStickyNote({
+      const note = await createStickyNote({
         content: '',
         color,
         pinned: true,
         posX: Math.round(x),
         posY: Math.round(y),
       });
-      refetch();
+      setData((prev) => [...(prev || []), note]);
     } catch {
       toast.error('Failed to create sticky note');
     }
   };
 
   const handleUpdate = useCallback(async (id, data) => {
+    setData((prev) => (prev || []).map((n) => (n._id === id ? { ...n, ...data } : n)));
     try {
-      await updateStickyNote(id, data);
-      refetch();
+      const updated = await updateStickyNote(id, data);
+      setData((prev) => (prev || []).map((n) => (n._id === id ? updated : n)));
     } catch {
       toast.error('Failed to update');
     }
-  }, [refetch]);
+  }, [setData]);
 
   const handleDelete = useCallback(async (id) => {
-    if (!window.confirm('Delete this sticky note?')) return;
+    setData((prev) => (prev || []).filter((n) => n._id !== id));
     try {
       await deleteStickyNote(id);
-      refetch();
       toast.success('Deleted');
     } catch {
       toast.error('Failed to delete');
     }
-  }, [refetch]);
+  }, [setData]);
 
   const filtered = (notes || []).filter(
     (n) => colorFilter === 'all' || n.color === colorFilter
@@ -162,11 +177,27 @@ export default function StickyNotesPage() {
               key={note._id}
               note={note}
               onUpdate={handleUpdate}
-              onDelete={handleDelete}
+              onDeleteRequest={setDeleteId}
+              onShowOnScreen={showOnOverlay}
+              isHiddenFromScreen={isHiddenFromOverlay(note._id)}
             />
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleteId}
+        title="Delete sticky note?"
+        message="This will permanently remove the note from your screen and this section."
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => {
+          const id = deleteId;
+          setDeleteId(null);
+          handleDelete(id);
+        }}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 }

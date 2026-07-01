@@ -8,6 +8,7 @@ import { formatDistanceToNow } from 'date-fns';
 import {
   getNotes, createNote, updateNote, deleteNote, uploadNoteImage, getApiBase,
 } from '../utils/api';
+import ConfirmDialog from '../components/ConfirmDialog';
 import './NotesPage.css';
 
 const BACKEND = getApiBase();
@@ -154,6 +155,7 @@ export default function NotesPage() {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeNote, setActiveNote] = useState(null);
+  const [deleteNoteId, setDeleteNoteId] = useState(null);
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState({});
   const [saving, setSaving] = useState(false);
@@ -219,7 +221,6 @@ export default function NotesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this? Child pages will also be removed.')) return;
     try {
       await deleteNote(id);
       await fetchNotes();
@@ -337,7 +338,7 @@ export default function NotesPage() {
                   </button>
                 )}
                 {saving && <span className="notes-saving">Saving...</span>}
-                <button className="notes-delete-btn" onClick={() => handleDelete(activeNote._id)}>
+                <button className="notes-delete-btn" onClick={() => setDeleteNoteId(activeNote._id)}>
                   <Trash2 size={15} />
                 </button>
               </div>
@@ -376,6 +377,20 @@ export default function NotesPage() {
           </>
         )}
       </div>
+
+      <ConfirmDialog
+        open={!!deleteNoteId}
+        title="Delete note?"
+        message="This note and any child pages will be permanently removed."
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => {
+          const id = deleteNoteId;
+          setDeleteNoteId(null);
+          handleDelete(id);
+        }}
+        onCancel={() => setDeleteNoteId(null)}
+      />
     </div>
   );
 }

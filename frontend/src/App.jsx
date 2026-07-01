@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { useTheme } from './context/ThemeContext';
 import { useAuth } from './context/AuthContext';
+import { StickyNotesOverlayProvider } from './context/StickyNotesOverlayContext';
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 import StickyNotesOverlay from './components/StickyNotes/StickyNotesOverlay';
@@ -38,40 +38,42 @@ function getTitle(pathname) {
 
 function AppShell() {
   const location = useLocation();
-  const { theme } = useTheme();
   const title = getTitle(location.pathname);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const toastStyle =
-    theme === 'dark'
-      ? { background: '#1e1e1e', color: '#e8e8e8', border: '1px solid #2a2a2a' }
-      : { background: '#ffffff', color: '#111111', border: '1px solid #e2e2e2' };
+  const toastStyle = {
+    background: '#ffffff',
+    color: '#111111',
+    border: '1px solid #e2e2e2',
+  };
 
   return (
-    <div className="app-layout">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
-      <div className="app-main">
-        <Navbar title={title} onMenuClick={() => setSidebarOpen(true)} />
-        <div className="app-content">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/projects/:id" element={<ProjectDetailPage />} />
-            <Route path="/books" element={<BooksPage />} />
-            <Route path="/shows" element={<ShowsPage />} />
-            <Route path="/tables" element={<TablesPage />} />
-            <Route path="/tables/:id" element={<TablesPage />} />
-            <Route path="/notes" element={<NotesPage />} />
-            <Route path="/stickynotes" element={<StickyNotesPage />} />
-            <Route path="/habits" element={<HabitsPage />} />
-            <Route path="/goals" element={<GoalsPage />} />
-          </Routes>
+    <StickyNotesOverlayProvider>
+      <div className="app-layout">
+        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
+        <div className="app-main">
+          <Navbar title={title} onMenuClick={() => setSidebarOpen(true)} />
+          <div className="app-content">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/projects/:id" element={<ProjectDetailPage />} />
+              <Route path="/books" element={<BooksPage />} />
+              <Route path="/shows" element={<ShowsPage />} />
+              <Route path="/tables" element={<TablesPage />} />
+              <Route path="/tables/:id" element={<TablesPage />} />
+              <Route path="/notes" element={<NotesPage />} />
+              <Route path="/stickynotes" element={<StickyNotesPage />} />
+              <Route path="/habits" element={<HabitsPage />} />
+              <Route path="/goals" element={<GoalsPage />} />
+            </Routes>
+          </div>
         </div>
+        <StickyNotesOverlay />
+        <Toaster position="bottom-right" toastOptions={{ style: toastStyle }} />
       </div>
-      <StickyNotesOverlay />
-      <Toaster position="bottom-right" toastOptions={{ style: toastStyle }} />
-    </div>
+    </StickyNotesOverlayProvider>
   );
 }
 

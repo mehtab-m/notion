@@ -6,6 +6,7 @@ import ProgressRing from '../components/Dashboard/ProgressRing';
 import RecentActivity from '../components/Dashboard/RecentActivity';
 import QuickAdd from '../components/Dashboard/QuickAdd';
 import DashboardCharts from '../components/Dashboard/DashboardCharts';
+import useMediaQuery, { MOBILE_QUERY } from '../hooks/useMediaQuery';
 import './Dashboard.css';
 
 const BACKEND = getApiBase();
@@ -20,6 +21,7 @@ export default function Dashboard() {
   const [data, setData] = useState({ projects: [], books: [], shows: [], tables: [] });
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const isMobile = useMediaQuery(MOBILE_QUERY);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -49,7 +51,7 @@ export default function Dashboard() {
   const watchingShows = shows.filter((s) => s.status === 'watching');
 
   const recentActivity = [
-    ...projects.map((p) => ({ title: p.title, type: 'project', date: p.updatedAt || p.createdAt, action: `Project · ${p.status}` })),
+    ...(!isMobile ? projects.map((p) => ({ title: p.title, type: 'project', date: p.updatedAt || p.createdAt, action: `Project · ${p.status}` })) : []),
     ...books.map((b) => ({ title: b.title, type: 'book', date: b.createdAt, action: `Book · ${b.status}` })),
     ...shows.map((s) => ({ title: s.title, type: 'show', date: s.createdAt, action: `Show · ${s.status}` })),
     ...tables.map((t) => ({ title: t.name, type: 'table', date: t.createdAt, action: 'Table' })),
@@ -68,13 +70,15 @@ export default function Dashboard() {
   return (
     <div className="dashboard">
       <div className="dashboard-stats">
-        <StatsCard
-          icon={FolderKanban}
-          label="Projects"
-          value={projects.length}
-          subLabel={`${activeProjects.length} active`}
-          color="var(--accent)"
-        />
+        {!isMobile && (
+          <StatsCard
+            icon={FolderKanban}
+            label="Projects"
+            value={projects.length}
+            subLabel={`${activeProjects.length} active`}
+            color="var(--accent)"
+          />
+        )}
         <StatsCard
           icon={BookOpen}
           label="Books"
@@ -99,7 +103,7 @@ export default function Dashboard() {
       </div>
 
       <div className="dashboard-section">
-        <QuickAdd onAdded={fetchAll} />
+        <QuickAdd onAdded={fetchAll} hideProjects={isMobile} />
       </div>
 
       <DashboardCharts stats={stats} />
@@ -160,7 +164,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {activeProjects.length > 0 && (
+          {!isMobile && activeProjects.length > 0 && (
             <div className="dashboard-section">
               <h2 className="section-title">Active Projects</h2>
               <div className="projects-overview-list">

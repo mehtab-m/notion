@@ -6,6 +6,7 @@ import useApi from '../hooks/useApi';
 import { getTables, getTable, deleteTable, createTable } from '../utils/api';
 import TableModal from '../components/Tables/TableModal';
 import TableBoard from '../components/Tables/TableBoard';
+import ConfirmDialog from '../components/ConfirmDialog';
 import {
   addRow, updateRow, deleteRow, addColumn, updateColumn, deleteColumn,
 } from '../utils/api';
@@ -81,6 +82,7 @@ export default function TablesPage() {
   const [fullTables, setFullTables] = useState([]);
   const [loadingFull, setLoadingFull] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [deleteTableId, setDeleteTableId] = useState(null);
   const [creatingTemplate, setCreatingTemplate] = useState(false);
   const [highlightTableId, setHighlightTableId] = useState(highlightId || null);
 
@@ -122,7 +124,6 @@ export default function TablesPage() {
   }, [refetch]);
 
   const handleDelete = async (tableId) => {
-    if (!window.confirm('Delete this table and all its data?')) return;
     try {
       await deleteTable(tableId);
       toast.success('Table deleted');
@@ -201,7 +202,7 @@ export default function TablesPage() {
         <TableBoard
           tables={fullTables}
           getTableApi={(tableId) => makeTableApi(tableId)}
-          onDeleteTable={handleDelete}
+          onDeleteTable={setDeleteTableId}
           onTableChange={refreshTable}
           highlightId={highlightTableId}
           loading={loading}
@@ -212,6 +213,20 @@ export default function TablesPage() {
       {modalOpen && (
         <TableModal onClose={handleClose} onSaved={handleModalSaved} />
       )}
+
+      <ConfirmDialog
+        open={!!deleteTableId}
+        title="Delete table?"
+        message="This table and all its data will be permanently removed."
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => {
+          const id = deleteTableId;
+          setDeleteTableId(null);
+          handleDelete(id);
+        }}
+        onCancel={() => setDeleteTableId(null)}
+      />
     </div>
   );
 }

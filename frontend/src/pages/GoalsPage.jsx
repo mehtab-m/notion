@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import useApi from '../hooks/useApi';
 import { getGoals, createGoal, updateGoal, deleteGoal, toggleMilestone } from '../utils/api';
+import ConfirmDialog from '../components/ConfirmDialog';
 import './GoalsPage.css';
 
 const CATEGORIES = ['personal', 'work', 'health', 'finance', 'learning', 'other'];
@@ -156,9 +157,9 @@ export default function GoalsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editGoal, setEditGoal] = useState(null);
   const [catFilter, setCatFilter] = useState('all');
+  const [deleteId, setDeleteId] = useState(null);
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this goal?')) return;
     try {
       await deleteGoal(id);
       toast.success('Goal deleted');
@@ -221,7 +222,7 @@ export default function GoalsPage() {
                   </div>
                   <div className="goal-card-actions">
                     <button className="card-action-btn" onClick={() => { setEditGoal(goal); setModalOpen(true); }} title="Edit"><Plus size={13} style={{ transform: 'rotate(45deg)' }} /></button>
-                    <button className="card-action-btn danger" onClick={() => handleDelete(goal._id)} title="Delete"><Trash2 size={13} /></button>
+                    <button className="card-action-btn danger" onClick={() => setDeleteId(goal._id)} title="Delete"><Trash2 size={13} /></button>
                   </div>
                 </div>
 
@@ -267,6 +268,20 @@ export default function GoalsPage() {
       )}
 
       {modalOpen && <GoalModal goal={editGoal} onClose={handleClose} onSaved={refetch} />}
+
+      <ConfirmDialog
+        open={!!deleteId}
+        title="Delete goal?"
+        message="This goal and all its milestones will be permanently removed."
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => {
+          const id = deleteId;
+          setDeleteId(null);
+          handleDelete(id);
+        }}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 }

@@ -200,4 +200,6 @@
 
 @media (max-width: 480px) {
   .navbar { padding: 0 12px; }
+  .navbar-user-info { display: none; }
+  .navbar-right { gap: 8px; }
 }

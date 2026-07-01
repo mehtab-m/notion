@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import {
   addRow, updateRow, deleteRow, addColumn, updateColumn, deleteColumn,
 } from '../../utils/api';
+import ConfirmDialog from '../ConfirmDialog';
 import './DynamicTable.css';
 
 const TYPE_ICONS = {
@@ -329,6 +330,7 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
   const [openMenu, setOpenMenu] = useState(null);
   const [addingRow, setAddingRow] = useState(false);
   const [deletingCol, setDeletingCol] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   useEffect(() => {
     setColumns(normColumns(table.columns));
@@ -350,7 +352,6 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
   };
 
   const handleDeleteRow = async (rowId) => {
-    if (!window.confirm('Delete this row?')) return;
     try {
       await tableApi.deleteRow(tableId, rowId);
       setRows((prev) => prev.filter((r) => rid(r) !== rowId));
@@ -393,7 +394,6 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
 
   const handleDeleteColumn = async (col) => {
     const colId = cid(col);
-    if (!window.confirm(`Delete column "${col.name}"?`)) return;
     setDeletingCol(colId);
     try {
       await tableApi.deleteColumn(tableId, colId);
@@ -452,7 +452,7 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
                         <button
                           type="button"
                           className="col-delete-btn"
-                          onClick={() => handleDeleteColumn(col)}
+                          onClick={() => setConfirmDelete({ type: 'column', col })}
                           disabled={deletingCol === colId}
                           title={`Delete column "${col.name}"`}
                         >
@@ -499,7 +499,7 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
                     <td className="dt-row-delete-cell">
                       <button
                         className="dt-row-delete"
-                        onClick={() => handleDeleteRow(rowId)}
+                        onClick={() => setConfirmDelete({ type: 'row', rowId })}
                         title="Delete row"
                       >
                         <Trash2 size={13} />
@@ -523,6 +523,25 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title={confirmDelete?.type === 'column' ? 'Delete column?' : 'Delete row?'}
+        message={
+          confirmDelete?.type === 'column'
+            ? `Column "${confirmDelete.col?.name}" and all its data will be permanently removed.`
+            : 'This row and all its data will be permanently removed.'
+        }
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => {
+          const action = confirmDelete;
+          setConfirmDelete(null);
+          if (action?.type === 'row') handleDeleteRow(action.rowId);
+          else if (action?.type === 'column') handleDeleteColumn(action.col);
+        }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

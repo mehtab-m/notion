@@ -4,9 +4,11 @@ const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
 const { cleanBody } = require('../utils/body');
 const { serialize } = require('../utils/serialize');
+const { seedDefaultHabits } = require('../utils/defaultHabits');
 
 router.get('/', async (req, res) => {
   try {
+    await seedDefaultHabits(prisma, req.user.id);
     const habits = await prisma.habit.findMany({
       where: owned(req),
       orderBy: { createdAt: 'desc' },

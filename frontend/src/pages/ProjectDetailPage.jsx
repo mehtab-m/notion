@@ -17,6 +17,7 @@ import {
   getProjectMessages, sendProjectMessage,
 } from '../utils/api';
 import TableBoard from '../components/Tables/TableBoard';
+import ConfirmDialog from '../components/ConfirmDialog';
 import './ProjectDetailPage.css';
 
 const TABLE_TEMPLATES = [
@@ -206,6 +207,7 @@ function AssigneeSelect({ team, value, onChange, disabled }) {
 
 function TaskItem({ task, team, projectId, onUpdate }) {
   const [showDiscussion, setShowDiscussion] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const handleToggle = async () => {
     try {
@@ -222,7 +224,6 @@ function TaskItem({ task, team, projectId, onUpdate }) {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Delete this task?')) return;
     try {
       const updated = await deleteProjectTask(projectId, task.id);
       onUpdate(updated);
@@ -247,7 +248,7 @@ function TaskItem({ task, team, projectId, onUpdate }) {
             <MessageCircle size={14} />
             <span className="pd-discuss-label">Chat</span>
           </button>
-          <button type="button" className="pd-icon-btn danger" onClick={handleDelete}>
+          <button type="button" className="pd-icon-btn danger" onClick={() => setConfirmDelete(true)}>
             <Trash2 size={14} />
           </button>
         </div>
@@ -255,6 +256,19 @@ function TaskItem({ task, team, projectId, onUpdate }) {
       {showDiscussion && (
         <TaskComments projectId={projectId} taskId={task.id} />
       )}
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete task?"
+        message="This task will be permanently removed from the project."
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => {
+          setConfirmDelete(false);
+          handleDelete();
+        }}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   );
 }
@@ -271,6 +285,8 @@ export default function ProjectDetailPage() {
   const [taskAssignee, setTaskAssignee] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [tableInput, setTableInput] = useState('');
+  const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
+  const [deleteTableId, setDeleteTableId] = useState(null);
   const [highlightTableId, setHighlightTableId] = useState(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
@@ -426,12 +442,7 @@ export default function ProjectDetailPage() {
             <button
               type="button"
               className="btn btn-danger btn-sm pd-delete-btn"
-              onClick={async () => {
-                if (!window.confirm('Delete this project permanently?')) return;
-                await deleteProject(id);
-                toast.success('Deleted');
-                navigate('/projects');
-              }}
+              onClick={() => setConfirmDeleteProject(true)}
             >
               <Trash2 size={13} /> Delete
             </button>
@@ -551,12 +562,7 @@ export default function ProjectDetailPage() {
               <TableBoard
                 tables={project.dataTables || []}
                 getTableApi={getProjectTableApi}
-                onDeleteTable={async (tableId) => {
-                  if (!window.confirm('Delete this table and all its data?')) return;
-                  const updated = await deleteProjectTable(id, tableId);
-                  setProject(updated);
-                  toast.success('Table deleted');
-                }}
+                onDeleteTable={setDeleteTableId}
                 onTableChange={refreshProject}
                 highlightId={highlightTableId}
                 emptyMessage="No tables yet."
@@ -652,6 +658,37 @@ export default function ProjectDetailPage() {
           </section>
         )}
       </main>
+
+      <ConfirmDialog
+        open={confirmDeleteProject}
+        title="Delete project?"
+        message="This project and all its tasks, tables, and data will be permanently removed."
+        confirmLabel="Delete"
+        danger
+        onConfirm={async () => {
+          setConfirmDeleteProject(false);
+          await deleteProject(id);
+          toast.success('Deleted');
+          navigate('/projects');
+        }}
+        onCancel={() => setConfirmDeleteProject(false)}
+      />
+
+      <ConfirmDialog
+        open={!!deleteTableId}
+        title="Delete table?"
+        message="This table and all its data will be permanently removed."
+        confirmLabel="Delete"
+        danger
+        onConfirm={async () => {
+          const tableId = deleteTableId;
+          setDeleteTableId(null);
+          const updated = await deleteProjectTable(id, tableId);
+          setProject(updated);
+          toast.success('Table deleted');
+        }}
+        onCancel={() => setDeleteTableId(null)}
+      />
     </div>
   );
 }

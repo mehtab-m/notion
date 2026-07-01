@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { createProject, createBook, createShow } from '../../utils/api';
 import './QuickAdd.css';
 
-export default function QuickAdd({ onAdded }) {
+export default function QuickAdd({ onAdded, hideProjects = false }) {
   const [modal, setModal] = useState(null); // 'project' | 'book' | 'show'
   const [form, setForm] = useState({});
   const [loading, setLoading] = useState(false);
@@ -55,9 +55,11 @@ export default function QuickAdd({ onAdded }) {
     <>
       <div className="quick-add">
         <span className="quick-add-label">Quick Add:</span>
-        <button className="quick-add-btn" onClick={() => setModal('project')}>
-          <Plus size={14} /> Project
-        </button>
+        {!hideProjects && (
+          <button className="quick-add-btn" onClick={() => setModal('project')}>
+            <Plus size={14} /> Project
+          </button>
+        )}
         <button className="quick-add-btn" onClick={() => setModal('book')}>
           <Plus size={14} /> Book
         </button>

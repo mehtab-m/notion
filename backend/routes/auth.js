@@ -4,6 +4,7 @@ const prisma = require('../lib/prisma');
 const { signToken, authMiddleware } = require('../middleware/auth');
 const { sendVerificationEmail } = require('../utils/email');
 const { serialize } = require('../utils/serialize');
+const { seedDefaultHabits } = require('../utils/defaultHabits');
 
 const router = express.Router();
 
@@ -93,6 +94,8 @@ router.post('/verify', async (req, res) => {
       where: { id: user.id },
       data: { isVerified: true, verificationCode: null, verificationExpires: null },
     });
+
+    await seedDefaultHabits(prisma, verified.id);
 
     const token = signToken(verified.id);
     res.json({ token, user: publicUser(verified) });

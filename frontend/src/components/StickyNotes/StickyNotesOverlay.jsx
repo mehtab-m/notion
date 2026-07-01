@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Pin, X, Plus } from 'lucide-react';
+import { Pin, Trash2, Plus, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getStickyNotes, createStickyNote, updateStickyNote, deleteStickyNote } from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
+import { useStickyNotesOverlay } from '../../context/StickyNotesOverlayContext';
+import ConfirmDialog from '../ConfirmDialog';
 import './StickyNotesOverlay.css';
 
 const COLORS = ['yellow', 'pink', 'blue', 'green', 'purple', 'orange'];
@@ -16,7 +18,7 @@ const COLOR_MAP = {
   orange: { bg: '#ffedd5', text: '#7c2d12', border: '#fdba74' },
 };
 
-function FloatingSticky({ note, onUpdate, onDelete, zIndex, onFocus }) {
+function FloatingSticky({ note, onUpdate, onHide, onDeleteRequest, zIndex, onFocus }) {
   const [content, setContent] = useState(note.content || '');
   const [pos, setPos] = useState({ x: note.posX || 100, y: note.posY || 100 });
   const [dragging, setDragging] = useState(false);
@@ -97,11 +99,23 @@ function FloatingSticky({ note, onUpdate, onDelete, zIndex, onFocus }) {
           <button
             className={`sticky-pin ${note.pinned ? 'pinned' : ''}`}
             onClick={() => onUpdate(note._id, { pinned: !note.pinned })}
+            title={note.pinned ? 'Unpin' : 'Pin'}
           >
             <Pin size={12} />
           </button>
-          <button className="sticky-delete" onClick={() => onDelete(note._id)}>
-            <X size={12} />
+          <button
+            className="sticky-hide"
+            onClick={() => onHide(note._id)}
+            title="Hide from screen"
+          >
+            <EyeOff size={12} />
+          </button>
+          <button
+            className="sticky-delete"
+            onClick={() => onDeleteRequest(note._id)}
+            title="Delete permanently"
+          >
+            <Trash2 size={12} />
           </button>
         </div>
       </div>
@@ -117,8 +131,10 @@ function FloatingSticky({ note, onUpdate, onDelete, zIndex, onFocus }) {
 
 export default function StickyNotesOverlay() {
   const { user } = useAuth();
+  const { hiddenIds, hideFromOverlay } = useStickyNotesOverlay();
   const [notes, setNotes] = useState([]);
   const [topZ, setTopZ] = useState({});
+  const [deleteId, setDeleteId] = useState(null);
   const zCounter = useRef(200);
 
   const fetchNotes = useCallback(async () => {
@@ -137,22 +153,26 @@ export default function StickyNotesOverlay() {
   useEffect(() => { fetchNotes(); }, [fetchNotes]);
 
   const handleUpdate = useCallback(async (id, data) => {
+    setNotes((prev) => prev.map((n) => (n._id === id ? { ...n, ...data } : n)));
     try {
       const updated = await updateStickyNote(id, data);
       setNotes((prev) => prev.map((n) => (n._id === id ? updated : n)));
     } catch {
       toast.error('Failed to update sticky note');
+      fetchNotes();
     }
-  }, []);
+  }, [fetchNotes]);
 
   const handleDelete = useCallback(async (id) => {
+    setNotes((prev) => prev.filter((n) => n._id !== id));
     try {
       await deleteStickyNote(id);
-      setNotes((prev) => prev.filter((n) => n._id !== id));
+      toast.success('Sticky note deleted');
     } catch {
       toast.error('Failed to delete');
+      fetchNotes();
     }
-  }, []);
+  }, [fetchNotes]);
 
   const handleAdd = async () => {
     const x = 80 + Math.random() * (window.innerWidth - 350);
@@ -176,23 +196,18 @@ export default function StickyNotesOverlay() {
     setTopZ((prev) => ({ ...prev, [id]: zCounter.current }));
   };
 
-  if (notes.length === 0) {
-    return (
-      <button className="sticky-fab" onClick={handleAdd} title="Add sticky note">
-        <Plus size={20} />
-      </button>
-    );
-  }
+  const visibleNotes = notes.filter((n) => !hiddenIds.has(n._id));
 
   return (
     <>
       <div className="sticky-overlay">
-        {notes.map((note) => (
+        {visibleNotes.map((note) => (
           <FloatingSticky
             key={note._id}
             note={note}
             onUpdate={handleUpdate}
-            onDelete={handleDelete}
+            onHide={hideFromOverlay}
+            onDeleteRequest={setDeleteId}
             zIndex={topZ[note._id] || 200}
             onFocus={bringToFront}
           />
@@ -201,6 +216,20 @@ export default function StickyNotesOverlay() {
       <button className="sticky-fab" onClick={handleAdd} title="Add sticky note">
         <Plus size={20} />
       </button>
+
+      <ConfirmDialog
+        open={!!deleteId}
+        title="Delete sticky note?"
+        message="This will permanently remove the note from your screen and the Sticky Notes section."
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => {
+          const id = deleteId;
+          setDeleteId(null);
+          handleDelete(id);
+        }}
+        onCancel={() => setDeleteId(null)}
+      />
     </>
   );
 }
