@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from './context/AuthContext';
 import { StickyNotesOverlayProvider } from './context/StickyNotesOverlayContext';
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 import StickyNotesOverlay from './components/StickyNotes/StickyNotesOverlay';
+import LandingPage from './pages/landing/LandingPage';
 import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
 import ProjectsPage from './pages/ProjectsPage';
@@ -67,6 +68,7 @@ function AppShell() {
               <Route path="/stickynotes" element={<StickyNotesPage />} />
               <Route path="/habits" element={<HabitsPage />} />
               <Route path="/goals" element={<GoalsPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
         </div>
@@ -77,10 +79,31 @@ function AppShell() {
   );
 }
 
-export default function App() {
-  const { isAuthenticated, loading, user } = useAuth();
+function PublicRoutes() {
   const location = useLocation();
   const redirectTo = location.pathname + location.search;
+
+  return (
+    <>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route
+          path="/login"
+          element={<AuthPage initialMode="login" redirectTo={redirectTo !== '/login' ? redirectTo : undefined} />}
+        />
+        <Route
+          path="/signup"
+          element={<AuthPage initialMode="signup" redirectTo={redirectTo !== '/signup' ? redirectTo : undefined} />}
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <Toaster position="bottom-right" />
+    </>
+  );
+}
+
+export default function App() {
+  const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
     return (
@@ -91,13 +114,14 @@ export default function App() {
   }
 
   if (!isAuthenticated) {
-    return (
-      <>
-        <AuthPage redirectTo={redirectTo !== '/' ? redirectTo : undefined} />
-        <Toaster position="bottom-right" />
-      </>
-    );
+    return <PublicRoutes />;
   }
 
-  return <AppShell key={user._id} />;
+  return (
+    <Routes>
+      <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="/signup" element={<Navigate to="/" replace />} />
+      <Route path="/*" element={<AppShell key={user._id} />} />
+    </Routes>
+  );
 }

@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Grid2x2, Mail, Lock, User, KeyRound } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Grid2x2, Mail, Lock, User, KeyRound, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { signup, verifyEmail, login, resendCode } from '../utils/api';
 import './AuthPage.css';
 
-export default function AuthPage({ redirectTo }) {
+export default function AuthPage({ redirectTo, initialMode = 'login' }) {
   const { login: authLogin } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState('login'); // login | signup | verify
-  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState(initialMode);  const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
   const [form, setForm] = useState({ name: '', email: '', password: '', code: '' });
   const loadingTimers = useRef([]);
@@ -38,8 +37,11 @@ export default function AuthPage({ redirectTo }) {
 
   useEffect(() => () => loadingTimers.current.forEach(clearTimeout), []);
 
-  const authError = (err, fallback) => {
-    if (err.code === 'ECONNABORTED') return 'Request timed out. The server may be starting — try again in a moment.';
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
+
+  const authError = (err, fallback) => {    if (err.code === 'ECONNABORTED') return 'Request timed out. The server may be starting — try again in a moment.';
     if (!err.response) return 'Cannot reach server. Check your connection or try again shortly.';
     return err.response?.data?.error || fallback;
   };
@@ -59,9 +61,8 @@ export default function AuthPage({ redirectTo }) {
   };
 
   const goAfterAuth = () => {
-    if (redirectTo) navigate(redirectTo, { replace: true });
+    navigate(redirectTo || '/', { replace: true });
   };
-
   const handleVerify = async (e) => {
     e.preventDefault();
     startLoading('Verifying…');
@@ -109,15 +110,17 @@ export default function AuthPage({ redirectTo }) {
 
   return (
     <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-logo">
+      <Link to="/" className="auth-back-link">
+        <ArrowLeft size={16} /> Back to home
+      </Link>
+      <div className="auth-card">        <div className="auth-logo">
           <Grid2x2 size={28} color="var(--accent)" />
           <h1>My Notion</h1>
         </div>
 
         <div className="auth-tabs">
-          <button className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>Log in</button>
-          <button className={mode === 'signup' ? 'active' : ''} onClick={() => setMode('signup')}>Sign up</button>
+          <button className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); navigate('/login'); }}>Log in</button>
+          <button className={mode === 'signup' ? 'active' : ''} onClick={() => { setMode('signup'); navigate('/signup'); }}>Sign up</button>
           {mode === 'verify' && <button className="active">Verify</button>}
         </div>
 
