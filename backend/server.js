@@ -23,6 +23,8 @@ app.use(cors({
   origin: [
     'https://notion-lovat-psi.vercel.app',
     'http://localhost:5173',
+    'https://sortlife.com',
+    'https://www.sortlife.com',
     process.env.FRONTEND_URL?.replace(/\/$/, ''),
   ].filter(Boolean),
   credentials: true,
