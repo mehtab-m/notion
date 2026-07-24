@@ -3,8 +3,8 @@ const bcrypt = require('bcryptjs');
 const prisma = require('../lib/prisma');
 const { signToken, authMiddleware } = require('../middleware/auth');
 const { sendVerificationEmail } = require('../utils/email');
-const { serialize } = require('../utils/serialize');
 const { seedDefaultHabits } = require('../utils/defaultHabits');
+const { graceUntilFrom, logActivity, isAdminUser } = require('../utils/activity');
 
 const router = express.Router();
 
@@ -13,7 +13,17 @@ function generateCode() {
 }
 
 function publicUser(user) {
-  return { _id: user.id, name: user.name, email: user.email };
+  return {
+    _id: user.id,
+    name: user.name,
+    email: user.email,
+    isDeveloper: user.isDeveloper ?? null,
+    role: isAdminUser(user) ? 'admin' : (user.role || 'user'),
+    isActive: user.isActive ?? true,
+    activeGraceUntil: user.activeGraceUntil || null,
+    lastActiveAt: user.lastActiveAt || null,
+    createdAt: user.createdAt,
+  };
 }
 
 // POST /api/auth/signup
@@ -34,6 +44,7 @@ router.post('/signup', async (req, res) => {
     const code = generateCode();
     const hashed = await bcrypt.hash(password, 10);
     const expires = new Date(Date.now() + 15 * 60 * 1000);
+    const now = new Date();
 
     if (existing) {
       await prisma.user.update({
@@ -53,6 +64,8 @@ router.post('/signup', async (req, res) => {
           password: hashed,
           verificationCode: code,
           verificationExpires: expires,
+          isActive: true,
+          activeGraceUntil: graceUntilFrom(now),
         },
       });
     }
@@ -81,6 +94,7 @@ router.post('/verify', async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
     if (user.isVerified) {
       const token = signToken(user.id);
+      await logActivity(user.id, 'login');
       return res.json({ token, user: publicUser(user) });
     }
     if (user.verificationCode !== code.trim()) {
@@ -92,10 +106,17 @@ router.post('/verify', async (req, res) => {
 
     const verified = await prisma.user.update({
       where: { id: user.id },
-      data: { isVerified: true, verificationCode: null, verificationExpires: null },
+      data: {
+        isVerified: true,
+        verificationCode: null,
+        verificationExpires: null,
+        isActive: true,
+        activeGraceUntil: user.activeGraceUntil || graceUntilFrom(user.createdAt),
+      },
     });
 
     await seedDefaultHabits(prisma, verified.id);
+    await logActivity(verified.id, 'login');
 
     const token = signToken(verified.id);
     res.json({ token, user: publicUser(verified) });
@@ -145,8 +166,20 @@ router.post('/login', async (req, res) => {
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ error: 'Invalid email or password' });
 
-    const token = signToken(user.id);
-    res.json({ token, user: publicUser(user) });
+    // Ensure grace window exists for older accounts that predate this field
+    let readyUser = user;
+    if (!user.activeGraceUntil) {
+      readyUser = await prisma.user.update({
+        where: { id: user.id },
+        data: { activeGraceUntil: graceUntilFrom(user.createdAt) },
+      });
+    }
+
+    await logActivity(readyUser.id, 'login');
+    const refreshed = await prisma.user.findUnique({ where: { id: readyUser.id } });
+
+    const token = signToken(refreshed.id);
+    res.json({ token, user: publicUser(refreshed) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -155,6 +188,34 @@ router.post('/login', async (req, res) => {
 // GET /api/auth/me
 router.get('/me', authMiddleware, (req, res) => {
   res.json({ user: publicUser(req.user) });
+});
+
+// PATCH /api/auth/preferences — set developer status (once or update)
+router.patch('/preferences', authMiddleware, async (req, res) => {
+  try {
+    const { isDeveloper } = req.body;
+    if (typeof isDeveloper !== 'boolean') {
+      return res.status(400).json({ error: 'isDeveloper must be true or false' });
+    }
+    const updated = await prisma.user.update({
+      where: { id: req.user.id },
+      data: { isDeveloper },
+    });
+    res.json({ user: publicUser(updated) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/ping — record app usage for active-user analysis
+router.post('/ping', authMiddleware, async (req, res) => {
+  try {
+    await logActivity(req.user.id, 'app_use');
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    res.json({ ok: true, user: publicUser(user) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 module.exports = router;

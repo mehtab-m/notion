@@ -6,6 +6,7 @@ import { StickyNotesOverlayProvider } from './context/StickyNotesOverlayContext'
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 import StickyNotesOverlay from './components/StickyNotes/StickyNotesOverlay';
+import DeveloperOnboarding from './components/DeveloperOnboarding';
 import LandingPage from './pages/landing/LandingPage';
 import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
@@ -18,6 +19,7 @@ import NotesPage from './pages/NotesPage';
 import StickyNotesPage from './pages/StickyNotesPage';
 import HabitsPage from './pages/HabitsPage';
 import GoalsPage from './pages/GoalsPage';
+import AdminDashboard from './pages/AdminDashboard';
 
 const PAGE_TITLES = {
   '/': 'Dashboard',
@@ -29,6 +31,7 @@ const PAGE_TITLES = {
   '/stickynotes': 'Sticky Notes',
   '/habits': 'Habit Tracker',
   '/goals': 'Goals',
+  '/admin': 'Product Admin',
 };
 
 function getTitle(pathname) {
@@ -37,10 +40,23 @@ function getTitle(pathname) {
   return PAGE_TITLES[pathname] || 'Dashboard';
 }
 
+function DeveloperRoute({ children }) {
+  const { isDeveloper } = useAuth();
+  if (!isDeveloper) return <Navigate to="/" replace />;
+  return children;
+}
+
+function AdminRoute({ children }) {
+  const { isAdmin } = useAuth();
+  if (!isAdmin) return <Navigate to="/" replace />;
+  return children;
+}
+
 function AppShell() {
   const location = useLocation();
   const title = getTitle(location.pathname);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { needsDeveloperChoice } = useAuth();
 
   const toastStyle = {
     background: '#ffffff',
@@ -58,8 +74,22 @@ function AppShell() {
           <div className="app-content">
             <Routes>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/projects" element={<ProjectsPage />} />
-              <Route path="/projects/:id" element={<ProjectDetailPage />} />
+              <Route
+                path="/projects"
+                element={(
+                  <DeveloperRoute>
+                    <ProjectsPage />
+                  </DeveloperRoute>
+                )}
+              />
+              <Route
+                path="/projects/:id"
+                element={(
+                  <DeveloperRoute>
+                    <ProjectDetailPage />
+                  </DeveloperRoute>
+                )}
+              />
               <Route path="/books" element={<BooksPage />} />
               <Route path="/shows" element={<ShowsPage />} />
               <Route path="/tables" element={<TablesPage />} />
@@ -68,11 +98,20 @@ function AppShell() {
               <Route path="/stickynotes" element={<StickyNotesPage />} />
               <Route path="/habits" element={<HabitsPage />} />
               <Route path="/goals" element={<GoalsPage />} />
+              <Route
+                path="/admin"
+                element={(
+                  <AdminRoute>
+                    <AdminDashboard />
+                  </AdminRoute>
+                )}
+              />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
         </div>
         <StickyNotesOverlay />
+        {needsDeveloperChoice && <DeveloperOnboarding />}
         <Toaster position="bottom-right" toastOptions={{ style: toastStyle }} />
       </div>
     </StickyNotesOverlayProvider>

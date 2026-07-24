@@ -15,6 +15,7 @@ const stickyNotesRouter = require('./routes/stickynotes');
 const habitsRouter = require('./routes/habits');
 const goalsRouter = require('./routes/goals');
 const dashboardRouter = require('./routes/dashboard');
+const adminRouter = require('./routes/admin');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -38,6 +39,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRouter);
 
 app.use('/api', authMiddleware);
+app.use('/api/admin', adminRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/books', booksRouter);
 app.use('/api/shows', showsRouter);

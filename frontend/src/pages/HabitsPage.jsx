@@ -109,6 +109,10 @@ export default function HabitsPage() {
   const days = eachDayOfInterval({ start: subDays(new Date(), dayCount), end: new Date() });
 
   const handleToggle = useCallback(async (habitId, date) => {
+    if (date !== today) {
+      toast.error('You can only mark habits for today');
+      return;
+    }
     setData((prev) => (prev || []).map((h) => {
       if (h._id !== habitId) return h;
       const dates = [...(h.completedDates || [])];
@@ -121,11 +125,11 @@ export default function HabitsPage() {
     try {
       const updated = await toggleHabitDate(habitId, date);
       setData((prev) => (prev || []).map((h) => (h._id === habitId ? updated : h)));
-    } catch {
-      toast.error('Failed to update habit');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update habit');
       refetch({ silent: true });
     }
-  }, [setData, refetch]);
+  }, [setData, refetch, today]);
 
   const handleDelete = async (id) => {
     setData((prev) => (prev || []).filter((h) => h._id !== id));
@@ -144,7 +148,10 @@ export default function HabitsPage() {
         <div>
           <h1>Habit Tracker</h1>
           {isMobile && (
-            <p className="habits-mobile-hint">Showing last 7 days</p>
+            <p className="habits-mobile-hint">Showing last 7 days · only today can be marked</p>
+          )}
+          {!isMobile && (
+            <p className="habits-mobile-hint">Only today can be marked — past days are locked</p>
           )}
         </div>
         <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
@@ -196,14 +203,17 @@ export default function HabitsPage() {
                   {days.map((d) => {
                     const dateStr = format(d, 'yyyy-MM-dd');
                     const done = (habit.completedDates || []).includes(dateStr);
+                    const isToday = dateStr === today;
                     const isFuture = dateStr > today;
+                    const isPast = dateStr < today;
+                    const locked = !isToday;
                     return (
                       <td key={dateStr} className="habit-day-cell">
                         <button
-                          className={`habit-dot ${done ? 'done' : ''} ${isFuture ? 'future' : ''}`}
-                          onClick={() => !isFuture && handleToggle(habit._id, dateStr)}
-                          disabled={isFuture}
-                          title={dateStr}
+                          className={`habit-dot ${done ? 'done' : ''} ${isFuture ? 'future' : ''} ${isPast ? 'past' : ''} ${isToday ? 'today' : ''}`}
+                          onClick={() => isToday && handleToggle(habit._id, dateStr)}
+                          disabled={locked}
+                          title={isToday ? dateStr : `${dateStr} (locked — today only)`}
                         >
                           {done ? '✓' : ''}
                         </button>

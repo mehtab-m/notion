@@ -7,6 +7,9 @@ const { cleanBody } = require('../utils/body');
 const { serialize, serializeTablePart } = require('../utils/serialize');
 const { findAccessibleProject, findEditableProject, findOwnedProject, acceptedAssignees, accessibleProjectsWhere } = require('../utils/projectAccess');
 const { sendProjectInviteEmail } = require('../utils/email');
+const { developerMiddleware } = require('../middleware/auth');
+
+router.use(developerMiddleware);
 
 function calcProgress(tasks) {
   const items = [];

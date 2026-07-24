@@ -6,6 +6,18 @@ const { cleanBody } = require('../utils/body');
 const { serialize } = require('../utils/serialize');
 const { seedDefaultHabits } = require('../utils/defaultHabits');
 
+function todayStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function isValidDateStr(date) {
+  return typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date);
+}
+
 router.get('/', async (req, res) => {
   try {
     await seedDefaultHabits(prisma, req.user.id);
@@ -36,9 +48,13 @@ router.put('/:id', async (req, res) => {
       where: owned(req, { _id: req.params.id }),
     });
     if (!existing) return res.status(404).json({ error: 'Habit not found' });
+    // Prevent clients from rewriting historical completedDates via PUT
+    const data = cleanBody(req.body);
+    delete data.completedDates;
+    delete data.streak;
     const updated = await prisma.habit.update({
       where: { id: existing.id },
-      data: cleanBody(req.body),
+      data,
     });
     res.json(serialize(updated));
   } catch (err) {
@@ -49,20 +65,32 @@ router.put('/:id', async (req, res) => {
 router.post('/:id/toggle', async (req, res) => {
   try {
     const { date } = req.body;
+    if (!isValidDateStr(date)) {
+      return res.status(400).json({ error: 'date must be YYYY-MM-DD' });
+    }
+    const today = todayStr();
+    if (date !== today) {
+      return res.status(400).json({
+        error: 'You can only mark habits for today. Previous days cannot be changed.',
+      });
+    }
+
     const habit = await prisma.habit.findFirst({
       where: owned(req, { _id: req.params.id }),
     });
     if (!habit) return res.status(404).json({ error: 'Habit not found' });
+
     const completedDates = [...habit.completedDates];
     const idx = completedDates.indexOf(date);
     if (idx >= 0) completedDates.splice(idx, 1);
     else completedDates.push(date);
+
     const sorted = [...completedDates].sort((a, b) => (a > b ? -1 : 1));
     let streak = 0;
     let cursor = new Date();
     cursor.setHours(0, 0, 0, 0);
     for (const d of sorted) {
-      const dt = new Date(d);
+      const dt = new Date(d + 'T00:00:00');
       dt.setHours(0, 0, 0, 0);
       const diff = Math.round((cursor - dt) / 86400000);
       if (diff === 0 || diff === 1) {
@@ -70,6 +98,7 @@ router.post('/:id/toggle', async (req, res) => {
         cursor = dt;
       } else break;
     }
+
     const updated = await prisma.habit.update({
       where: { id: habit.id },
       data: { completedDates, streak },

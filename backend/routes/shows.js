@@ -6,9 +6,26 @@ const { owned } = require('../utils/scope');
 const { cleanBody, num } = require('../utils/body');
 const { serialize } = require('../utils/serialize');
 
+function isExternalUrl(value) {
+  return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
+}
+
 function showData(body, file) {
   const data = cleanBody(body);
-  if (file) data.posterImage = '/uploads/' + file.filename;
+  // Prefer uploaded file; otherwise accept posterImage / posterImageUrl string
+  if (file) {
+    data.posterImage = '/uploads/' + file.filename;
+  } else {
+    const urlCandidate = (data.posterImageUrl || data.posterImage || '').trim();
+    if (urlCandidate) {
+      data.posterImage = isExternalUrl(urlCandidate)
+        ? urlCandidate
+        : urlCandidate.startsWith('/uploads/')
+          ? urlCandidate
+          : urlCandidate;
+    }
+    delete data.posterImageUrl;
+  }
   if (data.currentSeason != null) data.currentSeason = num(data.currentSeason, 1);
   if (data.currentEpisode != null) data.currentEpisode = num(data.currentEpisode, 0);
   if (data.totalSeasons != null) data.totalSeasons = num(data.totalSeasons, 1);

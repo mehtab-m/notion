@@ -34,6 +34,13 @@ export const verifyEmail = (data) => api.post('/auth/verify', data).then((r) => 
 export const resendCode = (email) => api.post('/auth/resend', { email }).then((r) => r.data);
 export const login = (data) => api.post('/auth/login', data).then((r) => r.data);
 export const getMe = () => api.get('/auth/me').then((r) => r.data);
+export const updatePreferences = (data) => api.patch('/auth/preferences', data).then((r) => r.data);
+export const pingActivity = () => api.post('/auth/ping').then((r) => r.data);
+
+// ── Admin ────────────────────────────────────────────────
+export const getAdminStats = () => api.get('/admin/stats').then((r) => r.data);
+export const getAdminUsers = () => api.get('/admin/users').then((r) => r.data);
+export const updateAdminUser = (id, data) => api.patch(`/admin/users/${id}`, data).then((r) => r.data);
 
 // ── Projects ────────────────────────────────────────────
 export const getProjects = () => api.get('/projects').then((r) => r.data);

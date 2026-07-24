@@ -7,6 +7,8 @@ import RecentActivity from '../components/Dashboard/RecentActivity';
 import QuickAdd from '../components/Dashboard/QuickAdd';
 import DashboardCharts from '../components/Dashboard/DashboardCharts';
 import useMediaQuery, { MOBILE_QUERY } from '../hooks/useMediaQuery';
+import { useAuth } from '../context/AuthContext';
+import { resolvePosterUrl } from '../components/Shows/ShowCard';
 import './Dashboard.css';
 
 const BACKEND = getApiBase();
@@ -22,25 +24,38 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const isMobile = useMediaQuery(MOBILE_QUERY);
+  const { isDeveloper } = useAuth();
+  const showProjects = isDeveloper && !isMobile;
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [projects, books, shows, tables, dashStats] = await Promise.all([
-        getProjects(),
-        getBooks(),
-        getShows(),
-        getTables(),
-        getDashboardStats(),
-      ]);
-      setData({ projects, books, shows, tables });
-      setStats(dashStats);
+      if (isDeveloper) {
+        const [projects, books, shows, tables, dashStats] = await Promise.all([
+          getProjects(),
+          getBooks(),
+          getShows(),
+          getTables(),
+          getDashboardStats(),
+        ]);
+        setData({ projects, books, shows, tables });
+        setStats(dashStats);
+      } else {
+        const [books, shows, tables, dashStats] = await Promise.all([
+          getBooks(),
+          getShows(),
+          getTables(),
+          getDashboardStats(),
+        ]);
+        setData({ projects: [], books, shows, tables });
+        setStats(dashStats);
+      }
     } catch (err) {
       console.error('Dashboard fetch error', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isDeveloper]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -51,7 +66,7 @@ export default function Dashboard() {
   const watchingShows = shows.filter((s) => s.status === 'watching');
 
   const recentActivity = [
-    ...(!isMobile ? projects.map((p) => ({ title: p.title, type: 'project', date: p.updatedAt || p.createdAt, action: `Project · ${p.status}` })) : []),
+    ...(showProjects ? projects.map((p) => ({ title: p.title, type: 'project', date: p.updatedAt || p.createdAt, action: `Project · ${p.status}` })) : []),
     ...books.map((b) => ({ title: b.title, type: 'book', date: b.createdAt, action: `Book · ${b.status}` })),
     ...shows.map((s) => ({ title: s.title, type: 'show', date: s.createdAt, action: `Show · ${s.status}` })),
     ...tables.map((t) => ({ title: t.name, type: 'table', date: t.createdAt, action: 'Table' })),
@@ -70,7 +85,7 @@ export default function Dashboard() {
   return (
     <div className="dashboard">
       <div className="dashboard-stats">
-        {!isMobile && (
+        {showProjects && (
           <StatsCard
             icon={FolderKanban}
             label="Projects"
@@ -103,7 +118,7 @@ export default function Dashboard() {
       </div>
 
       <div className="dashboard-section">
-        <QuickAdd onAdded={fetchAll} hideProjects={isMobile} />
+        <QuickAdd onAdded={fetchAll} hideProjects={!showProjects} />
       </div>
 
       <DashboardCharts stats={stats} />
@@ -144,27 +159,30 @@ export default function Dashboard() {
             <div className="dashboard-section">
               <h2 className="section-title">Currently Watching</h2>
               <div className="in-progress-list">
-                {watchingShows.map((show) => (
-                  <div key={show._id} className="in-progress-item">
-                    {show.posterImage ? (
-                      <img src={`${BACKEND}${show.posterImage}`} alt={show.title} className="in-progress-cover" />
-                    ) : (
-                      <div className="in-progress-cover-placeholder">
-                        <Tv size={20} color="var(--accent-yellow)" />
+                {watchingShows.map((show) => {
+                  const posterSrc = resolvePosterUrl(show.posterImage);
+                  return (
+                    <div key={show._id} className="in-progress-item">
+                      {posterSrc ? (
+                        <img src={posterSrc} alt={show.title} className="in-progress-cover" />
+                      ) : (
+                        <div className="in-progress-cover-placeholder">
+                          <Tv size={20} color="var(--accent-yellow)" />
+                        </div>
+                      )}
+                      <div className="in-progress-info">
+                        <span className="in-progress-title">{show.title}</span>
+                        <span className="platform-badge platform-badge--small">{show.platform}</span>
+                        <span className="in-progress-sub">S{show.currentSeason} E{show.currentEpisode}</span>
                       </div>
-                    )}
-                    <div className="in-progress-info">
-                      <span className="in-progress-title">{show.title}</span>
-                      <span className="platform-badge platform-badge--small">{show.platform}</span>
-                      <span className="in-progress-sub">S{show.currentSeason} E{show.currentEpisode}</span>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {!isMobile && activeProjects.length > 0 && (
+          {showProjects && activeProjects.length > 0 && (
             <div className="dashboard-section">
               <h2 className="section-title">Active Projects</h2>
               <div className="projects-overview-list">

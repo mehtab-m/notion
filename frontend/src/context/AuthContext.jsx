@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getMe } from '../utils/api';
+import { getMe, pingActivity } from '../utils/api';
 
 const AuthContext = createContext(null);
 const TOKEN_KEY = 'auth_token';
@@ -19,6 +19,10 @@ export function AuthProvider({ children }) {
     setUser(userData);
   }, []);
 
+  const updateUser = useCallback((userData) => {
+    setUser(userData);
+  }, []);
+
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) {
@@ -31,8 +35,34 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false));
   }, []);
 
+  // Record app usage for active-user analysis (throttled on server)
+  useEffect(() => {
+    if (!user) return undefined;
+    pingActivity()
+      .then((data) => {
+        if (data?.user) setUser(data.user);
+      })
+      .catch(() => {});
+    const id = setInterval(() => {
+      pingActivity().catch(() => {});
+    }, 30 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [user?._id]);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        logout,
+        updateUser,
+        isAuthenticated: !!user,
+        isDeveloper: user?.isDeveloper === true,
+        isAdmin: user?.role === 'admin',
+        needsDeveloperChoice: user != null && user.isDeveloper == null,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

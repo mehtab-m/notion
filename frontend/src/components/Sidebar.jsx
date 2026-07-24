@@ -3,9 +3,11 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, BookOpen, Tv, Table,
   Grid2x2, PenLine, StickyNote, Target, Flame, ChevronDown, ChevronRight, X,
+  Shield,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import useMediaQuery, { MOBILE_QUERY } from '../hooks/useMediaQuery';
+import { useAuth } from '../context/AuthContext';
 import './Sidebar.css';
 
 const NAV_GROUPS = [
@@ -20,7 +22,7 @@ const NAV_GROUPS = [
   {
     label: 'PRODUCTIVITY',
     items: [
-      { to: '/projects', icon: FolderKanban, label: 'Projects', hideOnMobile: true },
+      { to: '/projects', icon: FolderKanban, label: 'Projects', hideOnMobile: true, requiresDeveloper: true },
       { to: '/goals', icon: Target, label: 'Goals' },
       { to: '/habits', icon: Flame, label: 'Habits' },
     ],
@@ -38,19 +40,31 @@ const NAV_GROUPS = [
       { to: '/tables', icon: Table, label: 'Tables' },
     ],
   },
+  {
+    label: 'PRODUCT',
+    items: [
+      { to: '/admin', icon: Shield, label: 'Admin', requiresAdmin: true },
+    ],
+  },
 ];
 
 export default function Sidebar({ open, onClose }) {
   const today = format(new Date(), 'EEE, MMM d yyyy');
   const [collapsed, setCollapsed] = useState({});
   const isMobile = useMediaQuery(MOBILE_QUERY);
+  const { isDeveloper, isAdmin } = useAuth();
 
   const toggleGroup = (label) =>
     setCollapsed((prev) => ({ ...prev, [label]: !prev[label] }));
 
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => !(isMobile && item.hideOnMobile)),
+    items: group.items.filter((item) => {
+      if (isMobile && item.hideOnMobile) return false;
+      if (item.requiresDeveloper && !isDeveloper) return false;
+      if (item.requiresAdmin && !isAdmin) return false;
+      return true;
+    }),
   })).filter((group) => group.items.length > 0);
 
   return (

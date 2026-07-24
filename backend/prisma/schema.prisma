@@ -17,6 +17,15 @@ model User {
   verificationExpires DateTime?
   resetCode           String?
   resetExpires        DateTime?
+  /// null = not chosen yet; true = developer (shows Projects); false = non-developer
+  isDeveloper         Boolean?
+  /// "user" | "admin"
+  role                String    @default("user")
+  /// Cached active status (grace period or weekly activity threshold)
+  isActive            Boolean   @default(true)
+  /// New users stay active until this date (createdAt + 7 days)
+  activeGraceUntil    DateTime?
+  lastActiveAt        DateTime?
   createdAt           DateTime  @default(now())
 
   projects    Project[]
@@ -29,6 +38,19 @@ model User {
   stickyNotes StickyNote[]
   projectMemberships ProjectMember[]
   sentProjectMessages ProjectMessage[]
+  activities  UserActivity[]
+}
+
+model UserActivity {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// "login" | "app_use"
+  type      String
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }
 
 model Project {

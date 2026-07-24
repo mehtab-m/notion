@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Pencil, Trash2, Tv, Star } from 'lucide-react';
+import { getApiBase } from '../../utils/api';
 import './ShowCard.css';
 
-const BACKEND = 'http://localhost:5000';
+const BACKEND = getApiBase();
 
 const statusClass = {
   watching: 'badge-watching',
@@ -22,15 +23,22 @@ const platformColors = {
   Other: { bg: 'rgba(96,96,96,0.2)', color: '#a0a0a0' },
 };
 
+export function resolvePosterUrl(posterImage) {
+  if (!posterImage) return null;
+  if (/^https?:\/\//i.test(posterImage)) return posterImage;
+  return `${BACKEND}${posterImage.startsWith('/') ? '' : '/'}${posterImage}`;
+}
+
 export default function ShowCard({ show, onEdit, onDelete }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const pc = platformColors[show.platform] || platformColors.Other;
+  const posterSrc = resolvePosterUrl(show.posterImage);
 
   return (
     <div className="show-card">
       <div className="show-card-poster">
-        {show.posterImage ? (
-          <img src={`${BACKEND}${show.posterImage}`} alt={show.title} />
+        {posterSrc ? (
+          <img src={posterSrc} alt={show.title} />
         ) : (
           <div className="show-poster-placeholder">
             <Tv size={32} color="var(--accent-yellow)" />
