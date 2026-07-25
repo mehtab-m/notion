@@ -13,7 +13,12 @@ const defaultForm = {
   rating: 0,
   genre: '',
   notes: '',
+  coverImageUrl: '',
 };
+
+function isExternalUrl(value) {
+  return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
+}
 
 export default function BookModal({ book, onClose, onSaved }) {
   const [form, setForm] = useState(defaultForm);
@@ -24,6 +29,7 @@ export default function BookModal({ book, onClose, onSaved }) {
 
   useEffect(() => {
     if (book) {
+      const existing = book.coverImage || '';
       setForm({
         title: book.title || '',
         author: book.author || '',
@@ -33,10 +39,12 @@ export default function BookModal({ book, onClose, onSaved }) {
         rating: book.rating || 0,
         genre: book.genre || '',
         notes: book.notes || '',
+        coverImageUrl: isExternalUrl(existing) ? existing : '',
       });
     } else {
       setForm(defaultForm);
     }
+    setImageFile(null);
   }, [book]);
 
   useEffect(() => {
@@ -54,11 +62,22 @@ export default function BookModal({ book, onClose, onSaved }) {
     e.preventDefault();
     if (!form.title.trim()) { toast.error('Title is required'); return; }
     if (!form.author.trim()) { toast.error('Author is required'); return; }
+    if (form.coverImageUrl.trim() && !isExternalUrl(form.coverImageUrl)) {
+      toast.error('Cover URL must start with http:// or https://');
+      return;
+    }
     setLoading(true);
     try {
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
-      if (imageFile) fd.append('coverImage', imageFile);
+      Object.entries(form).forEach(([k, v]) => {
+        if (k === 'coverImageUrl') return;
+        fd.append(k, v);
+      });
+      if (imageFile) {
+        fd.append('coverImage', imageFile);
+      } else if (form.coverImageUrl.trim()) {
+        fd.append('coverImageUrl', form.coverImageUrl.trim());
+      }
       if (isEdit) {
         await updateBook(book._id, fd);
         toast.success('Book updated!');
@@ -149,8 +168,37 @@ export default function BookModal({ book, onClose, onSaved }) {
             <textarea name="notes" value={form.notes} onChange={handleChange} placeholder="Your thoughts..." />
           </div>
           <div className="form-group">
-            <label>Cover Image</label>
-            <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files[0])} className="file-input" />
+            <label>Cover image URL</label>
+            <input
+              name="coverImageUrl"
+              value={form.coverImageUrl}
+              onChange={handleChange}
+              placeholder="https://example.com/cover.jpg"
+              disabled={!!imageFile}
+            />
+            <p className="form-hint">Paste a direct image link, or upload a file below (file wins if both set).</p>
+          </div>
+          <div className="form-group">
+            <label>Or upload cover</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                setImageFile(e.target.files[0] || null);
+                if (e.target.files[0]) setForm((p) => ({ ...p, coverImageUrl: '' }));
+              }}
+              className="file-input"
+            />
+            {imageFile && (
+              <button
+                type="button"
+                className="clear-rating"
+                style={{ marginTop: 8 }}
+                onClick={() => setImageFile(null)}
+              >
+                Clear file
+              </button>
+            )}
           </div>
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>

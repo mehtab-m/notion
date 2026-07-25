@@ -20,6 +20,7 @@ import StickyNotesPage from './pages/StickyNotesPage';
 import HabitsPage from './pages/HabitsPage';
 import GoalsPage from './pages/GoalsPage';
 import AdminDashboard from './pages/AdminDashboard';
+import SettingsPage from './pages/SettingsPage';
 
 const PAGE_TITLES = {
   '/': 'Dashboard',
@@ -30,8 +31,9 @@ const PAGE_TITLES = {
   '/notes': 'Notebook',
   '/stickynotes': 'Sticky Notes',
   '/habits': 'Habit Tracker',
-  '/goals': 'Goals',
+  '/goals': 'Goal Constellation',
   '/admin': 'Product Admin',
+  '/settings': 'Settings',
 };
 
 function getTitle(pathname) {
@@ -98,6 +100,7 @@ function AppShell() {
               <Route path="/stickynotes" element={<StickyNotesPage />} />
               <Route path="/habits" element={<HabitsPage />} />
               <Route path="/goals" element={<GoalsPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
               <Route
                 path="/admin"
                 element={(

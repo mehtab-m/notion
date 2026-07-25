@@ -205,18 +205,29 @@ model Habit {
 }
 
 model Goal {
-  id          String    @id @default(cuid())
-  title       String
-  description String    @default("")
-  category    String    @default("personal")
-  status      String    @default("not-started")
-  targetDate  DateTime?
-  progress    Int       @default(0)
-  milestones  Json      @default("[]")
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  title        String
+  description  String    @default("")
+  /// Deep reason / north-star "why"
+  why          String    @default("")
+  category     String    @default("personal")
+  status       String    @default("not-started")
+  /// sprint | season | year | lifetime
+  horizon      String    @default("season")
+  icon         String    @default("🎯")
+  /// 0–100 computed from milestones + micro-wins
+  progress     Int       @default(0)
+  /// Rolling engagement score
+  momentum     Int       @default(0)
+  targetDate   DateTime?
+  /// [{id,text,done,weight?,dueDate?,children:[{id,text,done}]}]
+  milestones   Json      @default("[]")
+  /// [{id,key,title,unlockedAt}]
+  achievements Json      @default("[]")
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([userId])
 }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Search, Menu, LogOut } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Search, Menu, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './Navbar.css';
 
@@ -39,7 +40,11 @@ export default function Navbar({ title, onMenuClick }) {
             <span className="navbar-user-email">{user.email}</span>
           </div>
         )}
-        <span className="navbar-greeting">{getGreeting()} 👋</span>
+        <span className="navbar-greeting">{getGreeting()}</span>
+
+        <Link to="/settings" className="navbar-logout" title="Settings" aria-label="Settings">
+          <Settings size={16} />
+        </Link>
 
         <button className="navbar-logout" onClick={logout} title="Log out">
           <LogOut size={16} />

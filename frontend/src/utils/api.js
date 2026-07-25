@@ -36,6 +36,8 @@ export const login = (data) => api.post('/auth/login', data).then((r) => r.data)
 export const getMe = () => api.get('/auth/me').then((r) => r.data);
 export const updatePreferences = (data) => api.patch('/auth/preferences', data).then((r) => r.data);
 export const pingActivity = () => api.post('/auth/ping').then((r) => r.data);
+export const updateProfile = (data) => api.patch('/auth/profile', data).then((r) => r.data);
+export const updatePassword = (data) => api.patch('/auth/password', data).then((r) => r.data);
 
 // ── Admin ────────────────────────────────────────────────
 export const getAdminStats = () => api.get('/admin/stats').then((r) => r.data);
@@ -169,6 +171,8 @@ export const updateGoal = (id, data) => api.put(`/goals/${id}`, data).then((r) =
 export const deleteGoal = (id) => api.delete(`/goals/${id}`).then((r) => r.data);
 export const toggleMilestone = (goalId, msId) =>
   api.post(`/goals/${goalId}/milestones/${msId}/toggle`).then((r) => r.data);
+export const toggleSubgoal = (goalId, msId, sgId) =>
+  api.post(`/goals/${goalId}/milestones/${msId}/subgoals/${sgId}/toggle`).then((r) => r.data);
 
 // ── Dashboard ────────────────────────────────────────────
 export const getDashboardStats = () => api.get('/dashboard/stats').then((r) => r.data);

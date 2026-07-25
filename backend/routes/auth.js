@@ -218,4 +218,58 @@ router.post('/ping', authMiddleware, async (req, res) => {
   }
 });
 
+// PATCH /api/auth/profile — name + email (role cannot be changed)
+router.patch('/profile', authMiddleware, async (req, res) => {
+  try {
+    const { name, email } = req.body;
+    const data = {};
+    if (typeof name === 'string' && name.trim()) data.name = name.trim();
+    if (typeof email === 'string' && email.trim()) {
+      const normalized = email.toLowerCase().trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+        return res.status(400).json({ error: 'Invalid email address' });
+      }
+      const taken = await prisma.user.findFirst({
+        where: { email: normalized, NOT: { id: req.user.id } },
+      });
+      if (taken) return res.status(400).json({ error: 'Email already in use' });
+      data.email = normalized;
+    }
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'Provide name and/or email' });
+    }
+    const updated = await prisma.user.update({
+      where: { id: req.user.id },
+      data,
+    });
+    res.json({ user: publicUser(updated) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// PATCH /api/auth/password
+router.patch('/password', authMiddleware, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current and new password are required' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    const match = await bcrypt.compare(currentPassword, user.password);
+    if (!match) return res.status(400).json({ error: 'Current password is incorrect' });
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashed },
+    });
+    res.json({ message: 'Password updated' });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 module.exports = router;

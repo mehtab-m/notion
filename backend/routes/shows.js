@@ -5,27 +5,22 @@ const upload = require('../middleware/upload');
 const { owned } = require('../utils/scope');
 const { cleanBody, num } = require('../utils/body');
 const { serialize } = require('../utils/serialize');
-
-function isExternalUrl(value) {
-  return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
-}
+const { resolveImageField } = require('../utils/mediaUrl');
 
 function showData(body, file) {
   const data = cleanBody(body);
-  // Prefer uploaded file; otherwise accept posterImage / posterImageUrl string
-  if (file) {
-    data.posterImage = '/uploads/' + file.filename;
-  } else {
-    const urlCandidate = (data.posterImageUrl || data.posterImage || '').trim();
-    if (urlCandidate) {
-      data.posterImage = isExternalUrl(urlCandidate)
-        ? urlCandidate
-        : urlCandidate.startsWith('/uploads/')
-          ? urlCandidate
-          : urlCandidate;
-    }
-    delete data.posterImageUrl;
+  const image = resolveImageField(data, file, {
+    fileField: 'posterImage',
+    urlFields: ['posterImageUrl', 'posterImage'],
+  });
+  if (!image.ok) {
+    const err = new Error(image.error);
+    err.status = 400;
+    throw err;
   }
+  if (image.value !== undefined) data.posterImage = image.value;
+  delete data.posterImageUrl;
+
   if (data.currentSeason != null) data.currentSeason = num(data.currentSeason, 1);
   if (data.currentEpisode != null) data.currentEpisode = num(data.currentEpisode, 0);
   if (data.totalSeasons != null) data.totalSeasons = num(data.totalSeasons, 1);
@@ -52,7 +47,7 @@ router.post('/', upload.single('posterImage'), async (req, res) => {
     });
     res.status(201).json(serialize(saved));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(err.status || 400).json({ error: err.message });
   }
 });
 
@@ -80,7 +75,7 @@ router.put('/:id', upload.single('posterImage'), async (req, res) => {
     });
     res.json(serialize(updated));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(err.status || 400).json({ error: err.message });
   }
 });
 

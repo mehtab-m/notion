@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, BookOpen, Tv, Table,
   Grid2x2, PenLine, StickyNote, Target, Flame, ChevronDown, ChevronRight, X,
-  Shield,
+  Shield, Settings,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import useMediaQuery, { MOBILE_QUERY } from '../hooks/useMediaQuery';
@@ -41,8 +41,9 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: 'PRODUCT',
+    label: 'ACCOUNT',
     items: [
+      { to: '/settings', icon: Settings, label: 'Settings' },
       { to: '/admin', icon: Shield, label: 'Admin', requiresAdmin: true },
     ],
   },

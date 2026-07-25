@@ -22,22 +22,34 @@ async function buildUserAnalytics(user) {
   const weekAgo = daysAgo(7);
   const [
     weekActivity,
+    weekLogins,
+    weekAppUses,
     totalActivity,
+    totalLogins,
+    totalAppUses,
     booksCount,
     showsCount,
     habitsCount,
     goalsCount,
     projectsCount,
     notesCount,
+    tablesCount,
+    stickyNotesCount,
   ] = await Promise.all([
     prisma.userActivity.count({ where: { userId: user.id, createdAt: { gte: weekAgo } } }),
+    prisma.userActivity.count({ where: { userId: user.id, type: 'login', createdAt: { gte: weekAgo } } }),
+    prisma.userActivity.count({ where: { userId: user.id, type: 'app_use', createdAt: { gte: weekAgo } } }),
     prisma.userActivity.count({ where: { userId: user.id } }),
+    prisma.userActivity.count({ where: { userId: user.id, type: 'login' } }),
+    prisma.userActivity.count({ where: { userId: user.id, type: 'app_use' } }),
     prisma.book.count({ where: { userId: user.id } }),
     prisma.show.count({ where: { userId: user.id } }),
     prisma.habit.count({ where: { userId: user.id } }),
     prisma.goal.count({ where: { userId: user.id } }),
     prisma.project.count({ where: { userId: user.id } }),
     prisma.note.count({ where: { userId: user.id } }),
+    prisma.spreadsheet.count({ where: { userId: user.id } }),
+    prisma.stickyNote.count({ where: { userId: user.id } }),
   ]);
 
   const now = new Date();
@@ -60,7 +72,22 @@ async function buildUserAnalytics(user) {
     lastActiveAt: user.lastActiveAt,
     createdAt: user.createdAt,
     weekActivityCount: weekActivity,
+    weekLogins,
+    weekAppUses,
     totalActivityCount: totalActivity,
+    totalLogins,
+    totalAppUses,
+    // Privacy-safe profile + usage snapshot (no passwords / codes)
+    profile: {
+      name: user.name,
+      email: user.email,
+      role: isAdminUser(user) ? 'admin' : user.role,
+      isDeveloper: user.isDeveloper,
+      isVerified: user.isVerified,
+      joinedAt: user.createdAt,
+      lastActiveAt: user.lastActiveAt,
+      graceEndsAt: user.activeGraceUntil,
+    },
     content: {
       books: booksCount,
       shows: showsCount,
@@ -68,6 +95,8 @@ async function buildUserAnalytics(user) {
       goals: goalsCount,
       projects: projectsCount,
       notes: notesCount,
+      tables: tablesCount,
+      stickyNotes: stickyNotesCount,
     },
   };
 }
@@ -136,7 +165,11 @@ router.get('/stats', async (req, res) => {
       totalGoals,
       totalProjects,
       totalNotes,
+      totalTables,
+      totalStickyNotes,
       totalActivitiesWeek,
+      weekLogins,
+      weekAppUses,
       signupsByDay,
     ] = await Promise.all([
       prisma.book.count(),
@@ -145,7 +178,11 @@ router.get('/stats', async (req, res) => {
       prisma.goal.count(),
       prisma.project.count(),
       prisma.note.count(),
+      prisma.spreadsheet.count(),
+      prisma.stickyNote.count(),
       prisma.userActivity.count({ where: { createdAt: { gte: weekAgo } } }),
+      prisma.userActivity.count({ where: { type: 'login', createdAt: { gte: weekAgo } } }),
+      prisma.userActivity.count({ where: { type: 'app_use', createdAt: { gte: weekAgo } } }),
       prisma.$queryRaw`
         SELECT DATE("createdAt") as day, COUNT(*)::int as count
         FROM "User"
@@ -167,8 +204,16 @@ router.get('/stats', async (req, res) => {
         newThisMonth,
         inGracePeriod: inGrace,
         weeklyActivityEvents: totalActivitiesWeek,
+        weeklyLogins: weekLogins,
+        weeklyAppUses: weekAppUses,
         activeThreshold: ACTIVE_WEEKLY_THRESHOLD,
         graceDays: GRACE_DAYS,
+      },
+      // Only privacy-safe operational metrics — no passwords, codes, or content bodies
+      ethicalDataPolicy: {
+        collected: ['login events', 'throttled app_use pings', 'account profile fields', 'content counts'],
+        notCollected: ['passwords', 'verification codes', 'note/page content bodies', 'third-party tracking'],
+        activeRule: `Active if ≥${ACTIVE_WEEKLY_THRESHOLD} login/app_use events in 7 days, or within first ${GRACE_DAYS} days of signup`,
       },
       contentTotals: {
         books: totalBooks,
@@ -177,6 +222,8 @@ router.get('/stats', async (req, res) => {
         goals: totalGoals,
         projects: totalProjects,
         notes: totalNotes,
+        tables: totalTables,
+        stickyNotes: totalStickyNotes,
       },
       signupsByDay: Array.isArray(signupsByDay)
         ? signupsByDay.map((r) => ({

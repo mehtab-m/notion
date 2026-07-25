@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FolderKanban, BookOpen, Tv, Table } from 'lucide-react';
-import { getProjects, getBooks, getShows, getTables, getDashboardStats, getApiBase } from '../utils/api';
+import { getProjects, getBooks, getShows, getTables, getDashboardStats } from '../utils/api';
 import StatsCard from '../components/Dashboard/StatsCard';
 import ProgressRing from '../components/Dashboard/ProgressRing';
 import RecentActivity from '../components/Dashboard/RecentActivity';
@@ -9,9 +9,8 @@ import DashboardCharts from '../components/Dashboard/DashboardCharts';
 import useMediaQuery, { MOBILE_QUERY } from '../hooks/useMediaQuery';
 import { useAuth } from '../context/AuthContext';
 import { resolvePosterUrl } from '../components/Shows/ShowCard';
+import { resolveCoverUrl } from '../components/Books/BookCard';
 import './Dashboard.css';
-
-const BACKEND = getApiBase();
 
 function priorityColor(priority) {
   if (priority === 'high') return 'var(--accent-red)';
@@ -133,8 +132,8 @@ export default function Dashboard() {
                   const pct = book.totalPages > 0 ? Math.round((book.currentPage / book.totalPages) * 100) : 0;
                   return (
                     <div key={book._id} className="in-progress-item">
-                      {book.coverImage ? (
-                        <img src={`${BACKEND}${book.coverImage}`} alt={book.title} className="in-progress-cover" />
+                      {resolveCoverUrl(book.coverImage) ? (
+                        <img src={resolveCoverUrl(book.coverImage)} alt={book.title} className="in-progress-cover" />
                       ) : (
                         <div className="in-progress-cover-placeholder">
                           <BookOpen size={20} color="var(--accent-green)" />

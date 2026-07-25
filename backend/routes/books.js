@@ -5,10 +5,22 @@ const upload = require('../middleware/upload');
 const { owned } = require('../utils/scope');
 const { cleanBody, num } = require('../utils/body');
 const { serialize } = require('../utils/serialize');
+const { resolveImageField } = require('../utils/mediaUrl');
 
 function bookData(body, file) {
   const data = cleanBody(body);
-  if (file) data.coverImage = '/uploads/' + file.filename;
+  const image = resolveImageField(data, file, {
+    fileField: 'coverImage',
+    urlFields: ['coverImageUrl', 'coverImage'],
+  });
+  if (!image.ok) {
+    const err = new Error(image.error);
+    err.status = 400;
+    throw err;
+  }
+  if (image.value !== undefined) data.coverImage = image.value;
+  delete data.coverImageUrl;
+
   if (data.currentPage != null) data.currentPage = num(data.currentPage, 0);
   if (data.totalPages != null) data.totalPages = num(data.totalPages, 0);
   if (data.rating != null) data.rating = num(data.rating, 0);
@@ -51,7 +63,7 @@ router.post('/', upload.single('coverImage'), async (req, res) => {
 
     res.status(201).json(serialize(withNotebook));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(err.status || 400).json({ error: err.message });
   }
 });
 
@@ -171,7 +183,7 @@ router.put('/:id', upload.single('coverImage'), async (req, res) => {
     }
     res.json(serialize(updated));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(err.status || 400).json({ error: err.message });
   }
 });
 

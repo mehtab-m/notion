@@ -8,11 +8,14 @@ const { serialize } = require('../utils/serialize');
 router.get('/stats', async (req, res) => {
   try {
     const filter = owned(req);
+    const isDeveloper = req.user?.isDeveloper === true;
     const [books, goals, habits, projects] = await Promise.all([
       prisma.book.findMany({ where: filter }),
       prisma.goal.findMany({ where: filter }),
       prisma.habit.findMany({ where: filter }),
-      prisma.project.findMany({ where: accessibleProjectsWhere(req.user) }),
+      isDeveloper
+        ? prisma.project.findMany({ where: accessibleProjectsWhere(req.user) })
+        : Promise.resolve([]),
     ]);
 
     const bookProgress = books.map((b) => ({

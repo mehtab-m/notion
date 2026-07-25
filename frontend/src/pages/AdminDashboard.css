@@ -265,6 +265,36 @@
   padding: 28px !important;
 }
 
+.admin-ethics-banner {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.admin-ethics-banner strong {
+  display: block;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.admin-ethics-banner p {
+  margin: 0 0 4px;
+}
+
+.admin-ethics-banner svg {
+  flex-shrink: 0;
+  color: var(--accent-green);
+  margin-top: 2px;
+}
+
 @media (max-width: 900px) {
   .admin-charts {
     grid-template-columns: 1fr;

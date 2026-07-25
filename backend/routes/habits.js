@@ -33,8 +33,12 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
+    // Never accept historical streak data on create — only today can be toggled later
+    const data = cleanBody(req.body);
+    delete data.completedDates;
+    delete data.streak;
     const saved = await prisma.habit.create({
-      data: { ...cleanBody(req.body), userId: req.user.id },
+      data: { ...data, userId: req.user.id },
     });
     res.status(201).json(serialize(saved));
   } catch (err) {

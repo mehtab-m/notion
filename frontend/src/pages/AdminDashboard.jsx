@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   Users, UserCheck, UserX, Code2, Activity, BookOpen, Tv, Flame, Target, FolderKanban, PenLine,
+  Table2, StickyNote, ShieldCheck,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell,
@@ -81,7 +82,7 @@ export default function AdminDashboard() {
     );
   }
 
-  const { overview, contentTotals, signupsByDay, users } = data;
+  const { overview, contentTotals, signupsByDay, users, ethicalDataPolicy } = data;
 
   const activityPie = [
     { name: 'Active', value: overview.activeUsers },
@@ -123,8 +124,22 @@ export default function AdminDashboard() {
         <StatTile icon={UserCheck} label="Active users" value={overview.activeUsers} sub={`${overview.inGracePeriod} in grace`} color="var(--accent-green)" />
         <StatTile icon={UserX} label="Inactive users" value={overview.inactiveUsers} color="var(--accent-red)" />
         <StatTile icon={Code2} label="Developers" value={overview.developers} sub={`${overview.nonDevelopers} non-dev · ${overview.undecidedDeveloper} undecided`} color="var(--accent-blue)" />
-        <StatTile icon={Activity} label="Week activity events" value={overview.weeklyActivityEvents} sub={`${overview.newThisWeek} new this week`} color="var(--accent-yellow)" />
+        <StatTile icon={Activity} label="Week activity events" value={overview.weeklyActivityEvents} sub={`${overview.weeklyLogins || 0} logins · ${overview.weeklyAppUses || 0} app uses · ${overview.newThisWeek} new`} color="var(--accent-yellow)" />
       </div>
+
+      {ethicalDataPolicy && (
+        <div className="admin-ethics-banner">
+          <ShieldCheck size={16} />
+          <div>
+            <strong>Ethical data policy</strong>
+            <p>{ethicalDataPolicy.activeRule}</p>
+            <p className="admin-muted">
+              Collected: {(ethicalDataPolicy.collected || []).join(', ')}.
+              Not collected: {(ethicalDataPolicy.notCollected || []).join(', ')}.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="admin-content-totals">
         <span><BookOpen size={14} /> {contentTotals.books} books</span>
@@ -133,6 +148,8 @@ export default function AdminDashboard() {
         <span><Target size={14} /> {contentTotals.goals} goals</span>
         <span><FolderKanban size={14} /> {contentTotals.projects} projects</span>
         <span><PenLine size={14} /> {contentTotals.notes} notes</span>
+        <span><Table2 size={14} /> {contentTotals.tables || 0} tables</span>
+        <span><StickyNote size={14} /> {contentTotals.stickyNotes || 0} stickies</span>
       </div>
 
       <div className="admin-charts">
@@ -206,6 +223,7 @@ export default function AdminDashboard() {
               <th>Status</th>
               <th>Developer</th>
               <th>Week uses</th>
+              <th>Logins / app</th>
               <th>Content</th>
               <th>Joined</th>
               <th>Role</th>
@@ -233,8 +251,19 @@ export default function AdminDashboard() {
                   <strong>{u.weekActivityCount}</strong>
                   <span className="admin-muted"> / {u.totalActivityCount} total</span>
                 </td>
+                <td>
+                  <span title="This week">{u.weekLogins || 0} / {u.weekAppUses || 0}</span>
+                  <span className="admin-muted block">
+                    all-time {u.totalLogins || 0} / {u.totalAppUses || 0}
+                  </span>
+                </td>
                 <td className="admin-content-cell">
                   B{u.content.books} · S{u.content.shows} · H{u.content.habits} · G{u.content.goals} · P{u.content.projects}
+                  {(u.content.tables != null || u.content.stickyNotes != null) && (
+                    <span className="admin-muted block">
+                      T{u.content.tables || 0} · N{u.content.notes} · St{u.content.stickyNotes || 0}
+                    </span>
+                  )}
                 </td>
                 <td>
                   {u.createdAt ? format(new Date(u.createdAt), 'MMM d, yyyy') : '—'}
@@ -258,7 +287,7 @@ export default function AdminDashboard() {
             ))}
             {filteredUsers.length === 0 && (
               <tr>
-                <td colSpan={7} className="admin-empty-row">No users match this filter.</td>
+                <td colSpan={8} className="admin-empty-row">No users match this filter.</td>
               </tr>
             )}
           </tbody>

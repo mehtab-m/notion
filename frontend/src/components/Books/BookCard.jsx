@@ -12,6 +12,12 @@ const statusClass = {
   paused: 'badge-paused',
 };
 
+export function resolveCoverUrl(coverImage) {
+  if (!coverImage) return null;
+  if (/^https?:\/\//i.test(coverImage)) return coverImage;
+  return `${BACKEND}${coverImage.startsWith('/') ? '' : '/'}${coverImage}`;
+}
+
 export default function BookCard({ book, onEdit, onDelete, onIncrementPage, onLearningLine }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [learningOpen, setLearningOpen] = useState(false);
@@ -21,6 +27,7 @@ export default function BookCard({ book, onEdit, onDelete, onIncrementPage, onLe
   const progress = book.totalPages > 0 ? Math.round((book.currentPage / book.totalPages) * 100) : 0;
   const showProgress = book.totalPages > 0 || book.currentPage > 0;
   const canIncrement = book.status !== 'completed';
+  const coverSrc = resolveCoverUrl(book.coverImage);
 
   const handleSaveLearning = async () => {
     if (!learningText.trim()) return;
@@ -37,8 +44,8 @@ export default function BookCard({ book, onEdit, onDelete, onIncrementPage, onLe
   return (
     <div className="book-card">
       <div className="book-card-cover">
-        {book.coverImage ? (
-          <img src={`${BACKEND}${book.coverImage}`} alt={book.title} />
+        {coverSrc ? (
+          <img src={coverSrc} alt={book.title} />
         ) : (
           <div className="book-cover-placeholder">
             <BookOpen size={28} color="var(--accent-green)" />
