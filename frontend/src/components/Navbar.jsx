@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Menu, LogOut, Settings } from 'lucide-react';
+import { Search, Menu, LogOut, Settings, Crown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './Navbar.css';
 
@@ -14,6 +14,8 @@ function getGreeting() {
 export default function Navbar({ title, onMenuClick }) {
   const [searchVal, setSearchVal] = useState('');
   const { user, logout } = useAuth();
+  const plan = user?.plan || 'common';
+  const showBadge = plan === 'premium' || plan === 'platinum';
 
   return (
     <header className="navbar">
@@ -36,7 +38,15 @@ export default function Navbar({ title, onMenuClick }) {
       <div className="navbar-right">
         {user && (
           <div className="navbar-user-info" title={user.email}>
-            <span className="navbar-user">{user.name}</span>
+            <div className="navbar-user-row">
+              <span className="navbar-user">{user.name}</span>
+              {showBadge && (
+                <span className={`navbar-plan-badge ${plan}`}>
+                  <Crown size={11} />
+                  {plan === 'platinum' ? 'Platinum' : 'Premium'}
+                </span>
+              )}
+            </div>
             <span className="navbar-user-email">{user.email}</span>
           </div>
         )}

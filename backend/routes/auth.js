@@ -4,7 +4,7 @@ const prisma = require('../lib/prisma');
 const { signToken, authMiddleware } = require('../middleware/auth');
 const { sendVerificationEmail } = require('../utils/email');
 const { seedDefaultHabits } = require('../utils/defaultHabits');
-const { graceUntilFrom, logActivity, isAdminUser } = require('../utils/activity');
+const { graceUntilFrom, logActivity, isAdminUser, defaultPlanExpiresAt, planMeta, resolveEffectivePlan } = require('../utils/activity');
 
 const router = express.Router();
 
@@ -13,6 +13,7 @@ function generateCode() {
 }
 
 function publicUser(user) {
+  const meta = planMeta(user);
   return {
     _id: user.id,
     name: user.name,
@@ -22,6 +23,14 @@ function publicUser(user) {
     isActive: user.isActive ?? true,
     activeGraceUntil: user.activeGraceUntil || null,
     lastActiveAt: user.lastActiveAt || null,
+    plan: meta.plan,
+    planRaw: meta.planRaw,
+    planExpiresAt: meta.planExpiresAt,
+    loginCount: meta.loginCount,
+    premiumStars: meta.premiumStars,
+    premiumStarHolders: meta.premiumStarHolders,
+    showPremiumWelcome: meta.showPremiumWelcome,
+    legalSettings: user.legalSettings || {},
     createdAt: user.createdAt,
   };
 }
@@ -66,6 +75,10 @@ router.post('/signup', async (req, res) => {
           verificationExpires: expires,
           isActive: true,
           activeGraceUntil: graceUntilFrom(now),
+          plan: 'premium',
+          planExpiresAt: defaultPlanExpiresAt(),
+          loginCount: 0,
+          legalSettings: {},
         },
       });
     }
@@ -112,6 +125,8 @@ router.post('/verify', async (req, res) => {
         verificationExpires: null,
         isActive: true,
         activeGraceUntil: user.activeGraceUntil || graceUntilFrom(user.createdAt),
+        plan: user.plan || 'premium',
+        planExpiresAt: user.planExpiresAt || defaultPlanExpiresAt(),
       },
     });
 
@@ -166,12 +181,20 @@ router.post('/login', async (req, res) => {
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ error: 'Invalid email or password' });
 
-    // Ensure grace window exists for older accounts that predate this field
+    // Ensure grace window + premium window exist for older accounts
     let readyUser = user;
-    if (!user.activeGraceUntil) {
+    const patch = {};
+    if (!user.activeGraceUntil) patch.activeGraceUntil = graceUntilFrom(user.createdAt);
+    if (!user.planExpiresAt) {
+      patch.plan = user.plan || 'premium';
+      patch.planExpiresAt = defaultPlanExpiresAt();
+    } else {
+      patch.plan = resolveEffectivePlan(user);
+    }
+    if (Object.keys(patch).length) {
       readyUser = await prisma.user.update({
         where: { id: user.id },
-        data: { activeGraceUntil: graceUntilFrom(user.createdAt) },
+        data: patch,
       });
     }
 

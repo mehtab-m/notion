@@ -328,7 +328,6 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
   const [rows, setRows] = useState(normRows(table.rows));
   const [showAddCol, setShowAddCol] = useState(false);
   const [openMenu, setOpenMenu] = useState(null);
-  const [addingRow, setAddingRow] = useState(false);
   const [deletingCol, setDeletingCol] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
@@ -337,21 +336,18 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
     setRows(normRows(table.rows));
   }, [table]);
 
-  const handleAddRow = async () => {
-    setAddingRow(true);
-    try {
-      const newRow = await tableApi.addRow(tableId, {});
-      const normalized = { ...newRow, id: rid(newRow) };
-      setRows((prev) => [...prev, normalized]);
-      onTableChange?.();
-    } catch {
-      toast.error('Failed to add row');
-    } finally {
-      setAddingRow(false);
-    }
+  const DRAFT_ID = '__draft__';
+
+  const ensureDraftRows = (list) => {
+    const hasDraft = list.some((r) => rid(r) === DRAFT_ID);
+    if (hasDraft) return list;
+    return [...list, { id: DRAFT_ID, _id: DRAFT_ID, data: {}, __draft: true }];
   };
 
+  const displayRows = ensureDraftRows(rows);
+
   const handleDeleteRow = async (rowId) => {
+    if (rowId === DRAFT_ID) return;
     try {
       await tableApi.deleteRow(tableId, rowId);
       setRows((prev) => prev.filter((r) => rid(r) !== rowId));
@@ -363,6 +359,23 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
   };
 
   const handleCellSave = async (rowId, colId, value) => {
+    if (rowId === DRAFT_ID) {
+      // Gesture: filling the trailing empty row creates a real row, then a new empty one appears
+      if (value === '' || value == null) return;
+      try {
+        const newRow = await tableApi.addRow(tableId, { [colId]: value });
+        const normalized = { ...newRow, id: rid(newRow), data: { ...(newRow.data || {}), [colId]: value } };
+        // Persist the first cell value if addRow returned empty data
+        if (!newRow.data?.[colId]) {
+          await tableApi.updateRow(tableId, rid(newRow), normalized.data);
+        }
+        setRows((prev) => [...prev.filter((r) => rid(r) !== DRAFT_ID), normalized]);
+        onTableChange?.();
+      } catch {
+        toast.error('Failed to add row');
+      }
+      return;
+    }
     const row = rows.find((r) => rid(r) === rowId);
     if (!row) return;
     const newData = { ...row.data, [colId]: value };
@@ -410,14 +423,6 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
     <div className="dynamic-table-wrap">
       <div className="dt-toolbar">
         {!hideName && <span className="dt-table-name">{table.name}</span>}
-        <div className="dt-toolbar-actions">
-          <button className="btn btn-secondary btn-sm" onClick={() => setShowAddCol((v) => !v)}>
-            <Plus size={14} /> Add Column
-          </button>
-          <button className="btn btn-primary btn-sm" onClick={handleAddRow} disabled={addingRow}>
-            <Plus size={14} /> Add Row
-          </button>
-        </div>
       </div>
 
       {showAddCol && (
@@ -433,7 +438,10 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
 
       {columns.length === 0 ? (
         <div className="empty-state" style={{ minHeight: 200 }}>
-          <p>No columns yet. Add a column to get started.</p>
+          <p>No columns yet. Use + to add your first column.</p>
+          <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 12 }} onClick={() => setShowAddCol(true)}>
+            <Plus size={14} /> Add column
+          </button>
         </div>
       ) : (
         <div className="dt-scroll">
@@ -482,28 +490,34 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
                     </th>
                   );
                 })}
+                <th className="dt-th dt-th-add">
+                  <button
+                    type="button"
+                    className="dt-add-col-btn"
+                    onClick={() => setShowAddCol(true)}
+                    title="Add column"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={columns.length + 1} className="dt-empty-row">
-                    No rows yet. Click "+ Add Row" to start.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row) => {
-                  const rowId = rid(row);
-                  return (
-                  <tr key={rowId} className="dt-row">
+              {displayRows.map((row) => {
+                const rowId = rid(row);
+                const isDraft = rowId === DRAFT_ID;
+                return (
+                  <tr key={rowId} className={`dt-row ${isDraft ? 'dt-row-draft' : ''}`}>
                     <td className="dt-row-delete-cell">
-                      <button
-                        className="dt-row-delete"
-                        onClick={() => setConfirmDelete({ type: 'row', rowId })}
-                        title="Delete row"
-                      >
-                        <Trash2 size={13} />
-                      </button>
+                      {!isDraft && (
+                        <button
+                          className="dt-row-delete"
+                          onClick={() => setConfirmDelete({ type: 'row', rowId })}
+                          title="Delete row"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
                     </td>
                     {columns.map((col) => (
                       <Cell
@@ -515,12 +529,13 @@ export default function DynamicTable({ table, onTableChange, tableApi = defaultT
                         onSave={(colId, val) => handleCellSave(rowId, colId, val)}
                       />
                     ))}
+                    <td className="dt-cell dt-cell-spacer" />
                   </tr>
-                  );
-                })
-              )}
+                );
+              })}
             </tbody>
           </table>
+          <p className="dt-gesture-hint">Type in the last empty row to add data — a new blank row appears automatically.</p>
         </div>
       )}
 

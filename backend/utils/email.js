@@ -99,4 +99,26 @@ async function sendProjectInviteEmail(to, inviterName, projectTitle, projectId) 
   });
 }
 
-module.exports = { sendVerificationEmail, sendProjectInviteEmail };
+async function sendInactiveFollowupEmail(to, name) {
+  const frontend = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+  return sendEmail({
+    to,
+    subject: 'We miss you on SortLife',
+    html: `
+      <div style="font-family:Georgia,serif;max-width:520px;margin:0 auto;color:#1a1a1a">
+        <h2 style="font-weight:600">Hey ${name || 'there'},</h2>
+        <p>It's been a few days since you last used <strong>SortLife</strong>. Your habits, goals, and notes are still waiting for you.</p>
+        <p>Come back and pick up where you left off — even five minutes today keeps your streak alive.</p>
+        <p style="margin:28px 0">
+          <a href="${frontend}/login" style="display:inline-block;padding:14px 22px;background:#0d9488;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-family:sans-serif">
+            Open SortLife
+          </a>
+        </p>
+        <p style="color:#888;font-size:12px;font-family:sans-serif">You're receiving this because your account went inactive after 3 days without activity.</p>
+      </div>
+    `,
+  });
+}
+
+module.exports = { sendVerificationEmail, sendProjectInviteEmail, sendInactiveFollowupEmail };
+

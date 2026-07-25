@@ -60,6 +60,8 @@ export function AuthProvider({ children }) {
         isAuthenticated: !!user,
         isDeveloper: user?.isDeveloper === true,
         isAdmin: user?.role === 'admin',
+        plan: user?.plan || 'common',
+        isPremium: user?.plan === 'premium' || user?.plan === 'platinum',
         needsDeveloperChoice: user != null && user.isDeveloper == null,
       }}
     >

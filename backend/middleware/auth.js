@@ -19,6 +19,11 @@ const USER_SELECT = {
   isActive: true,
   activeGraceUntil: true,
   lastActiveAt: true,
+  plan: true,
+  planExpiresAt: true,
+  loginCount: true,
+  followupEmailSentAt: true,
+  legalSettings: true,
   createdAt: true,
 };
 

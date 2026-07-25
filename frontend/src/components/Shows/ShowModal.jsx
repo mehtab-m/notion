@@ -6,8 +6,15 @@ import './ShowModal.css';
 
 const PLATFORMS = ['Netflix', 'HBO', 'Disney+', 'Apple TV+', 'Amazon Prime', 'Hulu', 'Other'];
 
+const GENRES = [
+  'Action', 'Adventure', 'Animation', 'Biography', 'Comedy', 'Crime', 'Documentary',
+  'Drama', 'Family', 'Fantasy', 'History', 'Horror', 'Music', 'Mystery', 'Romance',
+  'Sci-Fi', 'Sport', 'Thriller', 'War', 'Western', 'Reality', 'Talk Show', 'Other',
+];
+
 const defaultForm = {
   title: '',
+  mediaType: 'series',
   platform: 'Other',
   status: 'want-to-watch',
   currentSeason: 1,
@@ -29,12 +36,14 @@ export default function ShowModal({ show, onClose, onSaved }) {
   const [hoverRating, setHoverRating] = useState(0);
   const [loading, setLoading] = useState(false);
   const isEdit = Boolean(show);
+  const isMovie = form.mediaType === 'movie';
 
   useEffect(() => {
     if (show) {
       const existing = show.posterImage || '';
       setForm({
         title: show.title || '',
+        mediaType: show.mediaType === 'movie' ? 'movie' : 'series',
         platform: show.platform || 'Other',
         status: show.status || 'want-to-watch',
         currentSeason: show.currentSeason || 1,
@@ -74,6 +83,11 @@ export default function ShowModal({ show, onClose, onSaved }) {
       const fd = new FormData();
       Object.entries(form).forEach(([k, v]) => {
         if (k === 'posterImageUrl') return;
+        if (isMovie && (k === 'currentSeason' || k === 'totalSeasons' || k === 'currentEpisode')) {
+          if (k === 'currentSeason' || k === 'totalSeasons') fd.append(k, '1');
+          else fd.append(k, '0');
+          return;
+        }
         fd.append(k, v);
       });
       if (imageFile) {
@@ -83,15 +97,15 @@ export default function ShowModal({ show, onClose, onSaved }) {
       }
       if (isEdit) {
         await updateShow(show._id, fd);
-        toast.success('Show updated!');
+        toast.success(isMovie ? 'Movie updated!' : 'Show updated!');
       } else {
         await createShow(fd);
-        toast.success('Show added!');
+        toast.success(isMovie ? 'Movie added!' : 'Show added!');
       }
       onSaved();
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to save show');
+      toast.error(err.response?.data?.error || 'Failed to save');
     } finally {
       setLoading(false);
     }
@@ -101,23 +115,30 @@ export default function ShowModal({ show, onClose, onSaved }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{isEdit ? 'Edit Show' : 'Add Show'}</h2>
+          <h2>{isEdit ? (isMovie ? 'Edit Movie' : 'Edit Show') : 'Add Movie / Show'}</h2>
           <button className="modal-close" onClick={onClose}><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="form-row">
             <div className="form-group">
               <label>Title *</label>
-              <input name="title" value={form.title} onChange={handleChange} placeholder="Show title..." autoFocus />
+              <input name="title" value={form.title} onChange={handleChange} placeholder="Title..." autoFocus />
             </div>
+            <div className="form-group">
+              <label>Type</label>
+              <select name="mediaType" value={form.mediaType} onChange={handleChange}>
+                <option value="movie">Movie</option>
+                <option value="series">Series / Show</option>
+              </select>
+            </div>
+          </div>
+          <div className="form-row">
             <div className="form-group">
               <label>Platform</label>
               <select name="platform" value={form.platform} onChange={handleChange}>
                 {PLATFORMS.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
-          </div>
-          <div className="form-row">
             <div className="form-group">
               <label>Status</label>
               <select name="status" value={form.status} onChange={handleChange}>
@@ -128,27 +149,34 @@ export default function ShowModal({ show, onClose, onSaved }) {
                 <option value="dropped">Dropped</option>
               </select>
             </div>
-            <div className="form-group">
-              <label>Genre</label>
-              <input name="genre" value={form.genre} onChange={handleChange} placeholder="Drama, Sci-Fi..." />
-            </div>
           </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Current Season</label>
-              <input type="number" name="currentSeason" min="1" value={form.currentSeason} onChange={handleChange} />
-            </div>
-            <div className="form-group">
-              <label>Current Episode</label>
-              <input type="number" name="currentEpisode" min="0" value={form.currentEpisode} onChange={handleChange} />
-            </div>
+          <div className="form-group">
+            <label>Genre</label>
+            <select name="genre" value={form.genre} onChange={handleChange}>
+              <option value="">Select genre…</option>
+              {GENRES.map((g) => <option key={g} value={g}>{g}</option>)}
+            </select>
           </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Total Seasons</label>
-              <input type="number" name="totalSeasons" min="1" value={form.totalSeasons} onChange={handleChange} />
-            </div>
-          </div>
+          {!isMovie && (
+            <>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Current Season</label>
+                  <input type="number" name="currentSeason" min="1" value={form.currentSeason} onChange={handleChange} />
+                </div>
+                <div className="form-group">
+                  <label>Current Episode</label>
+                  <input type="number" name="currentEpisode" min="0" value={form.currentEpisode} onChange={handleChange} />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Total Seasons</label>
+                  <input type="number" name="totalSeasons" min="1" value={form.totalSeasons} onChange={handleChange} />
+                </div>
+              </div>
+            </>
+          )}
           <div className="form-group">
             <label>Rating</label>
             <div className="star-input">
@@ -202,12 +230,7 @@ export default function ShowModal({ show, onClose, onSaved }) {
               className="file-input"
             />
             {imageFile && (
-              <button
-                type="button"
-                className="clear-rating"
-                style={{ marginTop: 8 }}
-                onClick={() => setImageFile(null)}
-              >
+              <button type="button" className="clear-rating" style={{ marginTop: 8 }} onClick={() => setImageFile(null)}>
                 Clear file
               </button>
             )}
@@ -215,7 +238,7 @@ export default function ShowModal({ show, onClose, onSaved }) {
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? 'Saving...' : isEdit ? 'Update' : 'Add Show'}
+              {loading ? 'Saving...' : isEdit ? 'Update' : 'Add'}
             </button>
           </div>
         </form>

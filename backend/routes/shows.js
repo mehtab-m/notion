@@ -25,6 +25,14 @@ function showData(body, file) {
   if (data.currentEpisode != null) data.currentEpisode = num(data.currentEpisode, 0);
   if (data.totalSeasons != null) data.totalSeasons = num(data.totalSeasons, 1);
   if (data.rating != null) data.rating = num(data.rating, 0);
+  if (data.mediaType != null) {
+    data.mediaType = data.mediaType === 'movie' ? 'movie' : 'series';
+    if (data.mediaType === 'movie') {
+      data.currentSeason = 1;
+      data.currentEpisode = data.currentEpisode || 0;
+      data.totalSeasons = 1;
+    }
+  }
   return data;
 }
 

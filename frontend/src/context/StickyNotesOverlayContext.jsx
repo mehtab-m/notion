@@ -9,6 +9,10 @@ export function StickyNotesOverlayProvider({ children }) {
     setHiddenIds((prev) => new Set([...prev, id]));
   }, []);
 
+  const hideAllFromOverlay = useCallback((ids = []) => {
+    setHiddenIds((prev) => new Set([...prev, ...ids]));
+  }, []);
+
   const showOnOverlay = useCallback((id) => {
     setHiddenIds((prev) => {
       const next = new Set(prev);
@@ -17,11 +21,22 @@ export function StickyNotesOverlayProvider({ children }) {
     });
   }, []);
 
+  const showAllOnOverlay = useCallback(() => {
+    setHiddenIds(new Set());
+  }, []);
+
   const isHiddenFromOverlay = useCallback((id) => hiddenIds.has(id), [hiddenIds]);
 
   return (
     <StickyNotesOverlayContext.Provider
-      value={{ hiddenIds, hideFromOverlay, showOnOverlay, isHiddenFromOverlay }}
+      value={{
+        hiddenIds,
+        hideFromOverlay,
+        hideAllFromOverlay,
+        showOnOverlay,
+        showAllOnOverlay,
+        isHiddenFromOverlay,
+      }}
     >
       {children}
     </StickyNotesOverlayContext.Provider>

@@ -21,11 +21,22 @@ model User {
   isDeveloper         Boolean?
   /// "user" | "admin"
   role                String    @default("user")
-  /// Cached active status (grace period or weekly activity threshold)
+  /// Cached active status (grace period or recent activity)
   isActive            Boolean   @default(true)
-  /// New users stay active until this date (createdAt + 7 days)
+  /// New users stay active until this date (createdAt + grace days)
   activeGraceUntil    DateTime?
   lastActiveAt        DateTime?
+  /// "common" | "premium" | "platinum"
+  plan                String    @default("premium")
+  /// Premium entitlement ends at this date (default 2027-03-15)
+  planExpiresAt       DateTime?
+  /// Successful login count (for premium stars welcome animation)
+  loginCount          Int       @default(0)
+  /// When inactive follow-up email was last sent
+  followupEmailSentAt DateTime?
+  /// Admin-managed legal / consent flags
+  /// { marketingEmails, dataProcessing, termsAccepted, analyticsOptIn, notes }
+  legalSettings       Json      @default("{}")
   createdAt           DateTime  @default(now())
 
   projects    Project[]
@@ -158,6 +169,8 @@ model Note {
 model Show {
   id             String   @id @default(cuid())
   title          String
+  /// "movie" | "series"
+  mediaType      String   @default("series")
   platform       String   @default("Other")
   status         String   @default("want-to-watch")
   currentSeason  Int      @default(1)

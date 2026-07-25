@@ -5,18 +5,8 @@ import { getStickyNotes, createStickyNote, updateStickyNote, deleteStickyNote } 
 import { useAuth } from '../../context/AuthContext';
 import { useStickyNotesOverlay } from '../../context/StickyNotesOverlayContext';
 import ConfirmDialog from '../ConfirmDialog';
+import { STICKY_COLORS as COLORS, STICKY_COLOR_MAP as COLOR_MAP } from './stickyColors';
 import './StickyNotesOverlay.css';
-
-const COLORS = ['yellow', 'pink', 'blue', 'green', 'purple', 'orange'];
-
-const COLOR_MAP = {
-  yellow: { bg: '#fef9c3', text: '#713f12', border: '#fde047' },
-  pink:   { bg: '#fce7f3', text: '#831843', border: '#f9a8d4' },
-  blue:   { bg: '#dbeafe', text: '#1e3a5f', border: '#93c5fd' },
-  green:  { bg: '#dcfce7', text: '#14532d', border: '#86efac' },
-  purple: { bg: '#f3e8ff', text: '#4a1d96', border: '#d8b4fe' },
-  orange: { bg: '#ffedd5', text: '#7c2d12', border: '#fdba74' },
-};
 
 function FloatingSticky({ note, onUpdate, onHide, onDeleteRequest, zIndex, onFocus }) {
   const [content, setContent] = useState(note.content || '');

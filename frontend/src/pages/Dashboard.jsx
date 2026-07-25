@@ -3,7 +3,6 @@ import { FolderKanban, BookOpen, Tv, Table } from 'lucide-react';
 import { getProjects, getBooks, getShows, getTables, getDashboardStats } from '../utils/api';
 import StatsCard from '../components/Dashboard/StatsCard';
 import ProgressRing from '../components/Dashboard/ProgressRing';
-import RecentActivity from '../components/Dashboard/RecentActivity';
 import QuickAdd from '../components/Dashboard/QuickAdd';
 import DashboardCharts from '../components/Dashboard/DashboardCharts';
 import useMediaQuery, { MOBILE_QUERY } from '../hooks/useMediaQuery';
@@ -63,15 +62,6 @@ export default function Dashboard() {
   const activeProjects = projects.filter((p) => p.status === 'active');
   const readingBooks = books.filter((b) => b.status === 'reading');
   const watchingShows = shows.filter((s) => s.status === 'watching');
-
-  const recentActivity = [
-    ...(showProjects ? projects.map((p) => ({ title: p.title, type: 'project', date: p.updatedAt || p.createdAt, action: `Project · ${p.status}` })) : []),
-    ...books.map((b) => ({ title: b.title, type: 'book', date: b.createdAt, action: `Book · ${b.status}` })),
-    ...shows.map((s) => ({ title: s.title, type: 'show', date: s.createdAt, action: `Show · ${s.status}` })),
-    ...tables.map((t) => ({ title: t.name, type: 'table', date: t.createdAt, action: 'Table' })),
-  ]
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 12);
 
   if (loading) {
     return (
@@ -212,13 +202,6 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-        </div>
-
-        <div className="dashboard-right">
-          <div className="dashboard-section">
-            <h2 className="section-title">Recent Activity</h2>
-            <RecentActivity items={recentActivity} />
-          </div>
         </div>
       </div>
     </div>

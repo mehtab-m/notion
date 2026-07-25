@@ -104,20 +104,11 @@ export default function TableBoard({
     setOpenIds((prev) => {
       if (isMobile) return new Set();
 
-      const next = new Set(prev);
-
-      currentIds.forEach((id) => {
-        if (!prevIds.has(id)) next.add(id);
-      });
-
-      for (const id of [...next]) {
-        if (!currentIds.includes(id)) next.delete(id);
+      // Keep tables collapsed by default; only preserve already-open ones
+      const next = new Set();
+      for (const id of prev) {
+        if (currentIds.includes(id)) next.add(id);
       }
-
-      if (next.size === 0 && currentIds.length > 0) {
-        currentIds.forEach((id) => next.add(id));
-      }
-
       return next;
     });
 

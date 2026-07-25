@@ -7,6 +7,7 @@ import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 import StickyNotesOverlay from './components/StickyNotes/StickyNotesOverlay';
 import DeveloperOnboarding from './components/DeveloperOnboarding';
+import PremiumWelcome from './components/PremiumWelcome';
 import LandingPage from './pages/landing/LandingPage';
 import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
@@ -115,6 +116,7 @@ function AppShell() {
         </div>
         <StickyNotesOverlay />
         {needsDeveloperChoice && <DeveloperOnboarding />}
+        <PremiumWelcome />
         <Toaster position="bottom-right" toastOptions={{ style: toastStyle }} />
       </div>
     </StickyNotesOverlayProvider>

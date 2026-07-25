@@ -1,22 +1,12 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Plus, Pin, Trash2, Eye } from 'lucide-react';
+import { Plus, Pin, Trash2, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useApi from '../hooks/useApi';
 import { getStickyNotes, createStickyNote, updateStickyNote, deleteStickyNote } from '../utils/api';
 import { useStickyNotesOverlay } from '../context/StickyNotesOverlayContext';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { STICKY_COLORS as COLORS, STICKY_COLOR_MAP as COLOR_MAP } from '../components/StickyNotes/stickyColors';
 import './StickyNotesPage.css';
-
-const COLORS = ['yellow', 'pink', 'blue', 'green', 'purple', 'orange'];
-
-const COLOR_MAP = {
-  yellow: { bg: '#fef9c3', text: '#713f12', border: '#fde047' },
-  pink:   { bg: '#fce7f3', text: '#831843', border: '#f9a8d4' },
-  blue:   { bg: '#dbeafe', text: '#1e3a5f', border: '#93c5fd' },
-  green:  { bg: '#dcfce7', text: '#14532d', border: '#86efac' },
-  purple: { bg: '#f3e8ff', text: '#4a1d96', border: '#d8b4fe' },
-  orange: { bg: '#ffedd5', text: '#7c2d12', border: '#fdba74' },
-};
 
 function StickyCard({ note, onUpdate, onDeleteRequest, onShowOnScreen, isHiddenFromScreen }) {
   const [content, setContent] = useState(note.content || '');
@@ -87,7 +77,7 @@ export default function StickyNotesPage() {
   const { data: notes, loading, setData } = useApi(getStickyNotes);
   const [colorFilter, setColorFilter] = useState('all');
   const [deleteId, setDeleteId] = useState(null);
-  const { isHiddenFromOverlay, showOnOverlay } = useStickyNotesOverlay();
+  const { isHiddenFromOverlay, showOnOverlay, hideAllFromOverlay, showAllOnOverlay, hiddenIds } = useStickyNotesOverlay();
 
   const handleAdd = async (color = 'yellow') => {
     const x = 80 + Math.random() * (window.innerWidth - 350);
@@ -135,6 +125,34 @@ export default function StickyNotesPage() {
       <div className="page-header">
         <h1>Sticky Notes</h1>
         <div className="sticky-add-row">
+          {(notes || []).length > 0 && (
+            <>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  hideAllFromOverlay((notes || []).map((n) => n._id));
+                  toast.success('All sticky notes hidden from screen');
+                }}
+                title="Hide all from overlay"
+              >
+                <EyeOff size={14} /> Hide all
+              </button>
+              {hiddenIds.size > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    showAllOnOverlay();
+                    toast.success('Sticky notes restored on screen');
+                  }}
+                  title="Show all on overlay"
+                >
+                  <Eye size={14} /> Show all
+                </button>
+              )}
+            </>
+          )}
           {COLORS.map((c) => (
             <button
               key={c}

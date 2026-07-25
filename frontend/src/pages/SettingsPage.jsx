@@ -1,14 +1,20 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
-import { Settings as SettingsIcon, Palette, Lock, User } from 'lucide-react';
+import { User, Lock, Palette, Code2, Crown, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { updateProfile, updatePassword, updatePreferences } from '../utils/api';
 import './SettingsPage.css';
 
+function planLabel(plan) {
+  if (plan === 'platinum') return 'Platinum';
+  if (plan === 'premium') return 'Premium';
+  return 'Common';
+}
+
 export default function SettingsPage() {
   const { user, updateUser } = useAuth();
-  const { theme, setTheme, themes } = useTheme();
+  const { theme, setTheme, themes, customVars, updateCustomVar, resetCustom, themeVars } = useTheme();
   const [profile, setProfile] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -73,92 +79,95 @@ export default function SettingsPage() {
     }
   };
 
+  const initials = (user?.name || '?')
+    .split(/\s+/)
+    .map((p) => p[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  const stars = user?.premiumStars || 0;
+  const holders = user?.premiumStarHolders || 5;
+
   return (
     <div className="settings-page">
-      <div className="page-header">
-        <div>
-          <h1>Settings</h1>
-          <p className="settings-lede">Account, security, and workspace theme. Role cannot be changed here.</p>
+      <header className="settings-hero">
+        <div className="settings-avatar" aria-hidden>{initials}</div>
+        <div className="settings-hero-copy">
+          <div className="settings-hero-top">
+            <h1>{user?.name || 'Account'}</h1>
+            {(user?.plan === 'premium' || user?.plan === 'platinum') && (
+              <span className={`settings-plan-badge plan-${user.plan}`}>
+                <Crown size={13} />
+                {planLabel(user.plan)}
+              </span>
+            )}
+            {user?.role === 'admin' && (
+              <span className="settings-plan-badge plan-admin">
+                <Shield size={13} /> Admin
+              </span>
+            )}
+          </div>
+          <p className="settings-hero-email">{user?.email}</p>
+          <div className="settings-star-row" title={`${stars} of ${holders} plan stars`}>
+            {Array.from({ length: holders }).map((_, i) => (
+              <span key={i} className={i < stars ? 'on' : ''}>{i < stars ? '★' : '☆'}</span>
+            ))}
+            <em>{planLabel(user?.plan)} · through {user?.planExpiresAt ? new Date(user.planExpiresAt).toLocaleDateString() : 'Mar 15, 2027'}</em>
+          </div>
         </div>
-      </div>
+      </header>
 
-      <section className="settings-panel">
-        <div className="settings-panel-head">
-          <Palette size={18} />
-          <h2>Theme</h2>
-        </div>
-        <p className="settings-hint">Pick one of five atmospheres for the whole app.</p>
-        <div className="theme-grid">
-          {themes.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className={`theme-card ${theme === t.id ? 'active' : ''}`}
-              onClick={() => setTheme(t.id)}
-            >
-              <div className="theme-swatches">
-                {t.swatch.map((c) => (
-                  <i key={c} style={{ background: c }} />
-                ))}
-              </div>
-              <strong>{t.label}</strong>
-              <span>{t.desc}</span>
+      <div className="settings-grid">
+        <section className="settings-card">
+          <div className="settings-card-head">
+            <User size={16} />
+            <h2>Profile</h2>
+          </div>
+          <form onSubmit={saveProfile} className="settings-form">
+            <div className="form-group">
+              <label>Full name</label>
+              <input
+                value={profile.name}
+                onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Email</label>
+              <input
+                type="email"
+                value={profile.email}
+                onChange={(e) => setProfile((p) => ({ ...p, email: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="settings-readonly-row">
+              <span>Role</span>
+              <strong>{user?.role === 'admin' ? 'Administrator' : 'Member'}</strong>
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={savingProfile}>
+              {savingProfile ? 'Saving…' : 'Save profile'}
             </button>
-          ))}
-        </div>
-      </section>
+          </form>
+        </section>
 
-      <section className="settings-panel">
-        <div className="settings-panel-head">
-          <User size={18} />
-          <h2>Profile</h2>
-        </div>
-        <form onSubmit={saveProfile} className="settings-form">
-          <div className="form-group">
-            <label>Display name</label>
-            <input
-              value={profile.name}
-              onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))}
-              required
-            />
+        <section className="settings-card">
+          <div className="settings-card-head">
+            <Lock size={16} />
+            <h2>Security</h2>
           </div>
-          <div className="form-group">
-            <label>Email</label>
-            <input
-              type="email"
-              value={profile.email}
-              onChange={(e) => setProfile((p) => ({ ...p, email: e.target.value }))}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label>Role</label>
-            <input value={user?.role === 'admin' ? 'Admin (read-only)' : 'User (read-only)'} disabled />
-            <p className="settings-hint">Role is managed by product admins and cannot be changed.</p>
-          </div>
-          <button type="submit" className="btn btn-primary" disabled={savingProfile}>
-            {savingProfile ? 'Saving…' : 'Save profile'}
-          </button>
-        </form>
-      </section>
-
-      <section className="settings-panel">
-        <div className="settings-panel-head">
-          <Lock size={18} />
-          <h2>Password</h2>
-        </div>
-        <form onSubmit={savePassword} className="settings-form">
-          <div className="form-group">
-            <label>Current password</label>
-            <input
-              type="password"
-              value={passwords.currentPassword}
-              onChange={(e) => setPasswords((p) => ({ ...p, currentPassword: e.target.value }))}
-              required
-              autoComplete="current-password"
-            />
-          </div>
-          <div className="form-row">
+          <form onSubmit={savePassword} className="settings-form">
+            <div className="form-group">
+              <label>Current password</label>
+              <input
+                type="password"
+                value={passwords.currentPassword}
+                onChange={(e) => setPasswords((p) => ({ ...p, currentPassword: e.target.value }))}
+                required
+                autoComplete="current-password"
+              />
+            </div>
             <div className="form-group">
               <label>New password</label>
               <input
@@ -181,19 +190,73 @@ export default function SettingsPage() {
                 autoComplete="new-password"
               />
             </div>
-          </div>
-          <button type="submit" className="btn btn-primary" disabled={savingPass}>
-            {savingPass ? 'Updating…' : 'Update password'}
-          </button>
-        </form>
-      </section>
+            <button type="submit" className="btn btn-primary" disabled={savingPass}>
+              {savingPass ? 'Updating…' : 'Update password'}
+            </button>
+          </form>
+        </section>
 
-      <section className="settings-panel settings-meta">
-        <SettingsIcon size={16} />
-        <div className="settings-dev-block">
-          <p>Developer mode: {user?.isDeveloper === true ? 'On' : user?.isDeveloper === false ? 'Off' : 'Not chosen'}</p>
+        <section className="settings-card settings-card-wide">
+          <div className="settings-card-head">
+            <Palette size={16} />
+            <h2>Appearance</h2>
+          </div>
+          <div className="theme-grid">
+            {themes.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`theme-card ${theme === t.id ? 'active' : ''}`}
+                onClick={() => setTheme(t.id)}
+              >
+                <div className="theme-swatches">
+                  {t.swatch.map((c) => <i key={c} style={{ background: c }} />)}
+                </div>
+                <strong>{t.label}</strong>
+                <span>{t.desc}</span>
+              </button>
+            ))}
+          </div>
+
+          {theme === 'custom' && (
+            <div className="theme-editor">
+              <div className="theme-editor-head">
+                <h3>Custom palette</h3>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={resetCustom}>
+                  Reset defaults
+                </button>
+              </div>
+              <div className="theme-editor-grid">
+                {themeVars.map(({ key, label }) => (
+                  <label key={key} className="theme-var-field">
+                    <span>{label}</span>
+                    <div className="theme-var-inputs">
+                      <input
+                        type="color"
+                        value={/^#[0-9a-fA-F]{6}$/.test(customVars[key]) ? customVars[key] : '#000000'}
+                        onChange={(e) => updateCustomVar(key, e.target.value)}
+                      />
+                      <input
+                        type="text"
+                        value={customVars[key] || ''}
+                        onChange={(e) => updateCustomVar(key, e.target.value)}
+                        spellCheck={false}
+                      />
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="settings-card">
+          <div className="settings-card-head">
+            <Code2 size={16} />
+            <h2>Workspace</h2>
+          </div>
           <p className="settings-hint">
-            Developers see the Projects section. Non-developers keep it hidden entirely.
+            Developer mode controls whether Projects appear in your sidebar and API access.
           </p>
           <div className="settings-dev-actions">
             <button
@@ -213,8 +276,8 @@ export default function SettingsPage() {
               I am not a developer
             </button>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }

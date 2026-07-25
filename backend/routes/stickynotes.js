@@ -5,6 +5,16 @@ const { owned } = require('../utils/scope');
 const { cleanBody } = require('../utils/body');
 const { serialize } = require('../utils/serialize');
 
+const ALLOWED_STICKY_COLORS = ['yellow', 'purple', 'green'];
+
+function stickyData(body) {
+  const data = cleanBody(body);
+  if (data.color != null && !ALLOWED_STICKY_COLORS.includes(data.color)) {
+    data.color = 'yellow';
+  }
+  return data;
+}
+
 router.get('/', async (req, res) => {
   try {
     const notes = await prisma.stickyNote.findMany({
@@ -20,7 +30,7 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const saved = await prisma.stickyNote.create({
-      data: { ...cleanBody(req.body), userId: req.user.id },
+      data: { ...stickyData(req.body), userId: req.user.id },
     });
     res.status(201).json(serialize(saved));
   } catch (err) {
@@ -36,7 +46,7 @@ router.put('/:id', async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Sticky note not found' });
     const updated = await prisma.stickyNote.update({
       where: { id: existing.id },
-      data: cleanBody(req.body),
+      data: stickyData(req.body),
     });
     res.json(serialize(updated));
   } catch (err) {

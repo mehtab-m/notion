@@ -5,8 +5,12 @@ const { adminMiddleware } = require('../middleware/auth');
 const {
   ACTIVE_WEEKLY_THRESHOLD,
   GRACE_DAYS,
+  INACTIVE_AFTER_DAYS,
   recomputeActiveStatus,
   isAdminUser,
+  resolveEffectivePlan,
+  defaultPlanExpiresAt,
+  planMeta,
 } = require('../utils/activity');
 const { serialize } = require('../utils/serialize');
 
@@ -20,10 +24,12 @@ function daysAgo(n) {
 
 async function buildUserAnalytics(user) {
   const weekAgo = daysAgo(7);
+  const recentAgo = daysAgo(INACTIVE_AFTER_DAYS);
   const [
     weekActivity,
     weekLogins,
     weekAppUses,
+    recentActivity,
     totalActivity,
     totalLogins,
     totalAppUses,
@@ -39,6 +45,7 @@ async function buildUserAnalytics(user) {
     prisma.userActivity.count({ where: { userId: user.id, createdAt: { gte: weekAgo } } }),
     prisma.userActivity.count({ where: { userId: user.id, type: 'login', createdAt: { gte: weekAgo } } }),
     prisma.userActivity.count({ where: { userId: user.id, type: 'app_use', createdAt: { gte: weekAgo } } }),
+    prisma.userActivity.count({ where: { userId: user.id, createdAt: { gte: recentAgo } } }),
     prisma.userActivity.count({ where: { userId: user.id } }),
     prisma.userActivity.count({ where: { userId: user.id, type: 'login' } }),
     prisma.userActivity.count({ where: { userId: user.id, type: 'app_use' } }),
@@ -54,6 +61,10 @@ async function buildUserAnalytics(user) {
 
   const now = new Date();
   const inGrace = user.activeGraceUntil ? now <= new Date(user.activeGraceUntil) : false;
+  const meta = planMeta(user);
+  const legal = (user.legalSettings && typeof user.legalSettings === 'object')
+    ? user.legalSettings
+    : {};
 
   return {
     _id: user.id,
@@ -65,19 +76,32 @@ async function buildUserAnalytics(user) {
     isActive: user.isActive,
     activeReason: inGrace
       ? 'grace_period'
-      : weekActivity >= ACTIVE_WEEKLY_THRESHOLD
-        ? 'weekly_activity'
+      : recentActivity > 0 || weekActivity >= ACTIVE_WEEKLY_THRESHOLD
+        ? 'recent_activity'
         : 'inactive',
     activeGraceUntil: user.activeGraceUntil,
     lastActiveAt: user.lastActiveAt,
     createdAt: user.createdAt,
+    plan: meta.plan,
+    planRaw: meta.planRaw,
+    planExpiresAt: meta.planExpiresAt,
+    loginCount: meta.loginCount,
+    premiumStars: meta.premiumStars,
+    followupEmailSentAt: user.followupEmailSentAt || null,
+    legalSettings: {
+      marketingEmails: !!legal.marketingEmails,
+      dataProcessing: legal.dataProcessing !== false,
+      termsAccepted: !!legal.termsAccepted,
+      analyticsOptIn: !!legal.analyticsOptIn,
+      notes: typeof legal.notes === 'string' ? legal.notes : '',
+    },
     weekActivityCount: weekActivity,
+    recentActivityCount: recentActivity,
     weekLogins,
     weekAppUses,
     totalActivityCount: totalActivity,
     totalLogins,
     totalAppUses,
-    // Privacy-safe profile + usage snapshot (no passwords / codes)
     profile: {
       name: user.name,
       email: user.email,
@@ -87,6 +111,8 @@ async function buildUserAnalytics(user) {
       joinedAt: user.createdAt,
       lastActiveAt: user.lastActiveAt,
       graceEndsAt: user.activeGraceUntil,
+      plan: meta.plan,
+      loginCount: meta.loginCount,
     },
     content: {
       books: booksCount,
@@ -119,13 +145,18 @@ router.get('/stats', async (req, res) => {
         isActive: true,
         activeGraceUntil: true,
         lastActiveAt: true,
+        plan: true,
+        planExpiresAt: true,
+        loginCount: true,
+        followupEmailSentAt: true,
+        legalSettings: true,
         createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
     });
 
     // Refresh active flags for all users so dashboard is accurate
-    await Promise.all(users.map((u) => recomputeActiveStatus(u.id)));
+    await Promise.all(users.map((u) => recomputeActiveStatus(u.id, { touchLastActive: false })));
 
     const refreshed = await prisma.user.findMany({
       where: { isVerified: true },
@@ -139,6 +170,11 @@ router.get('/stats', async (req, res) => {
         isActive: true,
         activeGraceUntil: true,
         lastActiveAt: true,
+        plan: true,
+        planExpiresAt: true,
+        loginCount: true,
+        followupEmailSentAt: true,
+        legalSettings: true,
         createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -152,6 +188,9 @@ router.get('/stats', async (req, res) => {
     const developers = refreshed.filter((u) => u.isDeveloper === true).length;
     const nonDevelopers = refreshed.filter((u) => u.isDeveloper === false).length;
     const undecided = refreshed.filter((u) => u.isDeveloper == null).length;
+    const premiumUsers = refreshed.filter((u) => resolveEffectivePlan(u) === 'premium').length;
+    const platinumUsers = refreshed.filter((u) => resolveEffectivePlan(u) === 'platinum').length;
+    const commonUsers = refreshed.filter((u) => resolveEffectivePlan(u) === 'common').length;
     const newThisWeek = refreshed.filter((u) => new Date(u.createdAt) >= weekAgo).length;
     const newThisMonth = refreshed.filter((u) => new Date(u.createdAt) >= monthAgo).length;
     const inGrace = refreshed.filter(
@@ -200,6 +239,9 @@ router.get('/stats', async (req, res) => {
         developers,
         nonDevelopers,
         undecidedDeveloper: undecided,
+        premiumUsers,
+        platinumUsers,
+        commonUsers,
         newThisWeek,
         newThisMonth,
         inGracePeriod: inGrace,
@@ -208,12 +250,13 @@ router.get('/stats', async (req, res) => {
         weeklyAppUses: weekAppUses,
         activeThreshold: ACTIVE_WEEKLY_THRESHOLD,
         graceDays: GRACE_DAYS,
+        inactiveAfterDays: INACTIVE_AFTER_DAYS,
       },
       // Only privacy-safe operational metrics — no passwords, codes, or content bodies
       ethicalDataPolicy: {
-        collected: ['login events', 'throttled app_use pings', 'account profile fields', 'content counts'],
+        collected: ['login events', 'throttled app_use pings', 'account profile fields', 'content counts', 'plan tier'],
         notCollected: ['passwords', 'verification codes', 'note/page content bodies', 'third-party tracking'],
-        activeRule: `Active if ≥${ACTIVE_WEEKLY_THRESHOLD} login/app_use events in 7 days, or within first ${GRACE_DAYS} days of signup`,
+        activeRule: `Active if activity within last ${INACTIVE_AFTER_DAYS} days, or ≥${ACTIVE_WEEKLY_THRESHOLD} events/week, or within first ${GRACE_DAYS} days of signup. Inactive users receive one SortLife follow-up email.`,
       },
       contentTotals: {
         books: totalBooks,
@@ -254,6 +297,11 @@ router.get('/users', async (req, res) => {
         isActive: true,
         activeGraceUntil: true,
         lastActiveAt: true,
+        plan: true,
+        planExpiresAt: true,
+        loginCount: true,
+        followupEmailSentAt: true,
+        legalSettings: true,
         createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -265,16 +313,36 @@ router.get('/users', async (req, res) => {
   }
 });
 
-// PATCH /api/admin/users/:id — set role / active override
+// PATCH /api/admin/users/:id — role, plan, active, legal settings
 router.patch('/users/:id', async (req, res) => {
   try {
-    const { role, isActive } = req.body;
+    const { role, isActive, plan, planExpiresAt, legalSettings, isDeveloper } = req.body;
     const data = {};
     if (role === 'admin' || role === 'user') data.role = role;
     if (typeof isActive === 'boolean') data.isActive = isActive;
+    if (plan === 'common' || plan === 'premium' || plan === 'platinum') {
+      data.plan = plan;
+      if (plan === 'premium' && !planExpiresAt) {
+        data.planExpiresAt = defaultPlanExpiresAt();
+      }
+    }
+    if (planExpiresAt) {
+      const d = new Date(planExpiresAt);
+      if (!Number.isNaN(d.getTime())) data.planExpiresAt = d;
+    }
+    if (typeof isDeveloper === 'boolean') data.isDeveloper = isDeveloper;
+    if (legalSettings && typeof legalSettings === 'object') {
+      data.legalSettings = {
+        marketingEmails: !!legalSettings.marketingEmails,
+        dataProcessing: legalSettings.dataProcessing !== false,
+        termsAccepted: !!legalSettings.termsAccepted,
+        analyticsOptIn: !!legalSettings.analyticsOptIn,
+        notes: typeof legalSettings.notes === 'string' ? legalSettings.notes.slice(0, 2000) : '',
+      };
+    }
 
     if (Object.keys(data).length === 0) {
-      return res.status(400).json({ error: 'Provide role and/or isActive' });
+      return res.status(400).json({ error: 'Provide role, plan, isActive, isDeveloper, and/or legalSettings' });
     }
 
     const updated = await prisma.user.update({
