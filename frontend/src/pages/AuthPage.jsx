@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Grid2x2, Mail, Lock, User, KeyRound, ArrowLeft } from 'lucide-react';
+import { Zap, Mail, Lock, User, KeyRound, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { signup, verifyEmail, login, resendCode } from '../utils/api';
@@ -113,8 +113,9 @@ export default function AuthPage({ redirectTo, initialMode = 'login' }) {
       <Link to="/" className="auth-back-link">
         <ArrowLeft size={16} /> Back to home
       </Link>
-      <div className="auth-card">        <div className="auth-logo">
-          <Grid2x2 size={28} color="var(--accent)" />
+      <div className="auth-card">
+        <div className="auth-logo">
+          <Zap size={26} className="auth-logo-icon" />
           <h1>SortLife</h1>
         </div>
 

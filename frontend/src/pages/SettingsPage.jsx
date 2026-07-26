@@ -14,7 +14,7 @@ function planLabel(plan) {
 
 export default function SettingsPage() {
   const { user, updateUser } = useAuth();
-  const { theme, setTheme, themes, customVars, updateCustomVar, resetCustom, themeVars } = useTheme();
+  const { theme, setTheme, themes } = useTheme();
   const [profile, setProfile] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -206,7 +206,7 @@ export default function SettingsPage() {
               <button
                 key={t.id}
                 type="button"
-                className={`theme-card ${theme === t.id ? 'active' : ''}`}
+                className={`theme-card ${theme.id === t.id ? 'active' : ''}`}
                 onClick={() => setTheme(t.id)}
               >
                 <div className="theme-swatches">
@@ -217,37 +217,6 @@ export default function SettingsPage() {
               </button>
             ))}
           </div>
-
-          {theme === 'custom' && (
-            <div className="theme-editor">
-              <div className="theme-editor-head">
-                <h3>Custom palette</h3>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={resetCustom}>
-                  Reset defaults
-                </button>
-              </div>
-              <div className="theme-editor-grid">
-                {themeVars.map(({ key, label }) => (
-                  <label key={key} className="theme-var-field">
-                    <span>{label}</span>
-                    <div className="theme-var-inputs">
-                      <input
-                        type="color"
-                        value={/^#[0-9a-fA-F]{6}$/.test(customVars[key]) ? customVars[key] : '#000000'}
-                        onChange={(e) => updateCustomVar(key, e.target.value)}
-                      />
-                      <input
-                        type="text"
-                        value={customVars[key] || ''}
-                        onChange={(e) => updateCustomVar(key, e.target.value)}
-                        spellCheck={false}
-                      />
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
         </section>
 
         <section className="settings-card">
