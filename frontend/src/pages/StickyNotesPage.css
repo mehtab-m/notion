@@ -27,6 +27,7 @@
   display: flex;
   flex-direction: column;
   min-height: 200px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   transition: transform 0.15s, box-shadow 0.15s;
   position: relative;
 }
@@ -82,7 +83,7 @@
 .sticky-pin:hover { background: rgba(0,0,0,0.16); }
 .sticky-pin.pinned { background: rgba(0,0,0,0.2); }
 .sticky-delete:hover { background: rgba(239,68,68,0.2); color: #ef4444; }
-.sticky-show:hover { background: rgba(99,102,241,0.2); color: #6366f1; }
+.sticky-show:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
 
 .sticky-card--hidden {
   opacity: 0.85;
@@ -95,8 +96,8 @@
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 10px;
-  background: rgba(99,102,241,0.15);
-  color: #6366f1;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
 }
 
 @media (max-width: 768px) {

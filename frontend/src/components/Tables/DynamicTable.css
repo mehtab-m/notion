@@ -97,7 +97,7 @@
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  background: rgba(99, 102, 241, 0.15);
+  background: var(--accent-soft);
   color: var(--accent);
   border-radius: 10px;
   font-size: 12px;
@@ -203,7 +203,7 @@
 
 .col-delete-btn:hover {
   color: var(--accent-red);
-  background: rgba(239, 68, 68, 0.1);
+  background: color-mix(in srgb, var(--accent-red) 12%, transparent);
   opacity: 1;
 }
 
@@ -234,7 +234,7 @@
   border-radius: var(--radius-sm);
   padding: 6px;
   min-width: 160px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-lg);
 }
 
 .col-menu-item {
@@ -355,7 +355,7 @@
 }
 
 .dt-cell:hover {
-  background: rgba(99, 102, 241, 0.04);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
 }
 
 .dt-cell-editing {
@@ -384,7 +384,7 @@
   width: 100%;
   height: 38px;
   padding: 9px 12px;
-  background: rgba(99, 102, 241, 0.08);
+  background: var(--accent-soft);
   border: 1px solid var(--accent);
   border-radius: 0;
   color: var(--text-primary);
@@ -426,7 +426,7 @@
 }
 
 .cell-select:focus {
-  background: rgba(99, 102, 241, 0.08);
+  background: var(--accent-soft);
   outline: none;
 }
 
@@ -460,12 +460,12 @@
   cursor: pointer;
   padding: 2px 6px;
   border-radius: 3px;
-  background: rgba(99, 102, 241, 0.1);
+  background: var(--accent-soft);
 }
 
 .cell-image-replace:hover,
 .cell-image-upload:hover {
-  background: rgba(99, 102, 241, 0.2);
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 /* URL cell */
@@ -510,11 +510,11 @@
 .dt-add-col-btn:hover {
   color: var(--accent);
   border-color: var(--accent);
-  background: rgba(13, 148, 136, 0.08);
+  background: var(--accent-soft);
 }
 
 .dt-row-draft {
-  background: rgba(13, 148, 136, 0.04);
+  background: color-mix(in srgb, var(--accent-green) 6%, transparent);
 }
 
 .dt-row-draft .cell-empty {

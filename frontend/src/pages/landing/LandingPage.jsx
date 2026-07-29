@@ -1,17 +1,14 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import {
-  ArrowRight, Menu, X, Check, Flame, Target, BookOpen, Tv,
+  ArrowRight, Menu, X, Flame, Target, BookOpen, Tv,
   LayoutDashboard, PenLine, StickyNote, Table, FolderKanban,
   Zap, Star, Sparkles, Quote, ChevronLeft, ChevronRight,
-  CheckCircle2, Circle, Palette,
+  CheckCircle2, Circle, Sun, Moon,
 } from 'lucide-react';
-import { useTheme, NOVA_THEMES } from '../../context/ThemeContext';
+import { useTheme } from '../../context/ThemeContext';
 import './landing.css';
-
-/* ─── Re-export for AuthPage backward compat ────────────── */
-export { NOVA_THEMES };
 
 /* ─── Nav links (no Pricing) ────────────────────────────── */
 const NAV_LINKS = [
@@ -105,54 +102,19 @@ function Orb({ style, cls = '' }) {
   );
 }
 
-/* ─── Theme picker ──────────────────────────────────────── */
-function ThemePicker({ current, onChange }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
+/* ─── Theme toggle ───────────────────────────────────────── */
+function ThemeToggle({ isDark, onToggle }) {
   return (
-    <div className="nova-theme-picker" ref={ref}>
-      <button
-        type="button"
-        className="nova-theme-btn"
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Change theme"
-        title="Change theme"
-      >
-        <Palette size={15} />
-        <span>{current.label}</span>
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            className="nova-theme-dropdown"
-            initial={{ opacity: 0, y: -8, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.96 }}
-            transition={{ duration: 0.15 }}
-          >
-            {NOVA_THEMES.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                className={`nova-theme-option ${current.id === t.id ? 'active' : ''}`}
-                onClick={() => { onChange(t); setOpen(false); }}
-              >
-                <span className="nova-theme-swatch" style={{ background: `linear-gradient(135deg,${t.a1},${t.a2})` }} />
-                <span>{t.label}</span>
-                {current.id === t.id && <Check size={12} />}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    <button
+      type="button"
+      className="nova-theme-btn"
+      onClick={onToggle}
+      aria-label="Toggle light/dark theme"
+      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {isDark ? <Moon size={15} /> : <Sun size={15} />}
+      <span>{isDark ? 'Dark' : 'Light'}</span>
+    </button>
   );
 }
 
@@ -262,7 +224,7 @@ function GoalsDemo() {
                   <span className="demo-goal-cat">{g.category}</span>
                 </div>
                 <svg className="demo-goal-ring" viewBox="0 0 36 36">
-                  <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
+                  <circle cx="18" cy="18" r="14" fill="none" stroke="var(--nova-border-md)" strokeWidth="3" />
                   <motion.circle
                     cx="18" cy="18" r="14" fill="none" stroke={color} strokeWidth="3"
                     strokeLinecap="round" strokeDasharray={`${circ}`}
@@ -346,7 +308,7 @@ function ProjectsDemo() {
           </div>
           <div className="demo-project-ring-wrap">
             <svg viewBox="0 0 60 60" className="demo-project-ring">
-              <circle cx="30" cy="30" r="26" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
+              <circle cx="30" cy="30" r="26" fill="none" stroke="var(--nova-border-md)" strokeWidth="4" />
               <motion.circle
                 cx="30" cy="30" r="26" fill="none"
                 stroke="var(--nova-amber)" strokeWidth="4" strokeLinecap="round"
@@ -480,7 +442,7 @@ function TestimonialsCarousel() {
             layout
           >
             <div className="nova-testi-stars">
-              {Array.from({ length: stars }).map((_, i) => <Star key={i} size={12} fill="var(--nova-amber)" color="var(--nova-amber)" />)}
+              {Array.from({ length: stars }).map((_, i) => <Star key={i} size={12} fill="#F5B942" color="#F5B942" />)}
             </div>
             <Quote size={18} className="nova-testi-quote-icon" />
             <p>"{text}"</p>
@@ -519,9 +481,7 @@ function Marquee({ items }) {
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const { theme, setTheme } = useTheme();
-
-  const handleTheme = useCallback((t) => setTheme(t), [setTheme]);
+  const { isDark, toggleTheme } = useTheme();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -550,12 +510,12 @@ export default function LandingPage() {
         <Link to="/" className="nova-brand"><Zap size={19} className="nova-brand-icon" />SortLife</Link>
         <nav className="nova-nav-links">
           {NAV_LINKS.map((l) => <a key={l.href} href={l.href}>{l.label}</a>)}
-          <ThemePicker current={theme} onChange={handleTheme} />
+          <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
           <Link to="/login" className="nova-nav-login">Log in</Link>
           <Link to="/signup" className="nova-nav-cta">Get Started <ArrowRight size={13} /></Link>
         </nav>
         <div className="nova-nav-right-mobile">
-          <ThemePicker current={theme} onChange={handleTheme} />
+          <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
           <button type="button" className="nova-nav-toggle" onClick={() => setMenuOpen((v) => !v)} aria-label="Menu">
             {menuOpen ? <X size={21} /> : <Menu size={21} />}
           </button>

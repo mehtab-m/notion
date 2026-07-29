@@ -14,7 +14,7 @@
 
 .project-card-v2:hover {
   transform: translateY(-4px);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--shadow-lg);
   border-color: color-mix(in srgb, var(--card-accent) 40%, var(--border));
 }
 
@@ -50,7 +50,7 @@
   font-weight: 700;
   padding: 3px 8px;
   border-radius: 20px;
-  background: rgba(99, 102, 241, 0.12);
+  background: var(--accent-soft);
   color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.3px;

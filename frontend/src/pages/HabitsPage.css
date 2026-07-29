@@ -7,6 +7,7 @@
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
 }
 
 .habits-table {
@@ -38,7 +39,7 @@
   border-bottom: 1px solid var(--border);
   min-width: 38px;
 }
-.habit-day-th.today { background: rgba(99,102,241,0.08); }
+.habit-day-th.today { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 
 .habit-day-label {
   display: flex;
@@ -112,7 +113,7 @@
   transition: all 0.15s;
 }
 .habit-dot:hover:not(.future):not(.past) {
-  background: rgba(99,102,241,0.15);
+  background: var(--accent-soft);
   border-color: var(--accent);
   transform: scale(1.15);
 }
@@ -131,7 +132,7 @@
 }
 .habit-dot.today:not(.done) {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
 .habit-streak-cell {
@@ -170,7 +171,7 @@
   transition: all 0.12s;
 }
 .emoji-btn:hover { border-color: var(--accent); transform: scale(1.1); }
-.emoji-btn.selected { border-color: var(--accent); background: rgba(99,102,241,0.12); }
+.emoji-btn.selected { border-color: var(--accent); background: var(--accent-soft); }
 
 .habits-mobile-hint {
   font-size: 12px;

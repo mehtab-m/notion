@@ -17,10 +17,10 @@ const platformColors = {
   Netflix: { bg: 'rgba(229,9,20,0.15)', color: '#e50914' },
   HBO: { bg: 'rgba(160,32,240,0.15)', color: '#a020f0' },
   'Disney+': { bg: 'rgba(17,60,207,0.15)', color: '#113ccf' },
-  'Apple TV+': { bg: 'rgba(255,255,255,0.1)', color: '#e8e8e8' },
+  'Apple TV+': { bg: 'var(--bg-hover)', color: 'var(--text-primary)' },
   'Amazon Prime': { bg: 'rgba(0,168,225,0.15)', color: '#00a8e1' },
-  Hulu: { bg: 'rgba(28,231,131,0.15)', color: '#1ce783' },
-  Other: { bg: 'rgba(96,96,96,0.2)', color: '#a0a0a0' },
+  Hulu: { bg: 'rgba(28,231,131,0.15)', color: '#0c9d59' },
+  Other: { bg: 'var(--bg-hover)', color: 'var(--text-secondary)' },
 };
 
 export function resolvePosterUrl(posterImage) {

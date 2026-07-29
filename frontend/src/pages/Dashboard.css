@@ -120,7 +120,7 @@
   font-weight: 600;
   padding: 2px 7px;
   border-radius: 10px;
-  background: rgba(99, 102, 241, 0.15);
+  background: var(--accent-soft);
   color: var(--accent);
 }
 

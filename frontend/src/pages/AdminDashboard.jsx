@@ -11,7 +11,7 @@ import { format, parseISO } from 'date-fns';
 import { getAdminStats, updateAdminUser } from '../utils/api';
 import './AdminDashboard.css';
 
-const PIE_COLORS = ['#10b981', '#ef4444'];
+const PIE_COLORS = ['var(--accent-green)', 'var(--accent-red)'];
 
 function StatTile({ icon: Icon, label, value, sub }) {
   return (
@@ -274,15 +274,15 @@ export default function AdminDashboard() {
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="signupFillEnt" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#0d9488" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#0d9488" stopOpacity={0} />
+                    <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
                 <Tooltip />
-                <Area type="monotone" dataKey="count" stroke="#0d9488" fill="url(#signupFillEnt)" strokeWidth={2} />
+                <Area type="monotone" dataKey="count" stroke="var(--accent)" fill="url(#signupFillEnt)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           )}

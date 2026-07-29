@@ -54,13 +54,13 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-sm);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .table-board-section.is-open {
   border-color: var(--border-light);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow);
 }
 
 .table-board-section-header {
@@ -155,8 +155,8 @@
 
 .table-board-delete:hover {
   color: var(--accent-red);
-  border-color: rgba(239, 68, 68, 0.4);
-  background: rgba(239, 68, 68, 0.08);
+  border-color: color-mix(in srgb, var(--accent-red) 40%, transparent);
+  background: color-mix(in srgb, var(--accent-red) 10%, transparent);
 }
 
 .table-board-section-body {

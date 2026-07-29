@@ -18,12 +18,12 @@
   position: relative;
   width: min(440px, 92vw);
   padding: 36px 32px 28px;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background:
-    radial-gradient(120% 80% at 50% -20%, rgba(245, 158, 11, 0.22), transparent 55%),
-    var(--bg-primary, #111);
+    radial-gradient(120% 80% at 50% -20%, rgba(245, 158, 11, 0.16), transparent 55%),
+    var(--bg-card);
   border: 1px solid rgba(245, 158, 11, 0.35);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow-lg);
   text-align: center;
   color: var(--text-primary);
 }
@@ -84,7 +84,7 @@
 
 .premium-star-slot {
   font-size: 28px;
-  color: rgba(255, 255, 255, 0.18);
+  color: var(--border-light);
   transition: color 0.2s, transform 0.2s;
 }
 

@@ -10,7 +10,8 @@
 
 .stats-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow);
+  border-color: var(--border-light);
 }
 
 .stats-card-left {
@@ -23,7 +24,7 @@
   width: 44px;
   height: 44px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--card-color, var(--accent)) 14%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;

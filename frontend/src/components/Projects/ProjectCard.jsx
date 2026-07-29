@@ -14,9 +14,9 @@ const statusClass = {
 };
 
 const statusColors = {
-  active: '#6366f1',
-  completed: '#10b981',
-  'on-hold': '#f59e0b',
+  active: 'var(--accent)',
+  completed: 'var(--accent-green)',
+  'on-hold': 'var(--accent-yellow)',
   planned: '#8b5cf6',
 };
 

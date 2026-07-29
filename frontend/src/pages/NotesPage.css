@@ -6,6 +6,7 @@
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
   position: relative;
 }
@@ -107,7 +108,7 @@
 }
 .notes-list-item:hover { background: var(--bg-hover); }
 .notes-list-item.active {
-  background: rgba(99,102,241,0.08);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
   border-left-color: var(--accent);
 }
 .notes-list-item-header {
@@ -260,7 +261,7 @@
 }
 
 .notes-tree-item:hover { background: var(--bg-hover); color: var(--text-primary); }
-.notes-tree-item.active { background: rgba(99,102,241,0.1); color: var(--accent); }
+.notes-tree-item.active { background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); }
 
 .notes-tree-section {
   font-size: 10px;
@@ -411,6 +412,7 @@
 .notebook-page-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
+  box-shadow: var(--shadow-sm);
 }
 
 @media (max-width: 768px) {

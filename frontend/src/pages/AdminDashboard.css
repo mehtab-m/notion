@@ -57,7 +57,7 @@
   border-radius: 8px;
   display: grid;
   place-items: center;
-  background: rgba(13, 148, 136, 0.12);
+  background: var(--accent-soft);
   color: var(--accent);
 }
 
@@ -212,8 +212,8 @@
   border-radius: 999px;
 }
 
-.ent-pill.on { background: rgba(16, 185, 129, 0.15); color: #10b981; }
-.ent-pill.off { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.ent-pill.on { background: color-mix(in srgb, var(--accent-green) 15%, transparent); color: var(--accent-green); }
+.ent-pill.off { background: color-mix(in srgb, var(--accent-red) 15%, transparent); color: var(--accent-red); }
 
 .ent-plan {
   text-transform: capitalize;
@@ -221,8 +221,8 @@
   font-size: 12px;
 }
 
-.ent-plan.premium { color: #f59e0b; }
-.ent-plan.platinum { color: #c084fc; }
+.ent-plan.premium { color: var(--accent-yellow); }
+.ent-plan.platinum { color: #9333EA; }
 .ent-plan.common { color: var(--text-secondary); }
 
 .ent-empty {

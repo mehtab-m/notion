@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
-import { User, Lock, Palette, Code2, Crown, Shield } from 'lucide-react';
+import { User, Lock, Palette, Code2, Crown, Shield, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { updateProfile, updatePassword, updatePreferences } from '../utils/api';
@@ -14,7 +14,7 @@ function planLabel(plan) {
 
 export default function SettingsPage() {
   const { user, updateUser } = useAuth();
-  const { theme, setTheme, themes } = useTheme();
+  const { isDark, setTheme } = useTheme();
   const [profile, setProfile] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -201,21 +201,25 @@ export default function SettingsPage() {
             <Palette size={16} />
             <h2>Appearance</h2>
           </div>
-          <div className="theme-grid">
-            {themes.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                className={`theme-card ${theme.id === t.id ? 'active' : ''}`}
-                onClick={() => setTheme(t.id)}
-              >
-                <div className="theme-swatches">
-                  {t.swatch.map((c) => <i key={c} style={{ background: c }} />)}
-                </div>
-                <strong>{t.label}</strong>
-                <span>{t.desc}</span>
-              </button>
-            ))}
+          <div className="theme-toggle-row">
+            <button
+              type="button"
+              className={`theme-option-card ${!isDark ? 'active' : ''}`}
+              onClick={() => setTheme('light')}
+            >
+              <span className="theme-option-icon"><Sun size={18} /></span>
+              <strong>Light</strong>
+              <span>Clean off-white workspace</span>
+            </button>
+            <button
+              type="button"
+              className={`theme-option-card ${isDark ? 'active' : ''}`}
+              onClick={() => setTheme('dark')}
+            >
+              <span className="theme-option-icon"><Moon size={18} /></span>
+              <strong>Dark</strong>
+              <span>Low-glare, easy on the eyes</span>
+            </button>
           </div>
         </section>
 

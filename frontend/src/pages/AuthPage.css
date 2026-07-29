@@ -1,4 +1,4 @@
-/* ── AuthPage — uses Nova theme tokens set by LandingPage ── */
+/* ── AuthPage — follows the app's core light/dark tokens ── */
 .auth-page {
   min-height: 100vh;
   display: flex;
@@ -6,11 +6,9 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: var(--nova-bg, #1A1512);
+  background: var(--bg-primary);
   position: relative;
   overflow: hidden;
-  font-family: 'Inter', 'Geist', system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
 }
 
 /* ambient glow behind the card */
@@ -21,22 +19,22 @@
   border-radius: 50%;
   pointer-events: none;
   filter: blur(70px);
-  opacity: 0.35;
+  opacity: 0.3;
 }
 .auth-page::before {
   width: 460px;
   height: 460px;
   top: -10%;
   right: -8%;
-  background: radial-gradient(circle, var(--nova-amber, #F5A623) 0%, transparent 70%);
+  background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
 }
 .auth-page::after {
   width: 320px;
   height: 320px;
   bottom: 5%;
   left: -6%;
-  background: radial-gradient(circle, var(--nova-orange, #FF8A3D) 0%, transparent 70%);
-  opacity: 0.2;
+  background: radial-gradient(circle, var(--accent-hover) 0%, transparent 70%);
+  opacity: 0.18;
 }
 
 .auth-back-link {
@@ -48,18 +46,18 @@
   gap: 6px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--nova-muted, #9A8E7E);
+  color: var(--text-secondary);
   text-decoration: none;
   padding: 7px 12px;
   border-radius: 999px;
-  border: 1px solid var(--nova-border, rgba(245,166,35,0.12));
-  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
   transition: color 0.15s, border-color 0.15s;
   z-index: 1;
 }
 .auth-back-link:hover {
-  color: var(--nova-text, #F5EFE6);
-  border-color: var(--nova-border-md, rgba(245,166,35,0.22));
+  color: var(--text-primary);
+  border-color: var(--border-light);
 }
 
 .auth-card {
@@ -67,11 +65,11 @@
   z-index: 1;
   width: 100%;
   max-width: 400px;
-  background: var(--nova-bg-card, #252018);
-  border: 1px solid var(--nova-border-md, rgba(245,166,35,0.22));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 18px;
   padding: 32px 28px;
-  box-shadow: 0 24px 64px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04);
+  box-shadow: var(--shadow-lg);
 }
 
 .auth-logo {
@@ -83,21 +81,21 @@
 }
 
 .auth-logo-icon {
-  color: var(--nova-amber, #F5A623);
+  color: var(--accent);
 }
 
 .auth-logo h1 {
   font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.03em;
-  color: var(--nova-text, #F5EFE6);
+  color: var(--text-primary);
 }
 
 .auth-tabs {
   display: flex;
   gap: 4px;
   margin-bottom: 24px;
-  border-bottom: 1px solid var(--nova-border, rgba(245,166,35,0.12));
+  border-bottom: 1px solid var(--border);
 }
 
 .auth-tabs button {
@@ -105,7 +103,7 @@
   padding: 10px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--nova-muted, #9A8E7E);
+  color: var(--text-secondary);
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -116,8 +114,8 @@
 }
 
 .auth-tabs button.active {
-  color: var(--nova-amber, #F5A623);
-  border-bottom-color: var(--nova-amber, #F5A623);
+  color: var(--accent);
+  border-bottom-color: var(--accent);
 }
 
 .auth-form {
@@ -130,17 +128,17 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--nova-bg-2, #201C18);
-  border: 1px solid var(--nova-border, rgba(245,166,35,0.12));
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0 12px;
-  color: var(--nova-muted, #9A8E7E);
+  color: var(--text-muted);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .auth-field:focus-within {
-  border-color: var(--nova-amber, #F5A623);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--nova-amber, #F5A623) 15%, transparent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .auth-field input {
@@ -150,12 +148,12 @@
   padding: 12px 0;
   font-size: 14px;
   outline: none;
-  color: var(--nova-text, #F5EFE6);
+  color: var(--text-primary);
   font-family: inherit;
 }
 
 .auth-field input::placeholder {
-  color: var(--nova-dim, #6B5F50);
+  color: var(--text-muted);
 }
 
 .auth-submit {
@@ -163,8 +161,8 @@
   justify-content: center;
   margin-top: 8px;
   padding: 12px;
-  background: var(--nova-grad, linear-gradient(135deg,#F5A623,#FF8A3D));
-  color: #111;
+  background: var(--accent);
+  color: #fff;
   font-weight: 700;
   font-size: 0.95rem;
   border: none;
@@ -173,36 +171,37 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 4px 18px color-mix(in srgb, var(--nova-amber, #F5A623) 28%, transparent);
-  transition: opacity 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--accent) 30%, transparent);
+  transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
   font-family: inherit;
 }
 
 .auth-submit:hover:not(:disabled) {
-  opacity: 0.9;
-  box-shadow: 0 6px 24px color-mix(in srgb, var(--nova-amber, #F5A623) 38%, transparent);
+  background: var(--accent-hover);
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--accent) 40%, transparent);
+  transform: translateY(-1px);
 }
 
 .auth-submit:disabled {
-  opacity: 0.65;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
 .auth-hint {
   font-size: 13px;
-  color: var(--nova-muted, #9A8E7E);
+  color: var(--text-secondary);
   line-height: 1.5;
   margin-bottom: 4px;
 }
 
 .auth-hint strong {
-  color: var(--nova-text, #F5EFE6);
+  color: var(--text-primary);
 }
 
 .auth-link-btn {
   background: none;
   border: none;
-  color: var(--nova-amber, #F5A623);
+  color: var(--accent);
   font-size: 13px;
   cursor: pointer;
   text-align: center;
@@ -211,19 +210,19 @@
   transition: opacity 0.15s;
 }
 
-.auth-link-btn:hover { opacity: 0.8; }
+.auth-link-btn:hover { opacity: 0.75; }
 
 .auth-footer-note {
   text-align: center;
   font-size: 11px;
-  color: var(--nova-dim, #6B5F50);
+  color: var(--text-muted);
   margin-top: 4px;
 }
 
 .auth-loading-hint {
   text-align: center;
   font-size: 12px;
-  color: var(--nova-muted, #9A8E7E);
+  color: var(--text-secondary);
   line-height: 1.45;
   margin-top: 8px;
   animation: auth-fade-in 0.2s ease;

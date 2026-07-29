@@ -62,9 +62,10 @@ function AppShell() {
   const { needsDeveloperChoice } = useAuth();
 
   const toastStyle = {
-    background: '#ffffff',
-    color: '#111111',
-    border: '1px solid #e2e2e2',
+    background: 'var(--bg-card)',
+    color: 'var(--text-primary)',
+    border: '1px solid var(--border)',
+    boxShadow: 'var(--shadow)',
   };
 
   return (
@@ -141,7 +142,17 @@ function PublicRoutes() {
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <Toaster position="bottom-right" />
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          style: {
+            background: 'var(--bg-card)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--shadow)',
+          },
+        }}
+      />
     </>
   );
 }

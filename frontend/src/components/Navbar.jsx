@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Menu, LogOut, Settings, Crown } from 'lucide-react';
+import { Search, Menu, LogOut, Settings, Crown, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import './Navbar.css';
 
 function getGreeting() {
@@ -14,6 +15,7 @@ function getGreeting() {
 export default function Navbar({ title, onMenuClick }) {
   const [searchVal, setSearchVal] = useState('');
   const { user, logout } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const plan = user?.plan || 'common';
   const showBadge = plan === 'premium' || plan === 'platinum';
 
@@ -51,6 +53,20 @@ export default function Navbar({ title, onMenuClick }) {
           </div>
         )}
         <span className="navbar-greeting">{getGreeting()}</span>
+
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={toggleTheme}
+          title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          aria-label="Toggle theme"
+        >
+          <span className="theme-toggle-track">
+            <span className="theme-toggle-thumb">
+              {isDark ? <Moon size={12} /> : <Sun size={12} />}
+            </span>
+          </span>
+        </button>
 
         <Link to="/settings" className="navbar-logout" title="Settings" aria-label="Settings">
           <Settings size={16} />

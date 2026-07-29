@@ -1,22 +1,22 @@
 /* ══════════════════════════════════════════════════════════
-   Nova Landing — dark charcoal + warm accent (theme-driven)
+   Nova Landing — aliases the app's core light/dark tokens so
+   the marketing site and auth pages always match the product.
    ══════════════════════════════════════════════════════════ */
 
-/* ── CSS custom properties (overridden by JS theme picker) ─ */
 :root {
-  --nova-bg:        #1A1512;
-  --nova-bg-2:      #201C18;
-  --nova-bg-card:   #252018;
-  --nova-bg-hover:  #2E2720;
-  --nova-border:    rgba(245,166,35,0.12);
-  --nova-border-md: rgba(245,166,35,0.22);
-  --nova-text:      #F5EFE6;
-  --nova-muted:     #9A8E7E;
-  --nova-dim:       #6B5F50;
-  --nova-amber:     #F5A623;
-  --nova-orange:    #FF8A3D;
-  --nova-grad:      linear-gradient(135deg,#F5A623,#FF8A3D);
-  --nova-glow:      rgba(245,166,35,0.18);
+  --nova-bg:        var(--bg-primary);
+  --nova-bg-2:      var(--bg-secondary);
+  --nova-bg-card:   var(--bg-card);
+  --nova-bg-hover:  var(--bg-hover);
+  --nova-border:    var(--border);
+  --nova-border-md: var(--border-light);
+  --nova-text:      var(--text-primary);
+  --nova-muted:     var(--text-secondary);
+  --nova-dim:       var(--text-muted);
+  --nova-amber:     var(--accent);
+  --nova-orange:    var(--accent-hover);
+  --nova-grad:      linear-gradient(135deg, var(--accent), var(--accent-hover));
+  --nova-glow:      color-mix(in srgb, var(--accent) 20%, transparent);
   --nova-radius:    14px;
   --nova-radius-sm: 8px;
 }
@@ -65,7 +65,7 @@
 }
 .nova-btn-primary {
   display: inline-flex; align-items: center; gap: 8px;
-  background: var(--nova-grad); color: #111; font-weight: 700; font-size: 0.92rem;
+  background: var(--nova-grad); color: #fff; font-weight: 700; font-size: 0.92rem;
   padding: 12px 22px; border-radius: 999px; text-decoration: none; border: none; cursor: pointer;
   box-shadow: 0 4px 20px color-mix(in srgb, var(--nova-amber) 30%, transparent);
   transition: opacity 0.2s, box-shadow 0.2s;
@@ -125,7 +125,7 @@
 .nova-nav-login { color: var(--nova-text) !important; font-weight: 600 !important; }
 .nova-nav-cta {
   display: inline-flex !important; align-items: center; gap: 6px;
-  background: var(--nova-grad) !important; color: #111 !important; font-weight: 700 !important;
+  background: var(--nova-grad) !important; color: #fff !important; font-weight: 700 !important;
   padding: 8px 18px; border-radius: 999px; text-decoration: none;
   animation: nova-pulse 2.8s ease-in-out infinite;
 }
