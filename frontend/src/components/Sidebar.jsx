@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, BookOpen, Tv, Table,
   Grid2x2, PenLine, StickyNote, Target, Flame, ChevronDown, ChevronRight, X,
-  Shield, Settings,
+  Shield, Settings, IndianRupee,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import useMediaQuery, { MOBILE_QUERY } from '../hooks/useMediaQuery';
@@ -23,6 +23,7 @@ const NAV_GROUPS = [
     label: 'PRODUCTIVITY',
     items: [
       { to: '/projects', icon: FolderKanban, label: 'Projects', hideOnMobile: true, requiresDeveloper: true },
+      { to: '/money', icon: IndianRupee, label: 'Money' },
       { to: '/goals', icon: Target, label: 'Goals' },
       { to: '/habits', icon: Flame, label: 'Habits' },
     ],

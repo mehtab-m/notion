@@ -16,6 +16,7 @@ const habitsRouter = require('./routes/habits');
 const goalsRouter = require('./routes/goals');
 const dashboardRouter = require('./routes/dashboard');
 const adminRouter = require('./routes/admin');
+const moneyRouter = require('./routes/money');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -49,6 +50,7 @@ app.use('/api/stickynotes', stickyNotesRouter);
 app.use('/api/habits', habitsRouter);
 app.use('/api/goals', goalsRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/money', moneyRouter);
 
 async function start() {
   try {

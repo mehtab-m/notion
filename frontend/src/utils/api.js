@@ -177,4 +177,18 @@ export const toggleSubgoal = (goalId, msId, sgId) =>
 // ── Dashboard ────────────────────────────────────────────
 export const getDashboardStats = () => api.get('/dashboard/stats').then((r) => r.data);
 
+// ── Money ────────────────────────────────────────────────
+export const getMoneySummary = () => api.get('/money/summary').then((r) => r.data);
+export const getMoneyFriends = () => api.get('/money/friends').then((r) => r.data);
+export const createMoneyFriend = (data) => api.post('/money/friends', data).then((r) => r.data);
+export const deleteMoneyFriend = (id) => api.delete(`/money/friends/${id}`).then((r) => r.data);
+export const getMoneyTransactions = (friendId) =>
+  api.get(`/money/friends/${friendId}/transactions`).then((r) => r.data);
+export const addMoneyTransaction = (friendId, data) =>
+  api.post(`/money/friends/${friendId}/transactions`, data).then((r) => r.data);
+export const updateMoneyTransaction = (id, data) =>
+  api.put(`/money/transactions/${id}`, data).then((r) => r.data);
+export const deleteMoneyTransaction = (id) =>
+  api.delete(`/money/transactions/${id}`).then((r) => r.data);
+
 export const getApiBase = () => resolveApiBase().replace(/\/api$/, '') || 'http://localhost:5000';

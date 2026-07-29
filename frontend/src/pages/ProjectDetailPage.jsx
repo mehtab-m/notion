@@ -65,6 +65,7 @@ const TABLE_TEMPLATES = [
 ];
 
 function TaskComments({ projectId, taskId }) {
+  const { user } = useAuth();
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
 
@@ -98,15 +99,23 @@ function TaskComments({ projectId, taskId }) {
         {messages.length === 0 ? (
           <p className="pd-discussion-empty">No messages yet — start the conversation</p>
         ) : (
-          messages.map((m) => (
-            <div key={m._id} className="pd-discussion-bubble">
-              <div className="pd-discussion-bubble-top">
-                <span className="pd-discussion-author">{m.userName}</span>
-                <time>{format(new Date(m.createdAt), 'MMM d, h:mm a')}</time>
+          messages.map((m) => {
+            const mine = m.userId === user?._id;
+            return (
+              <div key={m._id} className={`pd-discussion-row ${mine ? 'mine' : 'theirs'}`}>
+                {!mine && <span className="pd-chat-avatar">{(m.userName || '?').charAt(0).toUpperCase()}</span>}
+                <div className="pd-discussion-bubble">
+                  {!mine && (
+                    <div className="pd-discussion-bubble-top">
+                      <span className="pd-discussion-author">{m.userName}</span>
+                    </div>
+                  )}
+                  <p>{m.text}</p>
+                  <time>{format(new Date(m.createdAt), 'h:mm a')}</time>
+                </div>
               </div>
-              <p>{m.text}</p>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
       <div className="pd-discussion-compose">
@@ -123,6 +132,7 @@ function TaskComments({ projectId, taskId }) {
 }
 
 function ProjectChat({ projectId }) {
+  const { user } = useAuth();
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
 
@@ -156,15 +166,23 @@ function ProjectChat({ projectId }) {
         {messages.length === 0 ? (
           <div className="pd-empty"><MessageSquare size={36} strokeWidth={1} /><p>Start the project conversation</p></div>
         ) : (
-          messages.map((m) => (
-            <div key={m._id} className="pd-chat-bubble">
-              <div className="pd-chat-bubble-head">
-                <span className="pd-chat-author">{m.userName}</span>
-                <time>{format(new Date(m.createdAt), 'MMM d, h:mm a')}</time>
+          messages.map((m) => {
+            const mine = m.userId === user?._id;
+            return (
+              <div key={m._id} className={`pd-chat-row ${mine ? 'mine' : 'theirs'}`}>
+                {!mine && <span className="pd-chat-avatar">{(m.userName || '?').charAt(0).toUpperCase()}</span>}
+                <div className="pd-chat-bubble">
+                  {!mine && (
+                    <div className="pd-chat-bubble-head">
+                      <span className="pd-chat-author">{m.userName}</span>
+                    </div>
+                  )}
+                  <p>{m.text}</p>
+                  <time>{format(new Date(m.createdAt), 'h:mm a')}</time>
+                </div>
               </div>
-              <p>{m.text}</p>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
       <div className="pd-chat-compose">
@@ -312,7 +330,7 @@ export default function ProjectDetailPage() {
 
   const saveField = async (patch) => {
     try {
-      const updated = await updateProject(id, { ...project, ...patch });
+      const updated = await updateProject(id, patch);
       setProject(updated);
     } catch {
       toast.error('Failed to save');
@@ -336,7 +354,11 @@ export default function ProjectDetailPage() {
       const updated = await inviteProjectMember(id, inviteEmail.trim());
       setProject(updated);
       setInviteEmail('');
-      toast.success('Invitation sent');
+      if (updated.emailDelivered === false) {
+        toast.error("Invite created, but the email couldn't be sent — share the project link manually", { duration: 6000 });
+      } else {
+        toast.success('Invitation sent');
+      }
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to invite');
     }

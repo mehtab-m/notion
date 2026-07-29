@@ -50,6 +50,8 @@ model User {
   projectMemberships ProjectMember[]
   sentProjectMessages ProjectMessage[]
   activities  UserActivity[]
+  moneyFriends MoneyFriend[]
+  moneyTransactions MoneyTransaction[]
 }
 
 model UserActivity {
@@ -120,6 +122,42 @@ model ProjectMessage {
 
   @@index([projectId])
   @@index([taskId])
+}
+
+model MoneyFriend {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  /// Optional Gmail/email used to link this friend to a real SortLife account
+  email          String?
+  /// Set when `email` matches a verified SortLife user — enables mutual sync
+  linkedUserId   String?
+  /// The reciprocal MoneyFriend row on the linked user's side, when mutual
+  mirrorFriendId String?
+  createdAt      DateTime @default(now())
+  transactions   MoneyTransaction[]
+
+  @@index([userId])
+  @@index([linkedUserId])
+}
+
+model MoneyTransaction {
+  id                  String   @id @default(cuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  friendId            String
+  friend              MoneyFriend @relation(fields: [friendId], references: [id], onDelete: Cascade)
+  /// "gave" | "received" — from userId's perspective
+  type                String
+  amount              Float
+  note                String   @default("")
+  /// Paired transaction on the linked friend's side, when mutual
+  mirrorTransactionId String?
+  createdAt           DateTime @default(now())
+
+  @@index([userId])
+  @@index([friendId])
 }
 
 model Book {

@@ -176,7 +176,8 @@ router.put('/:id', async (req, res) => {
   try {
     const existing = await loadProject(req, req.params.id, { requireEdit: true });
     if (!existing) return res.status(404).json({ error: 'Project not found' });
-    const full = await saveProject(existing, cleanBody(req.body), req.user);
+    const patch = cleanBody(req.body, ['members', 'user', 'isOwner', 'messages']);
+    const full = await saveProject(existing, patch, req.user);
     replyProject(res, full, req.user.id);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -236,9 +237,9 @@ router.post('/:id/invite', async (req, res) => {
       },
     });
 
-    await sendProjectInviteEmail(email, req.user.name, project.title, project.id);
+    const emailResult = await sendProjectInviteEmail(email, req.user.name, project.title, project.id);
     const full = await findOwnedProject(project.id, req.user.id);
-    res.status(201).json(projectPayload(full, req.user.id));
+    res.status(201).json({ ...projectPayload(full, req.user.id), emailDelivered: emailResult.sent });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

@@ -6,6 +6,7 @@ import { StickyNotesOverlayProvider } from './context/StickyNotesOverlayContext'
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 import StickyNotesOverlay from './components/StickyNotes/StickyNotesOverlay';
+import MoneyWidget from './components/Money/MoneyWidget';
 import DeveloperOnboarding from './components/DeveloperOnboarding';
 import PremiumWelcome from './components/PremiumWelcome';
 import LandingPage from './pages/landing/LandingPage';
@@ -13,6 +14,7 @@ import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
+import MoneyPage from './pages/MoneyPage';
 import BooksPage from './pages/BooksPage';
 import ShowsPage from './pages/ShowsPage';
 import TablesPage from './pages/TablesPage';
@@ -26,6 +28,7 @@ import SettingsPage from './pages/SettingsPage';
 const PAGE_TITLES = {
   '/': 'Dashboard',
   '/projects': 'Projects',
+  '/money': 'Money',
   '/books': 'Books',
   '/shows': 'Shows',
   '/tables': 'Tables',
@@ -94,6 +97,7 @@ function AppShell() {
                   </DeveloperRoute>
                 )}
               />
+              <Route path="/money" element={<MoneyPage />} />
               <Route path="/books" element={<BooksPage />} />
               <Route path="/shows" element={<ShowsPage />} />
               <Route path="/tables" element={<TablesPage />} />
@@ -116,6 +120,7 @@ function AppShell() {
           </div>
         </div>
         <StickyNotesOverlay />
+        <MoneyWidget />
         {needsDeveloperChoice && <DeveloperOnboarding />}
         <PremiumWelcome />
         <Toaster position="bottom-right" toastOptions={{ style: toastStyle }} />
