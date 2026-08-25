@@ -8,6 +8,10 @@ const { authLimiter, verifyLimiter, resendLimiter, passwordLimiter } = require('
 const { sendVerificationEmail } = require('../utils/email');
 const { seedDefaultHabits } = require('../utils/defaultHabits');
 const { graceUntilFrom, logActivity, isAdminUser, defaultPlanExpiresAt, planMeta, resolveEffectivePlan } = require('../utils/activity');
+const { sanitizeThemeSettings, resolveThemeSettings } = require('../utils/themes');
+const { DEFAULT_NOTIFICATION_PREFS, sanitizeNotificationPrefs } = require('../utils/notifications');
+const upload = require('../middleware/upload');
+const { uploadLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
 
@@ -71,6 +75,11 @@ function publicUser(user) {
     premiumStarHolders: meta.premiumStarHolders,
     showPremiumWelcome: meta.showPremiumWelcome,
     legalSettings: user.legalSettings || {},
+    /* Resolved, not raw: a downgraded account must not keep reporting a
+       Platinum theme the client would then try to render. */
+    themeSettings: resolveThemeSettings({ ...user, plan: meta.plan }),
+    notificationPrefs: { ...DEFAULT_NOTIFICATION_PREFS, ...(user.notificationPrefs || {}) },
+    avatarUrl: user.avatarUrl || null,
     createdAt: user.createdAt,
   };
 }
@@ -340,6 +349,143 @@ router.patch(
     res.json({ message: 'Password updated' });
   })
 );
+
+/* ─── Appearance ────────────────────────────────────────── */
+
+// PATCH /api/auth/theme — theme choice, custom palettes, density
+router.patch(
+  '/theme',
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const current = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { themeSettings: true, plan: true, planExpiresAt: true, loginCount: true },
+    });
+
+    // Entitlement follows the *effective* plan, so an expired Platinum
+    // subscription cannot keep saving Platinum-only themes.
+    const effective = { ...req.user, plan: resolveEffectivePlan(current) };
+    const existing =
+      current?.themeSettings && typeof current.themeSettings === 'object'
+        ? current.themeSettings
+        : {};
+
+    const themeSettings = sanitizeThemeSettings(effective, req.body || {}, existing);
+    const updated = await prisma.user.update({
+      where: { id: req.user.id },
+      data: { themeSettings },
+    });
+    res.json({ user: publicUser(updated) });
+  })
+);
+
+// PATCH /api/auth/notifications — per-channel switches
+router.patch(
+  '/notifications',
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const current = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { notificationPrefs: true },
+    });
+    const notificationPrefs = sanitizeNotificationPrefs(
+      req.body || {},
+      current?.notificationPrefs || {}
+    );
+    const updated = await prisma.user.update({
+      where: { id: req.user.id },
+      data: { notificationPrefs },
+    });
+    res.json({ user: publicUser(updated) });
+  })
+);
+
+/* ─── Avatar ────────────────────────────────────────────── */
+
+const AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+const AVATAR_MAX_BYTES = 4 * 1024 * 1024;
+
+// POST /api/auth/avatar — multipart "avatar", or { avatarUrl } JSON
+router.post(
+  '/avatar',
+  authMiddleware,
+  uploadLimiter,
+  upload.single('avatar'),
+  asyncHandler(async (req, res) => {
+    let avatarUrl;
+
+    if (req.file) {
+      if (!AVATAR_TYPES.includes(req.file.mimetype)) {
+        throw badRequest('Avatar must be a PNG, JPEG, WebP or GIF image');
+      }
+      if (req.file.size > AVATAR_MAX_BYTES) {
+        throw badRequest('Avatar must be under 4MB');
+      }
+      avatarUrl = `/uploads/${req.file.filename}`;
+    } else if (typeof req.body?.avatarUrl === 'string') {
+      const raw = req.body.avatarUrl.trim();
+      if (!raw) {
+        avatarUrl = null;
+      } else if (/^https:\/\/\S+$/i.test(raw) || raw.startsWith('/uploads/')) {
+        avatarUrl = raw.slice(0, 500);
+      } else {
+        throw badRequest('Avatar URL must be https:// or an uploaded file');
+      }
+    } else {
+      throw badRequest('No avatar provided');
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: req.user.id },
+      data: { avatarUrl },
+    });
+    res.json({ user: publicUser(updated) });
+  })
+);
+
+// DELETE /api/auth/avatar
+router.delete(
+  '/avatar',
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const updated = await prisma.user.update({
+      where: { id: req.user.id },
+      data: { avatarUrl: null },
+    });
+    res.json({ user: publicUser(updated) });
+  })
+);
+
+/* ─── Account deletion ──────────────────────────────────── */
+
+// DELETE /api/auth/account — irreversible; password + typed confirmation
+router.delete(
+  '/account',
+  authMiddleware,
+  passwordLimiter,
+  asyncHandler(async (req, res) => {
+    const { password, confirm } = req.body || {};
+
+    if (String(confirm || '').trim().toUpperCase() !== 'DELETE') {
+      throw badRequest('Type DELETE to confirm');
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, password: true, role: true },
+    });
+    if (!user) throw notFoundError('Account not found');
+
+    const ok = await bcrypt.compare(String(password || ''), user.password);
+    if (!ok) throw unauthorized('Password is incorrect');
+
+    /* Everything the user owns cascades from this row (onDelete:
+       Cascade on every relation), so one delete is the whole account. */
+    await prisma.user.delete({ where: { id: user.id } });
+    res.json({ message: 'Your account and all its data have been deleted' });
+  })
+);
+
 
 module.exports = router;
 module.exports.MIN_PASSWORD = MIN_PASSWORD;

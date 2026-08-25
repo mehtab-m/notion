@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
+const { active } = require('../utils/lifecycle');
 const { accessibleProjectsWhere } = require('../utils/projectAccess');
 const { serialize } = require('../utils/serialize');
 const { asyncHandler } = require('../middleware/errors');
@@ -29,7 +30,7 @@ function tally(rows, key, keys) {
 router.get(
   '/stats',
   asyncHandler(async (req, res) => {
-    const filter = owned(req);
+    const filter = active(req);
     const isDeveloper = req.user?.isDeveloper === true;
     const projectFilter = accessibleProjectsWhere(req.user);
 

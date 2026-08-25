@@ -31,6 +31,9 @@ const USER_SELECT = {
   loginCount: true,
   followupEmailSentAt: true,
   legalSettings: true,
+  themeSettings: true,
+  notificationPrefs: true,
+  avatarUrl: true,
   createdAt: true,
 };
 

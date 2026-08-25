@@ -3,6 +3,7 @@ const router = express.Router();
 const prisma = require('../lib/prisma');
 const upload = require('../middleware/upload');
 const { owned } = require('../utils/scope');
+const { active, notTrashed } = require('../utils/lifecycle');
 const { cleanBody, num } = require('../utils/body');
 const { serialize } = require('../utils/serialize');
 const { resolveImageField } = require('../utils/mediaUrl');
@@ -39,7 +40,7 @@ function showData(body, file) {
 router.get('/', async (req, res) => {
   try {
     const shows = await prisma.show.findMany({
-      where: owned(req),
+      where: active(req),
       orderBy: { createdAt: 'desc' },
     });
     res.json(serialize(shows));
@@ -62,7 +63,7 @@ router.post('/', upload.single('posterImage'), async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const show = await prisma.show.findFirst({
-      where: owned(req, { _id: req.params.id }),
+      where: notTrashed(req, { _id: req.params.id }),
     });
     if (!show) return res.status(404).json({ error: 'Show not found' });
     res.json(serialize(show));
@@ -74,7 +75,7 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', upload.single('posterImage'), async (req, res) => {
   try {
     const existing = await prisma.show.findFirst({
-      where: owned(req, { _id: req.params.id }),
+      where: notTrashed(req, { _id: req.params.id }),
     });
     if (!existing) return res.status(404).json({ error: 'Show not found' });
     const updated = await prisma.show.update({
@@ -90,11 +91,14 @@ router.put('/:id', upload.single('posterImage'), async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const existing = await prisma.show.findFirst({
-      where: owned(req, { _id: req.params.id }),
+      where: notTrashed(req, { _id: req.params.id }),
     });
     if (!existing) return res.status(404).json({ error: 'Show not found' });
-    await prisma.show.delete({ where: { id: existing.id } });
-    res.json({ message: 'Show deleted' });
+    await prisma.show.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date(), archivedAt: null },
+    });
+    res.json({ message: 'Show moved to trash', _id: existing.id, type: 'show' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

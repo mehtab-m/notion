@@ -3,12 +3,13 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
+const { active, notTrashed } = require('../utils/lifecycle');
 const { cleanBody } = require('../utils/body');
 const { serialize, serializeTablePart } = require('../utils/serialize');
 
 async function loadTable(req) {
   return prisma.spreadsheet.findFirst({
-    where: owned(req, { _id: req.params.id }),
+    where: notTrashed(req, { _id: req.params.id }),
   });
 }
 
@@ -19,8 +20,11 @@ function matchColId(col, id) {
 router.get('/', async (req, res) => {
   try {
     const tables = await prisma.spreadsheet.findMany({
-      where: owned(req),
-      select: { id: true, name: true, createdAt: true, columns: true, rows: true },
+      where: active(req),
+      select: {
+        id: true, name: true, createdAt: true, columns: true, rows: true,
+        favorite: true, tags: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
     const result = tables.map((t) => {
@@ -30,6 +34,8 @@ router.get('/', async (req, res) => {
         _id: t.id,
         name: t.name,
         createdAt: t.createdAt,
+        favorite: t.favorite,
+        tags: t.tags || [],
         columnCount: cols.length,
         rowCount: rows.length,
       };
@@ -86,8 +92,11 @@ router.delete('/:id', async (req, res) => {
   try {
     const existing = await loadTable(req);
     if (!existing) return res.status(404).json({ error: 'Table not found' });
-    await prisma.spreadsheet.delete({ where: { id: existing.id } });
-    res.json({ message: 'Table deleted' });
+    await prisma.spreadsheet.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date(), archivedAt: null },
+    });
+    res.json({ message: 'Table moved to trash', _id: existing.id, type: 'table' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

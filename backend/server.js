@@ -23,6 +23,11 @@ const goalsRouter = require('./routes/goals');
 const dashboardRouter = require('./routes/dashboard');
 const adminRouter = require('./routes/admin');
 const moneyRouter = require('./routes/money');
+const lifecycleRouter = require('./routes/lifecycle');
+const inboxRouter = require('./routes/inbox');
+const focusRouter = require('./routes/focus');
+const analyticsRouter = require('./routes/analytics');
+const dataRouter = require('./routes/dataTransfer');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -118,6 +123,11 @@ app.use('/api/habits', habitsRouter);
 app.use('/api/goals', goalsRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/money', moneyRouter);
+app.use('/api/lifecycle', lifecycleRouter);
+app.use('/api/inbox', inboxRouter);
+app.use('/api/focus', focusRouter);
+app.use('/api/analytics', analyticsRouter);
+app.use('/api/data', dataRouter);
 
 app.use(notFound);
 app.use(errorHandler);

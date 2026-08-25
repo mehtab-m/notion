@@ -1,6 +1,7 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
+const { notTrashed } = require('../utils/lifecycle');
 const { accessibleProjectsWhere } = require('../utils/projectAccess');
 const { asyncHandler } = require('../middleware/errors');
 
@@ -32,44 +33,46 @@ router.get(
     if (q.length < 2) return res.json({ query: q, total: 0, results: [] });
 
     const scope = owned(req);
+    // Archived rows stay findable — trashed ones do not.
+    const live = notTrashed(req);
     const isDeveloper = req.user?.isDeveloper === true;
 
-    const [notes, books, shows, tables, habits, goals, stickies, projects, friends] =
+    const [notes, books, shows, tables, habits, goals, stickies, projects, friends, inbox] =
       await Promise.all([
         prisma.note.findMany({
-          where: { ...scope, OR: [{ title: like(q) }, { content: like(q) }] },
+          where: { ...live, OR: [{ title: like(q) }, { content: like(q) }] },
           select: { id: true, title: true, content: true, folder: true, isNotebook: true, updatedAt: true },
           orderBy: { updatedAt: 'desc' },
           take: PER_TYPE,
         }),
         prisma.book.findMany({
-          where: { ...scope, OR: [{ title: like(q) }, { author: like(q) }, { genre: like(q) }] },
+          where: { ...live, OR: [{ title: like(q) }, { author: like(q) }, { genre: like(q) }] },
           select: { id: true, title: true, author: true, status: true, coverImage: true },
           take: PER_TYPE,
         }),
         prisma.show.findMany({
-          where: { ...scope, OR: [{ title: like(q) }, { platform: like(q) }, { genre: like(q) }] },
+          where: { ...live, OR: [{ title: like(q) }, { platform: like(q) }, { genre: like(q) }] },
           select: { id: true, title: true, platform: true, status: true, posterImage: true },
           take: PER_TYPE,
         }),
         prisma.spreadsheet.findMany({
-          where: { ...scope, name: like(q) },
+          where: { ...live, name: like(q) },
           select: { id: true, name: true, updatedAt: true },
           orderBy: { updatedAt: 'desc' },
           take: PER_TYPE,
         }),
         prisma.habit.findMany({
-          where: { ...scope, OR: [{ name: like(q) }, { description: like(q) }] },
+          where: { ...live, OR: [{ name: like(q) }, { description: like(q) }] },
           select: { id: true, name: true, description: true, icon: true, streak: true },
           take: PER_TYPE,
         }),
         prisma.goal.findMany({
-          where: { ...scope, OR: [{ title: like(q) }, { description: like(q) }, { why: like(q) }] },
+          where: { ...live, OR: [{ title: like(q) }, { description: like(q) }, { why: like(q) }] },
           select: { id: true, title: true, description: true, icon: true, progress: true, status: true },
           take: PER_TYPE,
         }),
         prisma.stickyNote.findMany({
-          where: { ...scope, content: like(q) },
+          where: { ...live, content: like(q) },
           select: { id: true, content: true, color: true },
           take: PER_TYPE,
         }),
@@ -88,6 +91,12 @@ router.get(
         prisma.moneyFriend.findMany({
           where: { ...scope, OR: [{ name: like(q) }, { email: like(q) }] },
           select: { id: true, name: true, email: true },
+          take: PER_TYPE,
+        }),
+        prisma.inboxItem.findMany({
+          where: { ...scope, status: 'open', OR: [{ text: like(q) }, { note: like(q) }] },
+          select: { id: true, text: true, note: true, priority: true },
+          orderBy: { createdAt: 'desc' },
           take: PER_TYPE,
         }),
       ]);
@@ -157,6 +166,13 @@ router.get(
         title: f.name,
         subtitle: f.email || 'Money ledger',
         url: `/money?friend=${f.id}`,
+      })),
+      ...inbox.map((i) => ({
+        _id: i.id,
+        type: 'inbox',
+        title: i.text,
+        subtitle: snippet(i.note, q) || 'Inbox',
+        url: `/inbox?item=${i.id}`,
       })),
     ];
 

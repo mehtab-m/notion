@@ -37,21 +37,75 @@ model User {
   /// Admin-managed legal / consent flags
   /// { marketingEmails, dataProcessing, termsAccepted, analyticsOptIn, notes }
   legalSettings       Json      @default("{}")
+  /// Appearance: { themeId, customThemes: [{id,name,base,tokens}], reducedMotion, density, fontScale }
+  themeSettings       Json      @default("{}")
+  /// { weeklySummary, productUpdates, habitReminders, focusChime, soundEffects }
+  notificationPrefs   Json      @default("{}")
+  /// Uploaded avatar path ("/uploads/…") or remote URL
+  avatarUrl           String?
   createdAt           DateTime  @default(now())
 
-  projects    Project[]
-  books       Book[]
-  notes       Note[]
-  shows       Show[]
-  tables      Spreadsheet[]
-  habits      Habit[]
-  goals       Goal[]
-  stickyNotes StickyNote[]
-  projectMemberships ProjectMember[]
+  projects            Project[]
+  books               Book[]
+  notes               Note[]
+  shows               Show[]
+  tables              Spreadsheet[]
+  habits              Habit[]
+  goals               Goal[]
+  stickyNotes         StickyNote[]
+  projectMemberships  ProjectMember[]
   sentProjectMessages ProjectMessage[]
-  activities  UserActivity[]
-  moneyFriends MoneyFriend[]
-  moneyTransactions MoneyTransaction[]
+  activities          UserActivity[]
+  moneyFriends        MoneyFriend[]
+  moneyTransactions   MoneyTransaction[]
+  focusSessions       FocusSession[]
+  inboxItems          InboxItem[]
+}
+
+/// A single pomodoro / deep-work block.
+model FocusSession {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// "focus" | "short-break" | "long-break"
+  kind      String    @default("focus")
+  /// Planned length in minutes
+  minutes   Int       @default(25)
+  /// Seconds actually elapsed before it ended
+  seconds   Int       @default(0)
+  completed Boolean   @default(false)
+  label     String    @default("")
+  /// Optional link back to what the session was for
+  linkType  String?
+  linkId    String?
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  @@index([userId, startedAt])
+}
+
+/// Quick-capture inbox — anything typed before it has a home.
+model InboxItem {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text        String
+  note        String    @default("")
+  tags        String[]  @default([])
+  /// "open" | "done" | "archived"
+  status      String    @default("open")
+  pinned      Boolean   @default(false)
+  /// low | medium | high
+  priority    String    @default("medium")
+  dueDate     DateTime?
+  /// Set when promoted into a real record
+  convertedTo String?
+  convertedId String?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId, status])
 }
 
 model UserActivity {
@@ -67,23 +121,23 @@ model UserActivity {
 }
 
 model Project {
-  id          String    @id @default(cuid())
+  id          String           @id @default(cuid())
   title       String
-  description String    @default("")
-  status      String    @default("active")
-  priority    String    @default("medium")
-  progress    Int       @default(0)
+  description String           @default("")
+  status      String           @default("active")
+  priority    String           @default("medium")
+  progress    Int              @default(0)
   dueDate     DateTime?
-  tags        String[]  @default([])
-  tasks       Json      @default("[]")
-  dataTables  Json      @default("[]")
-  team        String[]  @default([])
-  assignees   String[]  @default([])
-  color       String    @default("")
+  tags        String[]         @default([])
+  tasks       Json             @default("[]")
+  dataTables  Json             @default("[]")
+  team        String[]         @default([])
+  assignees   String[]         @default([])
+  color       String           @default("")
   userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
   members     ProjectMember[]
   messages    ProjectMessage[]
 
@@ -125,9 +179,9 @@ model ProjectMessage {
 }
 
 model MoneyFriend {
-  id             String   @id @default(cuid())
+  id             String             @id @default(cuid())
   userId         String
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   name           String
   /// Optional Gmail/email used to link this friend to a real SortLife account
   email          String?
@@ -135,7 +189,7 @@ model MoneyFriend {
   linkedUserId   String?
   /// The reciprocal MoneyFriend row on the linked user's side, when mutual
   mirrorFriendId String?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime           @default(now())
   transactions   MoneyTransaction[]
 
   @@index([userId])
@@ -143,18 +197,18 @@ model MoneyFriend {
 }
 
 model MoneyTransaction {
-  id                  String   @id @default(cuid())
+  id                  String      @id @default(cuid())
   userId              String
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   friendId            String
   friend              MoneyFriend @relation(fields: [friendId], references: [id], onDelete: Cascade)
   /// "gave" | "received" — from userId's perspective
   type                String
   amount              Float
-  note                String   @default("")
+  note                String      @default("")
   /// Paired transaction on the linked friend's side, when mutual
   mirrorTransactionId String?
-  createdAt           DateTime @default(now())
+  createdAt           DateTime    @default(now())
 
   @@index([userId])
   @@index([friendId])
@@ -178,6 +232,14 @@ model Book {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime  @default(now())
 
+  /// Starred by the user — floats to the top of its list
+  favorite   Boolean   @default(false)
+  /// Set when moved out of the active list into Archive
+  archivedAt DateTime?
+  /// Set when moved to Trash; purged for real after 30 days
+  deletedAt  DateTime?
+  tags       String[]  @default([])
+
   @@index([userId])
 }
 
@@ -199,6 +261,13 @@ model Note {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  /// Starred by the user — floats to the top of its list
+  favorite   Boolean   @default(false)
+  /// Set when moved out of the active list into Archive
+  archivedAt DateTime?
+  /// Set when moved to Trash; purged for real after 30 days
+  deletedAt  DateTime?
 
   @@index([userId])
   @@index([notebookId])
@@ -222,6 +291,14 @@ model Show {
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt      DateTime @default(now())
 
+  /// Starred by the user — floats to the top of its list
+  favorite   Boolean   @default(false)
+  /// Set when moved out of the active list into Archive
+  archivedAt DateTime?
+  /// Set when moved to Trash; purged for real after 30 days
+  deletedAt  DateTime?
+  tags       String[]  @default([])
+
   @@index([userId])
 }
 
@@ -234,6 +311,14 @@ model Spreadsheet {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  /// Starred by the user — floats to the top of its list
+  favorite   Boolean   @default(false)
+  /// Set when moved out of the active list into Archive
+  archivedAt DateTime?
+  /// Set when moved to Trash; purged for real after 30 days
+  deletedAt  DateTime?
+  tags       String[]  @default([])
 
   @@index([userId])
   @@map("tables")
@@ -251,6 +336,14 @@ model Habit {
   userId         String
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt      DateTime @default(now())
+
+  /// Starred by the user — floats to the top of its list
+  favorite   Boolean   @default(false)
+  /// Set when moved out of the active list into Archive
+  archivedAt DateTime?
+  /// Set when moved to Trash; purged for real after 30 days
+  deletedAt  DateTime?
+  tags       String[]  @default([])
 
   @@index([userId])
 }
@@ -280,6 +373,14 @@ model Goal {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  /// Starred by the user — floats to the top of its list
+  favorite   Boolean   @default(false)
+  /// Set when moved out of the active list into Archive
+  archivedAt DateTime?
+  /// Set when moved to Trash; purged for real after 30 days
+  deletedAt  DateTime?
+  tags       String[]  @default([])
+
   @@index([userId])
 }
 
@@ -294,6 +395,14 @@ model StickyNote {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  /// Starred by the user — floats to the top of its list
+  favorite   Boolean   @default(false)
+  /// Set when moved out of the active list into Archive
+  archivedAt DateTime?
+  /// Set when moved to Trash; purged for real after 30 days
+  deletedAt  DateTime?
+  tags       String[]  @default([])
 
   @@index([userId])
 }

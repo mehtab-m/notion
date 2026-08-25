@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
+const { active, notTrashed } = require('../utils/lifecycle');
 const {
   prepareGoalData,
   flattenMilestoneProgress,
@@ -36,7 +37,7 @@ async function saveGoalState(goal, milestones, extra = {}) {
 router.get('/', async (req, res) => {
   try {
     const goals = await prisma.goal.findMany({
-      where: owned(req),
+      where: active(req),
       orderBy: { updatedAt: 'desc' },
     });
     res.json(serialize(goals));
@@ -65,7 +66,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const existing = await prisma.goal.findFirst({
-      where: owned(req, { _id: req.params.id }),
+      where: notTrashed(req, { _id: req.params.id }),
     });
     if (!existing) return res.status(404).json({ error: 'Goal not found' });
     const data = prepareGoalData(req.body);
@@ -91,11 +92,14 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const existing = await prisma.goal.findFirst({
-      where: owned(req, { _id: req.params.id }),
+      where: notTrashed(req, { _id: req.params.id }),
     });
     if (!existing) return res.status(404).json({ error: 'Goal not found' });
-    await prisma.goal.delete({ where: { id: existing.id } });
-    res.json({ message: 'Goal deleted' });
+    await prisma.goal.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date(), archivedAt: null },
+    });
+    res.json({ message: 'Goal moved to trash', _id: existing.id, type: 'goal' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -104,7 +108,7 @@ router.delete('/:id', async (req, res) => {
 router.post('/:id/milestones/:msId/toggle', async (req, res) => {
   try {
     const goal = await prisma.goal.findFirst({
-      where: owned(req, { _id: req.params.id }),
+      where: notTrashed(req, { _id: req.params.id }),
     });
     if (!goal) return res.status(404).json({ error: 'Goal not found' });
     const milestones = Array.isArray(goal.milestones)
@@ -126,7 +130,7 @@ router.post('/:id/milestones/:msId/toggle', async (req, res) => {
 router.post('/:id/milestones/:msId/subgoals/:sgId/toggle', async (req, res) => {
   try {
     const goal = await prisma.goal.findFirst({
-      where: owned(req, { _id: req.params.id }),
+      where: notTrashed(req, { _id: req.params.id }),
     });
     if (!goal) return res.status(404).json({ error: 'Goal not found' });
     const milestones = Array.isArray(goal.milestones)

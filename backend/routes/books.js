@@ -3,6 +3,7 @@ const router = express.Router();
 const prisma = require('../lib/prisma');
 const upload = require('../middleware/upload');
 const { owned } = require('../utils/scope');
+const { active, notTrashed } = require('../utils/lifecycle');
 const { cleanBody, num } = require('../utils/body');
 const { serialize } = require('../utils/serialize');
 const { resolveImageField } = require('../utils/mediaUrl');
@@ -30,7 +31,7 @@ function bookData(body, file) {
 router.get('/', async (req, res) => {
   try {
     const books = await prisma.book.findMany({
-      where: owned(req),
+      where: active(req),
       orderBy: { createdAt: 'desc' },
     });
     res.json(serialize(books));
@@ -70,7 +71,7 @@ router.post('/', upload.single('coverImage'), async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const book = await prisma.book.findFirst({
-      where: owned(req, { _id: req.params.id }),
+      where: notTrashed(req, { _id: req.params.id }),
     });
     if (!book) return res.status(404).json({ error: 'Book not found' });
     res.json(serialize(book));
@@ -82,7 +83,7 @@ router.get('/:id', async (req, res) => {
 router.patch('/:id/increment-page', async (req, res) => {
   try {
     const book = await prisma.book.findFirst({
-      where: owned(req, { _id: req.params.id }),
+      where: notTrashed(req, { _id: req.params.id }),
     });
     if (!book) return res.status(404).json({ error: 'Book not found' });
     const increment = parseInt(req.body.increment, 10) || 1;
@@ -115,7 +116,7 @@ router.patch('/:id/increment-page', async (req, res) => {
 router.post('/:id/learning-line', async (req, res) => {
   try {
     const book = await prisma.book.findFirst({
-      where: owned(req, { _id: req.params.id }),
+      where: notTrashed(req, { _id: req.params.id }),
     });
     if (!book) return res.status(404).json({ error: 'Book not found' });
     const { text } = req.body;
@@ -167,7 +168,7 @@ router.post('/:id/learning-line', async (req, res) => {
 router.put('/:id', upload.single('coverImage'), async (req, res) => {
   try {
     const existing = await prisma.book.findFirst({
-      where: owned(req, { _id: req.params.id }),
+      where: notTrashed(req, { _id: req.params.id }),
     });
     if (!existing) return res.status(404).json({ error: 'Book not found' });
     const data = bookData(req.body, req.file);
@@ -190,15 +191,27 @@ router.put('/:id', upload.single('coverImage'), async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const book = await prisma.book.findFirst({
-      where: owned(req, { _id: req.params.id }),
+      where: notTrashed(req, { _id: req.params.id }),
     });
     if (!book) return res.status(404).json({ error: 'Book not found' });
+    const now = new Date();
+    // The book's notebook and its pages follow it into the trash, so a
+    // restore brings the reading notes back with it.
     if (book.notebookId) {
-      await prisma.note.deleteMany({ where: owned(req, { notebookId: book.notebookId }) });
-      await prisma.note.deleteMany({ where: owned(req, { id: book.notebookId }) });
+      await prisma.note.updateMany({
+        where: owned(req, { notebookId: book.notebookId, deletedAt: null }),
+        data: { deletedAt: now },
+      });
+      await prisma.note.updateMany({
+        where: owned(req, { id: book.notebookId, deletedAt: null }),
+        data: { deletedAt: now },
+      });
     }
-    await prisma.book.delete({ where: { id: book.id } });
-    res.json({ message: 'Book deleted' });
+    await prisma.book.update({
+      where: { id: book.id },
+      data: { deletedAt: now, archivedAt: null },
+    });
+    res.json({ message: 'Book moved to trash', _id: book.id, type: 'book' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

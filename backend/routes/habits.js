@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
+const { active, notTrashed } = require('../utils/lifecycle');
 const { cleanBody } = require('../utils/body');
 const { serialize } = require('../utils/serialize');
 const { seedDefaultHabits } = require('../utils/defaultHabits');
@@ -22,7 +23,7 @@ router.get('/', async (req, res) => {
   try {
     await seedDefaultHabits(prisma, req.user.id);
     const habits = await prisma.habit.findMany({
-      where: owned(req),
+      where: active(req),
       orderBy: { createdAt: 'desc' },
     });
     res.json(serialize(habits));
@@ -49,7 +50,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const existing = await prisma.habit.findFirst({
-      where: owned(req, { _id: req.params.id }),
+      where: notTrashed(req, { _id: req.params.id }),
     });
     if (!existing) return res.status(404).json({ error: 'Habit not found' });
     // Prevent clients from rewriting historical completedDates via PUT
@@ -80,7 +81,7 @@ router.post('/:id/toggle', async (req, res) => {
     }
 
     const habit = await prisma.habit.findFirst({
-      where: owned(req, { _id: req.params.id }),
+      where: notTrashed(req, { _id: req.params.id }),
     });
     if (!habit) return res.status(404).json({ error: 'Habit not found' });
 
@@ -116,11 +117,15 @@ router.post('/:id/toggle', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const existing = await prisma.habit.findFirst({
-      where: owned(req, { _id: req.params.id }),
+      where: notTrashed(req, { _id: req.params.id }),
     });
     if (!existing) return res.status(404).json({ error: 'Habit not found' });
-    await prisma.habit.delete({ where: { id: existing.id } });
-    res.json({ message: 'Habit deleted' });
+    // Soft delete — the row moves to Trash so it can be restored.
+    await prisma.habit.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date(), archivedAt: null },
+    });
+    res.json({ message: 'Habit moved to trash', _id: existing.id, type: 'habit' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
