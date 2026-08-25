@@ -1,0 +1,384 @@
+/* ═══════════════════════════════════════════════════════════
+   THEME PALETTES
+   Every theme sets the same token contract, so any component
+   written against the tokens works in all of them without a
+   single theme-specific rule. `data-theme` is set on <html>
+   by ThemeContext; `data-mode` follows it so light/dark-only
+   details (shadows, image dimming) have one thing to check.
+
+   Free:     light · dark · dim
+   Platinum: aurora · sunset · nord · rose · forest · mono
+   Custom:   [data-theme^='custom:'] — inline vars from the user
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Shared, theme-independent tokens ──────────────────── */
+:root {
+  /* Type */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  /* Radii */
+  --radius-xs: 6px;
+  --radius-sm: 9px;
+  --radius: 13px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-full: 999px;
+
+  /* Spacing scale */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+
+  /* Motion — one curve family, three speeds */
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 340ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Layout */
+  --sidebar-w: 248px;
+  --navbar-h: 62px;
+  --mobile-nav-h: 62px;
+
+  /* Where a floating action button's bottom edge sits. Below 900px the
+     bottom bar owns that strip, so index.css raises this clear of it. */
+  --fab-bottom: max(24px, env(safe-area-inset-bottom, 0px));
+  --fab-side: 24px;
+
+  /* Density — Settings swaps these three */
+  --density-y: 1;
+  --content-pad: 28px;
+
+  /* Z-index ladder, so nothing guesses */
+  --z-sticky: 40;
+  --z-sidebar: 100;
+  --z-fab: 120;
+  --z-float: 130;
+  --z-backdrop: 150;
+  --z-drawer: 160;
+  --z-modal: 1000;
+  --z-toast: 1200;
+  --z-palette: 1400;
+}
+
+[data-density='compact']  { --density-y: 0.78; --content-pad: 18px; }
+[data-density='spacious'] { --density-y: 1.22; --content-pad: 38px; }
+
+/* ─── Mode defaults: shadows & overlays ───────────────────
+   The light set is also declared on bare :root so that if
+   `data-mode` is ever absent — a browser that blocked the
+   inline boot script, say — shadows still resolve instead of
+   silently collapsing to nothing.                          */
+:root,
+[data-mode='light'] {
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.07), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow: 0 2px 6px rgba(16, 24, 40, 0.05), 0 12px 28px -8px rgba(16, 24, 40, 0.10);
+  --shadow-md: 0 4px 10px rgba(16, 24, 40, 0.06), 0 18px 40px -12px rgba(16, 24, 40, 0.14);
+  --shadow-lg: 0 8px 20px rgba(16, 24, 40, 0.08), 0 32px 64px -16px rgba(16, 24, 40, 0.18);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --overlay: rgba(16, 20, 32, 0.44);
+  --glass: rgba(255, 255, 255, 0.72);
+  --scrim: rgba(255, 255, 255, 0);
+  --img-filter: none;
+}
+
+[data-mode='dark'] {
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.45), 0 16px 36px -12px rgba(0, 0, 0, 0.55);
+  --shadow-md: 0 8px 20px rgba(0, 0, 0, 0.5), 0 24px 52px -14px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55), 0 40px 88px -20px rgba(0, 0, 0, 0.7);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --overlay: rgba(3, 5, 10, 0.72);
+  --glass: rgba(18, 20, 27, 0.76);
+  --scrim: rgba(0, 0, 0, 0);
+  --img-filter: brightness(0.94);
+}
+
+/* ══ 1. DAYLIGHT — free ═════════════════════════════════ */
+:root,
+[data-theme='light'] {
+  --bg-primary: #F6F7F9;
+  --bg-secondary: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-elevated: #FFFFFF;
+  --bg-hover: #EFF1F5;
+  --bg-sunken: #ECEEF3;
+  --border: #E4E7EC;
+  --border-light: #D0D5DD;
+  --text-primary: #101828;
+  --text-secondary: #475467;
+  --text-muted: #98A2B3;
+  --accent: #4F46E5;
+  --accent-hover: #4338CA;
+  --accent-soft: #EEF0FF;
+  --accent-2: #7C3AED;
+  --accent-contrast: #FFFFFF;
+  --accent-green: #059669;
+  --accent-yellow: #B45309;
+  --accent-red: #DC2626;
+  --accent-blue: #2563EB;
+  --chart-1: #4F46E5;
+  --chart-2: #2563EB;
+  --chart-3: #D97706;
+  --chart-4: #059669;
+  --chart-5: #DB2777;
+}
+
+/* ══ 2. MIDNIGHT — free ═════════════════════════════════ */
+[data-theme='dark'] {
+  --bg-primary: #08090D;
+  --bg-secondary: #0F1116;
+  --bg-card: #14161D;
+  --bg-elevated: #191C24;
+  --bg-hover: #1E2129;
+  --bg-sunken: #0B0D11;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-light: rgba(255, 255, 255, 0.15);
+  --text-primary: #ECEDF1;
+  --text-secondary: #9BA1AE;
+  --text-muted: #666D7B;
+  --accent: #6366F1;
+  --accent-hover: #818CF8;
+  --accent-soft: rgba(99, 102, 241, 0.15);
+  --accent-2: #A855F7;
+  --accent-contrast: #FFFFFF;
+  --accent-green: #34D399;
+  --accent-yellow: #FBBF24;
+  --accent-red: #F87171;
+  --accent-blue: #60A5FA;
+  --chart-1: #6366F1;
+  --chart-2: #60A5FA;
+  --chart-3: #FBBF24;
+  --chart-4: #34D399;
+  --chart-5: #F472B6;
+}
+
+/* ══ 3. DIM — free ══════════════════════════════════════ */
+[data-theme='dim'] {
+  --bg-primary: #16181D;
+  --bg-secondary: #1C1F26;
+  --bg-card: #21252D;
+  --bg-elevated: #272B34;
+  --bg-hover: #2C313B;
+  --bg-sunken: #121419;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-light: rgba(255, 255, 255, 0.14);
+  --text-primary: #E3E5EA;
+  --text-secondary: #A0A6B2;
+  --text-muted: #71778A;
+  --accent: #7C8CF8;
+  --accent-hover: #96A3FA;
+  --accent-soft: rgba(124, 140, 248, 0.16);
+  --accent-2: #B98CF5;
+  --accent-contrast: #10121A;
+  --accent-green: #4ADE80;
+  --accent-yellow: #FACC15;
+  --accent-red: #FB7185;
+  --accent-blue: #60A5FA;
+  --chart-1: #7C8CF8;
+  --chart-2: #60A5FA;
+  --chart-3: #FACC15;
+  --chart-4: #4ADE80;
+  --chart-5: #F472B6;
+}
+
+/* ══ 4. AURORA — platinum ═══════════════════════════════ */
+[data-theme='aurora'] {
+  --bg-primary: #04121A;
+  --bg-secondary: #071A25;
+  --bg-card: #0A2130;
+  --bg-elevated: #0E2A3B;
+  --bg-hover: #12344A;
+  --bg-sunken: #030D14;
+  --border: rgba(94, 234, 212, 0.13);
+  --border-light: rgba(94, 234, 212, 0.24);
+  --text-primary: #E4FBF6;
+  --text-secondary: #8FBFBB;
+  --text-muted: #5B8A88;
+  --accent: #2DD4BF;
+  --accent-hover: #5EEAD4;
+  --accent-soft: rgba(45, 212, 191, 0.15);
+  --accent-2: #38BDF8;
+  --accent-contrast: #032019;
+  --accent-green: #34D399;
+  --accent-yellow: #FBBF24;
+  --accent-red: #FB7185;
+  --accent-blue: #38BDF8;
+  --chart-1: #2DD4BF;
+  --chart-2: #38BDF8;
+  --chart-3: #FBBF24;
+  --chart-4: #A3E635;
+  --chart-5: #F472B6;
+}
+
+/* ══ 5. SUNSET — platinum ═══════════════════════════════ */
+[data-theme='sunset'] {
+  --bg-primary: #FFF8F2;
+  --bg-secondary: #FFFFFF;
+  --bg-card: #FFFDFB;
+  --bg-elevated: #FFFFFF;
+  --bg-hover: #FDEFE4;
+  --bg-sunken: #FBEADD;
+  --border: #F3DECB;
+  --border-light: #E8C9AC;
+  --text-primary: #3A2418;
+  --text-secondary: #7A5A44;
+  --text-muted: #A98A70;
+  --accent: #EA580C;
+  --accent-hover: #C2410C;
+  --accent-soft: #FFEDD5;
+  --accent-2: #E11D48;
+  --accent-contrast: #FFFFFF;
+  --accent-green: #15803D;
+  --accent-yellow: #A16207;
+  --accent-red: #BE123C;
+  --accent-blue: #0369A1;
+  --chart-1: #EA580C;
+  --chart-2: #E11D48;
+  --chart-3: #A16207;
+  --chart-4: #15803D;
+  --chart-5: #0369A1;
+}
+
+/* ══ 6. NORD — platinum ═════════════════════════════════ */
+[data-theme='nord'] {
+  --bg-primary: #2E3440;
+  --bg-secondary: #333B48;
+  --bg-card: #3B4252;
+  --bg-elevated: #434C5E;
+  --bg-hover: #4C566A;
+  --bg-sunken: #272D38;
+  --border: rgba(216, 222, 233, 0.10);
+  --border-light: rgba(216, 222, 233, 0.21);
+  --text-primary: #ECEFF4;
+  --text-secondary: #C3CBD9;
+  --text-muted: #8B94A6;
+  --accent: #88C0D0;
+  --accent-hover: #8FBCBB;
+  --accent-soft: rgba(136, 192, 208, 0.17);
+  --accent-2: #81A1C1;
+  --accent-contrast: #2E3440;
+  --accent-green: #A3BE8C;
+  --accent-yellow: #EBCB8B;
+  --accent-red: #BF616A;
+  --accent-blue: #81A1C1;
+  --chart-1: #88C0D0;
+  --chart-2: #81A1C1;
+  --chart-3: #EBCB8B;
+  --chart-4: #A3BE8C;
+  --chart-5: #B48EAD;
+}
+
+/* ══ 7. ROSÉ — platinum ═════════════════════════════════ */
+[data-theme='rose'] {
+  --bg-primary: #FDF6F8;
+  --bg-secondary: #FFFFFF;
+  --bg-card: #FFFDFE;
+  --bg-elevated: #FFFFFF;
+  --bg-hover: #FBEBF1;
+  --bg-sunken: #F8E4EC;
+  --border: #F2DCE5;
+  --border-light: #E7C3D2;
+  --text-primary: #33131F;
+  --text-secondary: #6E4356;
+  --text-muted: #A2778A;
+  --accent: #DB2777;
+  --accent-hover: #BE185D;
+  --accent-soft: #FCE7F3;
+  --accent-2: #9333EA;
+  --accent-contrast: #FFFFFF;
+  --accent-green: #047857;
+  --accent-yellow: #A16207;
+  --accent-red: #E11D48;
+  --accent-blue: #4F46E5;
+  --chart-1: #DB2777;
+  --chart-2: #9333EA;
+  --chart-3: #A16207;
+  --chart-4: #047857;
+  --chart-5: #4F46E5;
+}
+
+/* ══ 8. FOREST — platinum ═══════════════════════════════ */
+[data-theme='forest'] {
+  --bg-primary: #0A1410;
+  --bg-secondary: #0E1D17;
+  --bg-card: #12261E;
+  --bg-elevated: #173026;
+  --bg-hover: #1D3C2F;
+  --bg-sunken: #060F0C;
+  --border: rgba(134, 239, 172, 0.11);
+  --border-light: rgba(134, 239, 172, 0.22);
+  --text-primary: #E7F5EC;
+  --text-secondary: #97B7A4;
+  --text-muted: #628172;
+  --accent: #4ADE80;
+  --accent-hover: #86EFAC;
+  --accent-soft: rgba(74, 222, 128, 0.14);
+  --accent-2: #FACC15;
+  --accent-contrast: #04120B;
+  --accent-green: #4ADE80;
+  --accent-yellow: #FACC15;
+  --accent-red: #F87171;
+  --accent-blue: #60A5FA;
+  --chart-1: #4ADE80;
+  --chart-2: #FACC15;
+  --chart-3: #60A5FA;
+  --chart-4: #A3E635;
+  --chart-5: #FB923C;
+}
+
+/* ══ 9. MONOCHROME — platinum ═══════════════════════════ */
+[data-theme='mono'] {
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #FAFAFA;
+  --bg-card: #FFFFFF;
+  --bg-elevated: #FFFFFF;
+  --bg-hover: #F0F0F0;
+  --bg-sunken: #EDEDED;
+  --border: #DADADA;
+  --border-light: #B8B8B8;
+  --text-primary: #000000;
+  --text-secondary: #3F3F3F;
+  --text-muted: #757575;
+  --accent: #111111;
+  --accent-hover: #000000;
+  --accent-soft: #EDEDED;
+  --accent-2: #444444;
+  --accent-contrast: #FFFFFF;
+  --accent-green: #0F6B3F;
+  --accent-yellow: #7A5200;
+  --accent-red: #B01818;
+  --accent-blue: #1548A8;
+  --chart-1: #111111;
+  --chart-2: #555555;
+  --chart-3: #888888;
+  --chart-4: #0F6B3F;
+  --chart-5: #1548A8;
+}
+
+/* ─── Derived tokens ────────────────────────────────────
+   Written once against whatever the active theme resolved
+   to, so a custom palette gets these for free.           */
+:root {
+  --ring: color-mix(in srgb, var(--accent) 55%, transparent);
+  --grad-accent: linear-gradient(135deg, var(--accent), var(--accent-2));
+  --grad-surface: linear-gradient(
+    170deg,
+    color-mix(in srgb, var(--accent) 5%, var(--bg-card)),
+    var(--bg-card) 55%
+  );
+  --accent-glow: 0 6px 22px -6px color-mix(in srgb, var(--accent) 55%, transparent);
+}

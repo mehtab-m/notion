@@ -20,7 +20,7 @@ export default function ShowsPage() {
   const handleDelete = async (id) => {
     try {
       await deleteShow(id);
-      toast.success('Show deleted');
+      toast.success('Show moved to trash');
       refetch();
     } catch (err) {
       toast.error('Failed to delete show');
@@ -96,7 +96,13 @@ export default function ShowsPage() {
       ) : (
         <div className="card-grid">
           {filtered.map((show) => (
-            <ShowCard key={show._id} show={show} onEdit={handleEdit} onDelete={handleDelete} />
+            <ShowCard
+              key={show._id}
+              show={show}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onArchived={refetch}
+            />
           ))}
         </div>
       )}

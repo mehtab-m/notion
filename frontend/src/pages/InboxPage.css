@@ -1,0 +1,244 @@
+/* ─── Inbox ────────────────────────────────────────────────
+   A capture bar that is always the first thing under the
+   heading, then a flat list. Rows expand in place rather than
+   opening a modal — sorting an inbox is a rapid loop.      */
+
+.inbox-page { max-width: 860px; margin: 0 auto; }
+
+/* ── Capture bar ──────────────────────────────────────── */
+.inbox-capture {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 7px 7px 7px 12px;
+  margin-bottom: var(--sp-4);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-xs);
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.inbox-capture:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.inbox-capture-icon {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: color var(--dur) var(--ease), transform var(--dur) var(--ease-spring);
+}
+
+.inbox-capture:focus-within .inbox-capture-icon {
+  color: var(--accent);
+  transform: rotate(90deg);
+}
+
+.inbox-capture input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 8px 0;
+  font-size: 14.5px;
+}
+
+.inbox-capture input:focus { box-shadow: none; background: transparent; }
+
+/* ── Toolbar ──────────────────────────────────────────── */
+.inbox-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.inbox-toolbar .filter-btn em {
+  font-style: normal;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The search pill itself is `.filter-search` in index.css — Archive
+   uses it too, and a per-page copy would only ship with that page. */
+
+/* ── List ─────────────────────────────────────────────── */
+.inbox-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inbox-item {
+  position: relative;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  overflow: hidden;
+  transition: border-color var(--dur-fast) var(--ease),
+              box-shadow var(--dur) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out);
+  animation: fadeInUp var(--dur) var(--ease-out);
+}
+
+.inbox-item:hover {
+  border-color: var(--border-light);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.inbox-item.is-open {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+/* A priority stripe down the left edge — readable at a glance
+   without spending a whole column on a badge. */
+.inbox-item::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: transparent;
+  transition: background-color var(--dur) var(--ease);
+}
+
+.inbox-item.pri-high::before { background: var(--accent-red); }
+.inbox-item.pri-medium::before { background: var(--accent); }
+.inbox-item.pri-low::before { background: var(--accent-blue); }
+
+.inbox-item.is-pinned { background: var(--accent-soft); }
+.inbox-item.is-done { opacity: 0.6; }
+
+.inbox-item-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px 11px 14px;
+}
+
+.inbox-check {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  flex-shrink: 0;
+  border-radius: 7px;
+  border: 1.5px solid var(--border-light);
+  color: transparent;
+  transition: all var(--dur) var(--ease-spring);
+}
+
+.inbox-check:hover { border-color: var(--accent); transform: scale(1.1); }
+
+.inbox-item.is-done .inbox-check {
+  background: var(--accent-green);
+  border-color: var(--accent-green);
+  color: #fff;
+}
+
+.inbox-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.inbox-text {
+  font-size: 14px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color var(--dur) var(--ease);
+}
+
+.inbox-item.is-done .inbox-text {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.inbox-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.inbox-meta em { font-style: normal; }
+
+.inbox-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  opacity: 0;
+  transform: translateX(4px);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease-out);
+}
+
+.inbox-item:hover .inbox-actions,
+.inbox-item:focus-within .inbox-actions {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ── Expanded ─────────────────────────────────────────── */
+.inbox-expand {
+  padding: 0 14px 14px 45px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  animation: fadeInUp var(--dur) var(--ease-out);
+}
+
+.inbox-note {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+  white-space: pre-wrap;
+}
+
+.inbox-expand-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.inbox-expand-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 84px;
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.inbox-convert { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ── Responsive ───────────────────────────────────────── */
+@media (max-width: 600px) {
+  .inbox-toolbar { flex-direction: column; align-items: stretch; }
+
+  /* Touch has no hover, so the row actions have to stay visible. */
+  .inbox-actions { opacity: 1; transform: none; }
+
+  .inbox-expand { padding-left: 14px; }
+  .inbox-expand-row { flex-direction: column; align-items: stretch; }
+  .inbox-convert .btn { flex: 1; justify-content: center; }
+  .inbox-capture { flex-wrap: wrap; }
+  .inbox-capture input { min-width: 0; }
+}

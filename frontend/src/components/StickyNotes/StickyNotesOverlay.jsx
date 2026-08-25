@@ -8,6 +8,20 @@ import ConfirmDialog from '../ConfirmDialog';
 import { STICKY_COLORS as COLORS, STICKY_COLOR_MAP as COLOR_MAP } from './stickyColors';
 import './StickyNotesOverlay.css';
 
+/* Keeps a note inside the viewport. Notes are stored in absolute pixels,
+   so one dropped at x=900 on a desktop would otherwise be unreachable the
+   next time the same account opens the app on a phone. */
+function clampToViewport(x, y, el) {
+  const w = el?.offsetWidth || 200;
+  const h = el?.offsetHeight || 150;
+  const maxX = Math.max(0, window.innerWidth - w - 8);
+  const maxY = Math.max(0, window.innerHeight - h - 8);
+  return {
+    x: Math.round(Math.min(Math.max(0, x), maxX)),
+    y: Math.round(Math.min(Math.max(0, y), maxY)),
+  };
+}
+
 function FloatingSticky({ note, onUpdate, onHide, onDeleteRequest, zIndex, onFocus }) {
   const [content, setContent] = useState(note.content || '');
   const [pos, setPos] = useState({ x: note.posX || 100, y: note.posY || 100 });
@@ -15,6 +29,7 @@ function FloatingSticky({ note, onUpdate, onHide, onDeleteRequest, zIndex, onFoc
   const dragOffset = useRef({ x: 0, y: 0 });
   const posRef = useRef(pos);
   const saveTimer = useRef(null);
+  const elRef = useRef(null);
   const c = COLOR_MAP[note.color] || COLOR_MAP.yellow;
 
   posRef.current = pos;
@@ -24,11 +39,25 @@ function FloatingSticky({ note, onUpdate, onHide, onDeleteRequest, zIndex, onFoc
     setPos({ x: note.posX ?? 100, y: note.posY ?? 100 });
   }, [note._id, note.content, note.posX, note.posY]);
 
+  // Pull strays back on mount and on rotate/resize.
+  useEffect(() => {
+    const settle = () => setPos((p) => clampToViewport(p.x, p.y, elRef.current));
+    settle();
+    window.addEventListener('resize', settle);
+    window.addEventListener('orientationchange', settle);
+    return () => {
+      window.removeEventListener('resize', settle);
+      window.removeEventListener('orientationchange', settle);
+    };
+  }, []);
+
   const savePosition = useCallback((x, y) => {
     onUpdate(note._id, { posX: x, posY: y });
   }, [note._id, onUpdate]);
 
-  const handleMouseDown = (e) => {
+  /* Pointer events, not mouse events — the old handlers meant a note
+     could not be moved at all on a touch screen. */
+  const handlePointerDown = (e) => {
     if (e.target.closest('.sticky-float-content') || e.target.closest('.sticky-float-actions')) return;
     onFocus(note._id);
     setDragging(true);
@@ -37,21 +66,25 @@ function FloatingSticky({ note, onUpdate, onHide, onDeleteRequest, zIndex, onFoc
   };
 
   useEffect(() => {
-    if (!dragging) return;
+    if (!dragging) return undefined;
     const onMove = (e) => {
-      const x = Math.max(0, Math.min(window.innerWidth - 200, e.clientX - dragOffset.current.x));
-      const y = Math.max(0, Math.min(window.innerHeight - 150, e.clientY - dragOffset.current.y));
-      setPos({ x, y });
+      setPos(clampToViewport(
+        e.clientX - dragOffset.current.x,
+        e.clientY - dragOffset.current.y,
+        elRef.current,
+      ));
     };
     const onUp = () => {
       setDragging(false);
       savePosition(posRef.current.x, posRef.current.y);
     };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
     return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
     };
   }, [dragging, savePosition]);
 
@@ -63,6 +96,7 @@ function FloatingSticky({ note, onUpdate, onHide, onDeleteRequest, zIndex, onFoc
 
   return (
     <div
+      ref={elRef}
       className={`sticky-float ${dragging ? 'dragging' : ''}`}
       style={{
         left: pos.x,
@@ -72,7 +106,7 @@ function FloatingSticky({ note, onUpdate, onHide, onDeleteRequest, zIndex, onFoc
         '--sticky-text': c.text,
         '--sticky-border': c.border,
       }}
-      onMouseDown={handleMouseDown}
+      onPointerDown={handlePointerDown}
     >
       <div className="sticky-float-header">
         <div className="sticky-float-colors">
@@ -165,8 +199,10 @@ export default function StickyNotesOverlay() {
   }, [fetchNotes]);
 
   const handleAdd = async () => {
-    const x = 80 + Math.random() * (window.innerWidth - 350);
-    const y = 80 + Math.random() * (window.innerHeight - 300);
+    /* Math.max keeps the spread non-negative on narrow phones, where
+       `innerWidth - 350` goes below zero and spawned notes off-screen. */
+    const x = 24 + Math.random() * Math.max(0, window.innerWidth - 240);
+    const y = 80 + Math.random() * Math.max(0, window.innerHeight - 320);
     try {
       const note = await createStickyNote({
         content: '',

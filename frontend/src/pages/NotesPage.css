@@ -440,3 +440,9 @@
 
   .notes-editor { min-height: 400px; }
 }
+
+/* Touch has no hover, so a control revealed only on hover is a control
+   that does not exist on a phone. Show them outright there. */
+@media (hover: none) {
+  .block-toolbar { opacity: 1; }
+}

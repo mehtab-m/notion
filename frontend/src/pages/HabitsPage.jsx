@@ -7,10 +7,14 @@ import useMediaQuery, { MOBILE_QUERY } from '../hooks/useMediaQuery';
 import { getHabits, createHabit, deleteHabit, toggleHabitDate } from '../utils/api';
 import ConfirmDialog from '../components/ConfirmDialog';
 import './HabitsPage.css';
+import useFocusTrap from '../hooks/useFocusTrap';
 
 const EMOJIS = ['✅', '💪', '📚', '🏃', '💧', '🧘', '🥗', '😴', '✍️', '🎯', '🎸', '🌱'];
 
 function HabitModal({ onClose, onSaved }) {
+  /* Traps Tab inside the dialog and stops the page scrolling behind it —
+     on a phone the sheet used to slide over a page that kept moving. */
+  const cardRef = useFocusTrap(true, { onEscape: onClose, autoFocus: false });
   const [form, setForm] = useState({ name: '', description: '', icon: '✅', frequency: 'daily' });
   const [loading, setLoading] = useState(false);
 
@@ -38,7 +42,14 @@ function HabitModal({ onClose, onSaved }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        className="modal-card"
+        style={{ maxWidth: 420 }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h2>New Habit</h2>
           <button className="modal-close" onClick={onClose}><X size={18} /></button>

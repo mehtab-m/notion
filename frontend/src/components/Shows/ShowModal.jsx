@@ -3,6 +3,7 @@ import { X, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { createShow, updateShow } from '../../utils/api';
 import './ShowModal.css';
+import useFocusTrap from '../../hooks/useFocusTrap';
 
 const PLATFORMS = ['Netflix', 'HBO', 'Disney+', 'Apple TV+', 'Amazon Prime', 'Hulu', 'Other'];
 
@@ -31,6 +32,9 @@ function isExternalUrl(value) {
 }
 
 export default function ShowModal({ show, onClose, onSaved }) {
+  /* Traps Tab inside the dialog and stops the page scrolling behind it —
+     on a phone the sheet used to slide over a page that kept moving. */
+  const cardRef = useFocusTrap(true, { onEscape: onClose, autoFocus: false });
   const [form, setForm] = useState(defaultForm);
   const [imageFile, setImageFile] = useState(null);
   const [hoverRating, setHoverRating] = useState(0);
@@ -113,7 +117,13 @@ export default function ShowModal({ show, onClose, onSaved }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        className="modal-card"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h2>{isEdit ? (isMovie ? 'Edit Movie' : 'Edit Show') : 'Add Movie / Show'}</h2>
           <button className="modal-close" onClick={onClose}><X size={18} /></button>

@@ -196,3 +196,82 @@ export const deleteMoneyTransaction = (id) =>
   api.delete(`/money/transactions/${id}`).then((r) => r.data);
 
 export const getApiBase = () => resolveApiBase().replace(/\/api$/, '') || 'http://localhost:5000';
+
+/* ═══════════════════════════════════════════════════════════
+   Appearance, account & the feature set added alongside the
+   redesign. Grouped here rather than in per-feature modules so
+   there stays exactly one place that knows the URL shapes.
+   ═══════════════════════════════════════════════════════════ */
+
+// ── Appearance ───────────────────────────────────────────
+export const updateTheme = (data) => api.patch('/auth/theme', data).then((r) => r.data);
+
+// ── Account ──────────────────────────────────────────────
+export const updateNotifications = (data) =>
+  api.patch('/auth/notifications', data).then((r) => r.data);
+export const uploadAvatar = (file) => {
+  const fd = new FormData();
+  fd.append('avatar', file);
+  return api
+    .post('/auth/avatar', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+    .then((r) => r.data);
+};
+export const setAvatarUrl = (avatarUrl) =>
+  api.post('/auth/avatar', { avatarUrl }).then((r) => r.data);
+export const removeAvatar = () => api.delete('/auth/avatar').then((r) => r.data);
+export const deleteAccount = (data) =>
+  api.delete('/auth/account', { data }).then((r) => r.data);
+
+// ── Archive, trash & favourites ──────────────────────────
+export const getArchive = () => api.get('/lifecycle/archive').then((r) => r.data);
+export const getTrash = () => api.get('/lifecycle/trash').then((r) => r.data);
+export const getFavorites = () => api.get('/lifecycle/favorites').then((r) => r.data);
+export const archiveItem = (type, id) =>
+  api.post(`/lifecycle/${type}/${id}/archive`).then((r) => r.data);
+export const unarchiveItem = (type, id) =>
+  api.post(`/lifecycle/${type}/${id}/unarchive`).then((r) => r.data);
+export const restoreItem = (type, id) =>
+  api.post(`/lifecycle/${type}/${id}/restore`).then((r) => r.data);
+export const purgeItem = (type, id) =>
+  api.delete(`/lifecycle/${type}/${id}`).then((r) => r.data);
+export const toggleFavorite = (type, id, favorite) =>
+  api.post(`/lifecycle/${type}/${id}/favorite`, favorite === undefined ? {} : { favorite })
+    .then((r) => r.data);
+export const emptyTrash = () => api.post('/lifecycle/trash/empty').then((r) => r.data);
+
+// ── Quick-capture inbox ──────────────────────────────────
+export const getInbox = (params) => api.get('/inbox', { params }).then((r) => r.data);
+export const createInboxItem = (data) => api.post('/inbox', data).then((r) => r.data);
+export const updateInboxItem = (id, data) => api.put(`/inbox/${id}`, data).then((r) => r.data);
+export const toggleInboxItem = (id) => api.post(`/inbox/${id}/toggle`).then((r) => r.data);
+export const convertInboxItem = (id, target) =>
+  api.post(`/inbox/${id}/convert`, { target }).then((r) => r.data);
+export const deleteInboxItem = (id) => api.delete(`/inbox/${id}`).then((r) => r.data);
+export const clearDoneInbox = () => api.post('/inbox/clear-done').then((r) => r.data);
+
+// ── Focus timer ──────────────────────────────────────────
+export const getFocusSessions = (days) =>
+  api.get('/focus', { params: days ? { days } : {} }).then((r) => r.data);
+export const logFocusSession = (data) => api.post('/focus', data).then((r) => r.data);
+export const deleteFocusSession = (id) => api.delete(`/focus/${id}`).then((r) => r.data);
+
+// ── Insights ─────────────────────────────────────────────
+export const getAnalytics = (days) =>
+  api.get('/analytics/overview', { params: days ? { days } : {} }).then((r) => r.data);
+export const getToday = () => api.get('/analytics/today').then((r) => r.data);
+export const getWeeklySummary = () => api.get('/analytics/weekly').then((r) => r.data);
+
+// ── Export & import ──────────────────────────────────────
+export const getDataSummary = () => api.get('/data/summary').then((r) => r.data);
+export const exportData = (only) =>
+  api.get('/data/export', { params: only ? { only } : {} }).then((r) => r.data);
+export const importData = (payload, mode = 'merge') =>
+  api.post('/data/import', { ...payload, mode }).then((r) => r.data);
+
+/** A plain <a href> could not carry the bearer token, and putting it in
+    the query string would leak it into logs — so the CSV is fetched
+    through the same authorised client and saved from a Blob. */
+export const exportCsv = (collection) =>
+  api
+    .get('/data/export.csv', { params: { collection }, responseType: 'blob' })
+    .then((r) => r.data);

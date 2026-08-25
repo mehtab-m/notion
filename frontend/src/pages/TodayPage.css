@@ -1,0 +1,362 @@
+/* ─── My Day ───────────────────────────────────────────────
+   A hero that answers "how is today going", then four cards
+   of things that can actually be ticked off from here.     */
+
+.today-page { max-width: 1180px; margin: 0 auto; }
+
+/* ── Hero ─────────────────────────────────────────────── */
+.today-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  padding: 26px 28px;
+  margin-bottom: var(--sp-5);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--grad-surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  position: relative;
+}
+
+.today-hero::after {
+  content: '';
+  position: absolute;
+  top: -40%;
+  right: -6%;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent) 16%, transparent),
+    transparent 68%
+  );
+  pointer-events: none;
+}
+
+.today-hero-copy { position: relative; z-index: 1; min-width: 0; }
+
+.today-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.today-hero h1 {
+  font-size: clamp(1.5rem, 3.4vw, 2.05rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  margin-bottom: 7px;
+}
+
+.today-status {
+  font-size: 14px;
+  color: var(--text-secondary);
+  max-width: 46ch;
+  line-height: 1.55;
+}
+
+.today-hero-actions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-5);
+  flex-wrap: wrap;
+}
+
+/* ── Progress ring ────────────────────────────────────── */
+.today-ring {
+  position: relative;
+  width: 138px;
+  height: 138px;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.today-ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.today-ring circle {
+  fill: none;
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+
+.today-ring-track { stroke: var(--bg-sunken); }
+
+.today-ring-fill {
+  stroke: var(--accent);
+  transition: stroke-dashoffset 900ms var(--ease-out);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 45%, transparent));
+}
+
+.today-ring-copy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+
+.today-ring-copy strong {
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.today-ring-copy span {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-weight: 550;
+}
+
+/* ── Overdue banner ───────────────────────────────────── */
+.today-alert {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 13px 16px;
+  margin-bottom: var(--sp-5);
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--accent-yellow) 34%, transparent);
+  background: color-mix(in srgb, var(--accent-yellow) 10%, transparent);
+}
+
+.today-alert > svg { color: var(--accent-yellow); flex-shrink: 0; }
+.today-alert > div { flex: 1; min-width: 0; }
+
+.today-alert strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.today-alert span {
+  display: block;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Cards ────────────────────────────────────────────── */
+.today-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: var(--sp-4);
+}
+
+.today-card {
+  display: flex;
+  flex-direction: column;
+  padding: 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-xs);
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.today-card:hover { border-color: var(--border-light); box-shadow: var(--shadow-sm); }
+
+.today-card .section-head-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  transition: gap var(--dur) var(--ease);
+}
+
+.today-card .section-head-sub:hover { gap: 7px; text-decoration: underline; }
+
+.today-card .empty-state { padding: 28px 12px; }
+.today-card .empty-state-art { width: 54px; height: 54px; margin-bottom: 12px; }
+.today-card .empty-state-art svg { width: 22px; height: 22px; }
+
+.today-note {
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--accent-yellow);
+  margin-bottom: 8px;
+}
+
+/* ── Checkable rows ───────────────────────────────────── */
+.today-list { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+
+.today-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  transition: background-color var(--dur-fast) var(--ease),
+              transform var(--dur-fast) var(--ease-out);
+}
+
+.today-check:hover:not(:disabled) { background: var(--bg-hover); transform: translateX(2px); }
+.today-check:disabled { opacity: 0.55; cursor: wait; }
+
+.today-check-box {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  border: 1.5px solid var(--border-light);
+  color: transparent;
+  transition: all var(--dur) var(--ease-spring);
+}
+
+.today-check:hover .today-check-box { border-color: var(--accent); }
+
+.today-check.done .today-check-box {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+  transform: scale(1.08);
+}
+
+.today-check-icon { flex-shrink: 0; font-size: 15px; line-height: 1; }
+
+.today-check-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color var(--dur) var(--ease);
+}
+
+.today-check-label em {
+  display: block;
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.today-check.done .today-check-label {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--text-muted) 60%, transparent);
+}
+
+.today-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--accent-yellow);
+  background: color-mix(in srgb, var(--accent-yellow) 13%, transparent);
+}
+
+.today-due {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-weight: 550;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.today-due.overdue { color: var(--accent-red); font-weight: 650; }
+
+.today-check.is-overdue { background: color-mix(in srgb, var(--accent-red) 6%, transparent); }
+
+.today-flag {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-red);
+  background: color-mix(in srgb, var(--accent-red) 13%, transparent);
+}
+
+.today-check.pri-high .today-check-box { border-color: color-mix(in srgb, var(--accent-red) 55%, transparent); }
+
+/* ── Reading ──────────────────────────────────────────── */
+.today-reading {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.today-reading li { display: flex; flex-direction: column; gap: 7px; }
+
+.today-reading strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.today-reading span { font-size: 11.5px; }
+
+.today-focus-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-top: auto;
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border);
+}
+
+.today-focus-strip > div { display: flex; flex-direction: column; line-height: 1.2; }
+
+.today-focus-strip strong {
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.today-focus-strip span { font-size: 11px; color: var(--text-muted); }
+.today-focus-strip .btn { margin-left: auto; }
+
+/* ── Responsive ───────────────────────────────────────── */
+@media (max-width: 780px) {
+  .today-hero {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: var(--sp-5);
+    padding: 20px;
+  }
+
+  .today-ring { width: 104px; height: 104px; align-self: center; }
+  .today-ring-copy strong { font-size: 1.35rem; }
+  .today-hero-actions { width: 100%; }
+  .today-hero-actions .btn { flex: 1; justify-content: center; }
+  .today-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .today-alert { flex-wrap: wrap; }
+  .today-alert .btn { width: 100%; justify-content: center; }
+  .today-check { padding: 11px 8px; }
+}

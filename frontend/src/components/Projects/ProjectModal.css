@@ -217,3 +217,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Touch has no hover, so a control revealed only on hover is a control
+   that does not exist on a phone. Show them outright there. */
+@media (hover: none) {
+  .task-remove { opacity: 1; }
+}

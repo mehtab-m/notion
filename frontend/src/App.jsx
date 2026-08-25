@@ -2,11 +2,16 @@ import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from './context/AuthContext';
+import { useTheme } from './context/ThemeContext';
 import { StickyNotesOverlayProvider } from './context/StickyNotesOverlayContext';
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
+import MobileNav from './components/MobileNav';
 import ErrorBoundary from './components/ErrorBoundary';
 import CommandPalette from './components/CommandPalette';
+import QuickCapture from './components/QuickCapture';
+import ShortcutsOverlay from './components/ShortcutsOverlay';
+import useKeyboardShortcuts from './hooks/useKeyboardShortcuts';
 import { PageSkeleton } from './components/Skeleton';
 
 /* Routes are split so the first paint downloads only the shell plus the
@@ -16,6 +21,12 @@ import { PageSkeleton } from './components/Skeleton';
 const LandingPage = lazy(() => import('./pages/landing/LandingPage'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
+const TodayPage = lazy(() => import('./pages/TodayPage'));
+const InboxPage = lazy(() => import('./pages/InboxPage'));
+const FocusPage = lazy(() => import('./pages/FocusPage'));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
+const ArchivePage = lazy(() => import('./pages/ArchivePage'));
+const UpgradePage = lazy(() => import('./pages/UpgradePage'));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
 const ProjectDetailPage = lazy(() => import('./pages/ProjectDetailPage'));
 const MoneyPage = lazy(() => import('./pages/MoneyPage'));
@@ -35,32 +46,41 @@ const MoneyWidget = lazy(() => import('./components/Money/MoneyWidget'));
 const DeveloperOnboarding = lazy(() => import('./components/DeveloperOnboarding'));
 const PremiumWelcome = lazy(() => import('./components/PremiumWelcome'));
 
-const PAGE_TITLES = {
-  '/': 'Dashboard',
-  '/projects': 'Projects',
-  '/money': 'Money',
-  '/books': 'Books',
-  '/shows': 'Shows',
-  '/tables': 'Tables',
-  '/notes': 'Notebook',
-  '/stickynotes': 'Sticky Notes',
-  '/habits': 'Habit Tracker',
-  '/goals': 'Goal Constellation',
-  '/admin': 'Product Admin',
-  '/settings': 'Settings',
+/* Title plus the one-line explanation the navbar shows under it. */
+const PAGE_META = {
+  '/': ['Dashboard', 'Everything at a glance'],
+  '/today': ['My Day', 'What is worth doing right now'],
+  '/inbox': ['Inbox', 'Capture first, sort later'],
+  '/focus': ['Focus', 'One block at a time'],
+  '/analytics': ['Insights', 'What the numbers say'],
+  '/archive': ['Archive', 'Shelved, deleted and starred'],
+  '/upgrade': ['Plans', 'Common, Premium and Platinum'],
+  '/projects': ['Projects', 'Work with a deadline'],
+  '/money': ['Money', 'Who owes what'],
+  '/books': ['Books', 'Your reading list'],
+  '/shows': ['Shows', 'What you are watching'],
+  '/tables': ['Tables', 'Structured data'],
+  '/notes': ['Notebook', 'Long-form thinking'],
+  '/stickynotes': ['Sticky Notes', 'Quick reminders on screen'],
+  '/habits': ['Habit Tracker', 'The part you do not decide'],
+  '/goals': ['Goal Constellation', 'Where you are heading'],
+  '/admin': ['Product Admin', 'Accounts and usage'],
+  '/settings': ['Settings', 'Your account and appearance'],
 };
 
-function getTitle(pathname) {
-  if (pathname.startsWith('/tables/')) return 'Table View';
-  if (pathname.startsWith('/projects/')) return 'Project';
-  return PAGE_TITLES[pathname] || 'Dashboard';
+function getMeta(pathname) {
+  if (pathname.startsWith('/tables/')) return ['Table View', 'Structured data'];
+  if (pathname.startsWith('/projects/')) return ['Project', 'Tasks, files and the team'];
+  return PAGE_META[pathname] || ['Dashboard', ''];
 }
 
 const TOAST_STYLE = {
-  background: 'var(--bg-card)',
+  background: 'var(--bg-elevated)',
   color: 'var(--text-primary)',
   border: '1px solid var(--border)',
-  boxShadow: 'var(--shadow)',
+  boxShadow: 'var(--shadow-md)',
+  borderRadius: 'var(--radius)',
+  fontSize: '14px',
 };
 
 const TOAST_OPTIONS = {
@@ -82,6 +102,17 @@ function AdminRoute({ children }) {
   return children;
 }
 
+/**
+ * Sends every navigation back to the top. The shell scrolls the document,
+ * so without this a route change from halfway down a long list dropped you
+ * halfway down the next page.
+ */
+function useScrollToTop(pathname) {
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [pathname]);
+}
+
 /** Keeps the browser tab title in step with the current page. */
 function useDocumentTitle(title) {
   useEffect(() => {
@@ -91,38 +122,37 @@ function useDocumentTitle(title) {
 
 function AppShell() {
   const location = useLocation();
-  const title = getTitle(location.pathname);
+  const [title, subtitle] = getMeta(location.pathname);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const { needsDeveloperChoice } = useAuth();
+  const { toggleTheme, themes, themeId, setTheme, canUse } = useTheme();
 
   useDocumentTitle(title);
+  useScrollToTop(location.pathname);
 
   const closePalette = useCallback(() => setPaletteOpen(false), []);
+  const openSearch = useCallback(() => setPaletteOpen((open) => !open), []);
+  const openCapture = useCallback(() => setCaptureOpen(true), []);
+  const openShortcuts = useCallback(() => setShortcutsOpen((open) => !open), []);
 
-  // Global search shortcut: Cmd+K / Ctrl+K, plus "/" when not typing.
-  useEffect(() => {
-    const onKeyDown = (e) => {
-      const key = e.key?.toLowerCase();
-      if (key === 'k' && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setPaletteOpen((open) => !open);
-        return;
-      }
-      if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        const el = e.target;
-        const typing =
-          el?.isContentEditable ||
-          ['INPUT', 'TEXTAREA', 'SELECT'].includes(el?.tagName);
-        if (!typing) {
-          e.preventDefault();
-          setPaletteOpen(true);
-        }
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  /** Cycle to the next theme this account is allowed to use. */
+  const nextTheme = useCallback(() => {
+    const allowed = themes.filter((t) => canUse(t.id));
+    if (allowed.length < 2) return;
+    const index = allowed.findIndex((t) => t.id === themeId);
+    setTheme(allowed[(index + 1) % allowed.length].id);
+  }, [themes, themeId, canUse, setTheme]);
+
+  useKeyboardShortcuts({
+    onSearch: openSearch,
+    onQuickCapture: openCapture,
+    onShortcuts: openShortcuts,
+    onToggleTheme: toggleTheme,
+    onNextTheme: nextTheme,
+  });
 
   // Close the mobile drawer whenever the route changes.
   useEffect(() => {
@@ -134,7 +164,11 @@ function AppShell() {
       <div className="app-layout">
         <a href="#main-content" className="skip-link">Skip to content</a>
 
-        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <Sidebar
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          onQuickCapture={openCapture}
+        />
         {sidebarOpen && (
           <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />
         )}
@@ -142,8 +176,10 @@ function AppShell() {
         <div className="app-main">
           <Navbar
             title={title}
+            subtitle={subtitle}
             onMenuClick={() => setSidebarOpen(true)}
             onSearchClick={() => setPaletteOpen(true)}
+            onShortcuts={openShortcuts}
           />
           <main className="app-content" id="main-content" tabIndex={-1}>
             {/* Keyed on pathname so navigating away clears a crashed page. */}
@@ -151,6 +187,12 @@ function AppShell() {
               <Suspense fallback={<PageSkeleton />}>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
+                  <Route path="/today" element={<TodayPage />} />
+                  <Route path="/inbox" element={<InboxPage />} />
+                  <Route path="/focus" element={<FocusPage />} />
+                  <Route path="/analytics" element={<AnalyticsPage />} />
+                  <Route path="/archive" element={<ArchivePage />} />
+                  <Route path="/upgrade" element={<UpgradePage />} />
                   <Route
                     path="/projects"
                     element={(
@@ -192,6 +234,8 @@ function AppShell() {
           </main>
         </div>
 
+        <MobileNav onQuickCapture={openCapture} onMenu={() => setSidebarOpen(true)} />
+
         {/* Overlays must never take the app down with them. */}
         <ErrorBoundary resetKey={location.pathname}>
           <Suspense fallback={null}>
@@ -203,6 +247,8 @@ function AppShell() {
         </ErrorBoundary>
 
         <CommandPalette open={paletteOpen} onClose={closePalette} />
+        <QuickCapture open={captureOpen} onClose={() => setCaptureOpen(false)} />
+        <ShortcutsOverlay open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
 
         <Toaster position="bottom-right" toastOptions={TOAST_OPTIONS} />
       </div>

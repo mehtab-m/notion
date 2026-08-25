@@ -234,15 +234,20 @@
 .ent-drawer-overlay {
   position: fixed;
   inset: 0;
-  z-index: 9000;
+  z-index: var(--z-modal);
   background: rgba(0, 0, 0, 0.45);
   display: flex;
   justify-content: flex-end;
 }
 
 .ent-drawer {
-  width: min(420px, 100vw);
+  /* 100% not 100vw — 100vw counts the scrollbar and left a sliver of
+     horizontal scroll behind the drawer on desktop. */
+  width: min(420px, 100%);
   height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   background: var(--bg-primary);
   border-left: 1px solid var(--border);
   display: flex;

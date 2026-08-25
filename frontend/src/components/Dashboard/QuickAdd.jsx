@@ -3,11 +3,16 @@ import { Plus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { createProject, createBook, createShow } from '../../utils/api';
 import './QuickAdd.css';
+import useFocusTrap from '../../hooks/useFocusTrap';
 
 export default function QuickAdd({ onAdded, hideProjects = false }) {
   const [modal, setModal] = useState(null); // 'project' | 'book' | 'show'
   const [form, setForm] = useState({});
   const [loading, setLoading] = useState(false);
+
+  /* Traps Tab inside the dialog and stops the page scrolling behind it —
+     on a phone the sheet used to slide over a page that kept moving. */
+  const cardRef = useFocusTrap(!!modal, { onEscape: () => setModal(null), autoFocus: false });
 
   useEffect(() => {
     if (!modal) { setForm({}); return; }
@@ -70,7 +75,13 @@ export default function QuickAdd({ onAdded, hideProjects = false }) {
 
       {modal && (
         <div className="modal-overlay" onClick={() => setModal(null)}>
-          <div className="modal-card quick-add-modal" onClick={(e) => e.stopPropagation()}>
+          <div
+            ref={cardRef}
+            role="dialog"
+            aria-modal="true"
+            className="modal-card quick-add-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <h2>Quick Add {modal.charAt(0).toUpperCase() + modal.slice(1)}</h2>
               <button className="modal-close" onClick={() => setModal(null)}><X size={18} /></button>

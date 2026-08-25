@@ -17,7 +17,7 @@ export default function BooksPage() {
   const handleDelete = async (id) => {
     try {
       await deleteBook(id);
-      toast.success('Book deleted');
+      toast.success('Book moved to trash');
       refetch();
     } catch {
       toast.error('Failed to delete book');
@@ -100,6 +100,7 @@ export default function BooksPage() {
               book={book}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              onArchived={refetch}
               onIncrementPage={handleIncrementPage}
               onLearningLine={handleLearningLine}
             />

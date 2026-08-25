@@ -2,7 +2,7 @@
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 150;
+  z-index: var(--z-float);
 }
 
 .sticky-float {
@@ -16,6 +16,11 @@
   display: flex;
   flex-direction: column;
   pointer-events: auto;
+  /* The header is a drag handle, so the browser must not claim the
+     gesture for scrolling; the textarea opts back in below. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
   transform: rotate(-1deg);
   transition: box-shadow 0.15s;
 }
@@ -81,6 +86,9 @@
 .sticky-hide:hover { color: var(--accent); }
 
 .sticky-float-content {
+  touch-action: auto;
+  -webkit-user-select: text;
+  user-select: text;
   flex: 1;
   background: transparent;
   border: none;
@@ -96,8 +104,8 @@
 
 .sticky-fab {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
+  bottom: var(--fab-bottom);
+  right: var(--fab-side);
   width: 48px;
   height: 48px;
   border-radius: 50%;
@@ -108,22 +116,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 160;
+  z-index: var(--z-fab);
   cursor: pointer;
   transition: transform 0.15s;
 }
 
 .sticky-fab:hover { transform: scale(1.1); }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .sticky-float {
-    width: 160px;
+    width: min(180px, calc(100dvw - 32px));
     min-height: 130px;
   }
+
   .sticky-fab {
-    bottom: 16px;
-    right: 16px;
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
   }
 }

@@ -17,4 +17,8 @@ export default function useMediaQuery(query) {
   return matches;
 }
 
-export const MOBILE_QUERY = '(max-width: 768px)';
+/* Must stay in step with the 900px drawer breakpoint in the stylesheet.
+   It used to say 768px, so between 769 and 900 the JS believed it was on
+   desktop (rail toggle live, desktop-only nav items shown) while the CSS
+   had already turned the sidebar into a drawer. */
+export const MOBILE_QUERY = '(max-width: 900px)';

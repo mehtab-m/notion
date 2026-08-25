@@ -3,6 +3,7 @@ import { X, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { createBook, updateBook } from '../../utils/api';
 import './BookModal.css';
+import useFocusTrap from '../../hooks/useFocusTrap';
 
 const defaultForm = {
   title: '',
@@ -21,6 +22,9 @@ function isExternalUrl(value) {
 }
 
 export default function BookModal({ book, onClose, onSaved }) {
+  /* Traps Tab inside the dialog and stops the page scrolling behind it —
+     on a phone the sheet used to slide over a page that kept moving. */
+  const cardRef = useFocusTrap(true, { onEscape: onClose, autoFocus: false });
   const [form, setForm] = useState(defaultForm);
   const [imageFile, setImageFile] = useState(null);
   const [hoverRating, setHoverRating] = useState(0);
@@ -96,7 +100,13 @@ export default function BookModal({ book, onClose, onSaved }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        className="modal-card"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h2>{isEdit ? 'Edit Book' : 'Add Book'}</h2>
           <button className="modal-close" onClick={onClose}><X size={18} /></button>

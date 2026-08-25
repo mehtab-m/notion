@@ -533,3 +533,10 @@
   font-size: 12px;
   color: var(--text-muted);
 }
+
+/* Touch has no hover, so a control revealed only on hover is a control
+   that does not exist on a phone. Show them outright there. */
+@media (hover: none) {
+  .dt-row-delete,
+  .col-menu-trigger { opacity: 1; }
+}

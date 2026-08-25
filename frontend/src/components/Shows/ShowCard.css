@@ -91,3 +91,9 @@
   color: var(--text-muted);
   font-style: italic;
 }
+
+/* Touch has no hover, so a control revealed only on hover is a control
+   that does not exist on a phone. Show them outright there. */
+@media (hover: none) {
+  .show-card-actions { opacity: 1; }
+}

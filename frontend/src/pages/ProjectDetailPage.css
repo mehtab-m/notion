@@ -118,15 +118,17 @@
 /* ── Navigation tabs ──────────────────────────────────── */
 .pd-nav {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 6px;
   position: sticky;
-  top: 0;
-  z-index: 20;
+  /* The page scrolls the document, and the app's own top bar is already
+     sticky at 0 — parking this there hid the tab strip behind it. */
+  top: var(--navbar-h);
+  z-index: calc(var(--z-sticky) - 1);
 }
 
 .pd-nav-item {
@@ -728,7 +730,7 @@
   }
 
   .pd-nav {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 4px;
     padding: 4px;
     border-radius: 10px;

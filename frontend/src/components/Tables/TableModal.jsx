@@ -3,12 +3,16 @@ import { X, Plus, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { createTable } from '../../utils/api';
 import './TableModal.css';
+import useFocusTrap from '../../hooks/useFocusTrap';
 
 const COLUMN_TYPES = ['text', 'number', 'date', 'dropdown', 'image', 'checkbox', 'url'];
 
 const newColumn = () => ({ id: crypto.randomUUID(), name: '', type: 'text', options: [], optionInput: '' });
 
 export default function TableModal({ onClose, onSaved }) {
+  /* Traps Tab inside the dialog and stops the page scrolling behind it —
+     on a phone the sheet used to slide over a page that kept moving. */
+  const cardRef = useFocusTrap(true, { onEscape: onClose, autoFocus: false });
   const [tableName, setTableName] = useState('');
   const [columns, setColumns] = useState([newColumn()]);
   const [loading, setLoading] = useState(false);
@@ -66,7 +70,13 @@ export default function TableModal({ onClose, onSaved }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card table-modal-card" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        className="modal-card table-modal-card"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h2>New Table</h2>
           <button className="modal-close" onClick={onClose}><X size={18} /></button>

@@ -58,7 +58,7 @@
 
 .tables-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   gap: 16px;
 }
 
@@ -153,4 +153,10 @@
 .card-action-btn.danger:hover {
   color: var(--accent-red);
   background: color-mix(in srgb, var(--accent-red) 12%, transparent);
+}
+
+/* Touch has no hover, so a control revealed only on hover is a control
+   that does not exist on a phone. Show them outright there. */
+@media (hover: none) {
+  .table-card-actions { opacity: 1; }
 }

@@ -245,3 +245,10 @@
 .priority-low { background: rgba(16, 185, 129, 0.12); color: var(--accent-green); }
 
 .confirm-delete { display: flex; gap: 4px; }
+
+/* Touch has no hover, so a control revealed only on hover is a control
+   that does not exist on a phone. Show them outright there. */
+@media (hover: none) {
+  .project-card-actions { opacity: 1; }
+  .project-card-v2-open { opacity: 1; transform: none; }
+}

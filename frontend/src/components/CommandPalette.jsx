@@ -4,6 +4,7 @@ import {
   Search, LayoutDashboard, FolderKanban, BookOpen, Tv, Table as TableIcon,
   PenLine, StickyNote, Target, Flame, Settings, IndianRupee, Shield,
   CornerDownLeft, ArrowUp, ArrowDown, FileText, BookMarked, Loader2, SearchX,
+  Sun, Inbox, Timer, BarChart3, Archive, Crown,
 } from 'lucide-react';
 import { searchAll } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
@@ -14,7 +15,11 @@ import './CommandPalette.css';
 /* Pages reachable without typing anything — the palette doubles as a
    keyboard-only navigation menu. */
 const PAGES = [
+  { label: 'My Day', to: '/today', icon: Sun, keywords: 'today plan agenda now' },
   { label: 'Dashboard', to: '/', icon: LayoutDashboard, keywords: 'home overview stats' },
+  { label: 'Inbox', to: '/inbox', icon: Inbox, keywords: 'capture quick triage' },
+  { label: 'Focus', to: '/focus', icon: Timer, keywords: 'pomodoro timer deep work' },
+  { label: 'Insights', to: '/analytics', icon: BarChart3, keywords: 'analytics charts stats heatmap' },
   { label: 'Notebook', to: '/notes', icon: PenLine, keywords: 'notes writing pages' },
   { label: 'Sticky Notes', to: '/stickynotes', icon: StickyNote, keywords: 'stickies reminders' },
   { label: 'Projects', to: '/projects', icon: FolderKanban, keywords: 'tasks kanban work', developer: true },
@@ -24,7 +29,9 @@ const PAGES = [
   { label: 'Books', to: '/books', icon: BookOpen, keywords: 'reading library' },
   { label: 'Shows', to: '/shows', icon: Tv, keywords: 'movies series watching' },
   { label: 'Tables', to: '/tables', icon: TableIcon, keywords: 'spreadsheet data grid' },
-  { label: 'Settings', to: '/settings', icon: Settings, keywords: 'account theme profile password' },
+  { label: 'Archive', to: '/archive', icon: Archive, keywords: 'trash deleted restore starred' },
+  { label: 'Settings', to: '/settings', icon: Settings, keywords: 'account theme profile password appearance' },
+  { label: 'Plans', to: '/upgrade', icon: Crown, keywords: 'platinum premium pricing themes upgrade' },
   { label: 'Admin', to: '/admin', icon: Shield, keywords: 'users analytics product', admin: true },
 ];
 
@@ -39,6 +46,7 @@ const TYPE_ICON = {
   table: TableIcon,
   sticky: StickyNote,
   money: IndianRupee,
+  inbox: Inbox,
 };
 
 const TYPE_LABEL = {
@@ -52,6 +60,7 @@ const TYPE_LABEL = {
   table: 'Table',
   sticky: 'Sticky',
   money: 'Money',
+  inbox: 'Inbox',
 };
 
 export default function CommandPalette({ open, onClose, initialQuery = '' }) {

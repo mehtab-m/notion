@@ -129,7 +129,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1100;
+  z-index: calc(var(--z-modal) + 10);
   padding: 20px;
 }
 
@@ -163,4 +163,10 @@
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+}
+
+/* Touch has no hover, so a control revealed only on hover is a control
+   that does not exist on a phone. Show them outright there. */
+@media (hover: none) {
+  .book-card-actions { opacity: 1; }
 }

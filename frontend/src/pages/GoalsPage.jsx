@@ -6,6 +6,7 @@ import useApi from '../hooks/useApi';
 import { getGoals, createGoal, updateGoal, deleteGoal, toggleMilestone, toggleSubgoal } from '../utils/api';
 import ConfirmDialog from '../components/ConfirmDialog';
 import './GoalsPage.css';
+import useFocusTrap from '../hooks/useFocusTrap';
 
 const CATEGORIES = ['personal', 'work', 'health', 'finance', 'learning', 'other'];
 const STATUSES = ['not-started', 'in-progress', 'completed', 'abandoned'];
@@ -31,6 +32,9 @@ function uid() {
 }
 
 function GoalModal({ goal, onClose, onSaved }) {
+  /* Traps Tab inside the dialog and stops the page scrolling behind it —
+     on a phone the sheet used to slide over a page that kept moving. */
+  const cardRef = useFocusTrap(true, { onEscape: onClose, autoFocus: false });
   const isEdit = Boolean(goal);
   const [form, setForm] = useState({
     title: '', description: '', why: '', category: 'personal',
@@ -111,7 +115,13 @@ function GoalModal({ goal, onClose, onSaved }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card goal-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        className="modal-card goal-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h2>{isEdit ? 'Edit constellation' : 'New north-star goal'}</h2>
           <button className="modal-close" onClick={onClose} type="button"><X size={18} /></button>

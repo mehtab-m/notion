@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Pencil, Trash2, Tv, Star } from 'lucide-react';
 import { getApiBase } from '../../utils/api';
+import ItemActions from '../ItemActions';
 import './ShowCard.css';
 
 const BACKEND = getApiBase();
@@ -29,7 +30,7 @@ export function resolvePosterUrl(posterImage) {
   return `${BACKEND}${posterImage.startsWith('/') ? '' : '/'}${posterImage}`;
 }
 
-export default function ShowCard({ show, onEdit, onDelete }) {
+export default function ShowCard({ show, onEdit, onDelete, onArchived }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const pc = platformColors[show.platform] || platformColors.Other;
   const posterSrc = resolvePosterUrl(show.posterImage);
@@ -51,6 +52,14 @@ export default function ShowCard({ show, onEdit, onDelete }) {
           {show.platform}
         </span>
         <div className="show-card-actions">
+          <ItemActions
+            type="show"
+            id={show._id}
+            favorite={show.favorite}
+            onArchived={onArchived}
+            variant="card"
+            size={13}
+          />
           <button className="card-action-btn" onClick={() => onEdit(show)} title="Edit">
             <Pencil size={13} />
           </button>

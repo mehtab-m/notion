@@ -15,7 +15,7 @@
 
 .sticky-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr));
   gap: 16px;
 }
 
@@ -65,7 +65,8 @@
   gap: 4px;
   opacity: 1;
 }
-@media (min-width: 769px) {
+/* Hover-to-reveal only where a pointer can hover. */
+@media (hover: hover) {
   .sticky-actions { opacity: 0; }
   .sticky-card:hover .sticky-actions { opacity: 1; }
 }

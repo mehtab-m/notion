@@ -2,7 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover is what makes env(safe-area-inset-*) resolve to a real
+         value on notched phones; without it the bottom bar sat under the home
+         indicator and every safe-area pad in the stylesheet was a no-op. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <title>SortLife — Totally free forever</title>
     <meta
       name="description"
@@ -17,39 +23,87 @@
     <meta property="og:type" content="website" />
 
     <!--
-      Applies the saved theme before first paint. Without this the
-      document renders light, then React sets data-theme on mount and
-      dark-mode users see a white flash on every load.
+      Applies the saved appearance before first paint. Without this the
+      document renders in Daylight, then React sets data-theme on mount
+      and every non-default theme flashes white on load. Kept in sync
+      with src/theme/catalog.js by hand — it is nine ids and a mode.
     -->
     <script>
       (function () {
+        var MODES = {
+          light: 'light', dark: 'dark', dim: 'dark', aurora: 'dark',
+          sunset: 'light', nord: 'dark', rose: 'light', forest: 'dark',
+          mono: 'light'
+        };
+        var root = document.documentElement;
+        var state = null;
+
         try {
-          var saved = localStorage.getItem('sortlife_theme');
-          var theme =
-            saved === 'light' || saved === 'dark'
-              ? saved
-              : window.matchMedia('(prefers-color-scheme: dark)').matches
-                ? 'dark'
-                : 'light';
-          document.documentElement.setAttribute('data-theme', theme);
-        } catch (e) {
-          document.documentElement.setAttribute('data-theme', 'light');
+          var raw = localStorage.getItem('sortlife_appearance');
+          if (raw) state = JSON.parse(raw);
+          if (!state) {
+            var legacy = localStorage.getItem('sortlife_theme');
+            if (legacy === 'light' || legacy === 'dark') state = { themeId: legacy };
+          }
+        } catch (e) { /* private mode — fall back to the media query */ }
+
+        if (!state || !state.themeId) {
+          var prefersDark = window.matchMedia &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches;
+          state = { themeId: prefersDark ? 'dark' : 'light' };
+        }
+
+        var id = state.themeId;
+        var custom = null;
+        if (typeof id === 'string' && id.indexOf('custom:') === 0) {
+          var list = state.customThemes || [];
+          for (var i = 0; i < list.length; i++) {
+            if (list[i] && list[i].id === id) { custom = list[i]; break; }
+          }
+        }
+
+        var base = custom ? (custom.base || 'light') : id;
+        if (!MODES[base]) base = 'light';
+        root.setAttribute('data-theme', base);
+        root.setAttribute('data-mode', custom ? (custom.mode === 'dark' ? 'dark' : 'light') : MODES[base]);
+        root.setAttribute('data-density', state.density || 'comfortable');
+        root.setAttribute('data-reduced-motion', String(state.reducedMotion === true));
+        root.style.setProperty('--font-scale', String((state.fontScale || 100) / 100));
+        root.style.colorScheme = root.getAttribute('data-mode');
+
+        // Collapsed-rail state, so the shell does not jump on load.
+        try {
+          if (localStorage.getItem('sortlife_sidebar_collapsed') === 'true') {
+            root.setAttribute('data-rail', 'on');
+          }
+        } catch (e) { /* ignore */ }
+
+        if (custom && custom.tokens) {
+          for (var key in custom.tokens) {
+            if (/^[a-z-]+$/.test(key) && /^#[0-9a-fA-F]{3,8}$/.test(custom.tokens[key])) {
+              root.style.setProperty('--' + key, custom.tokens[key]);
+            }
+          }
         }
       })();
     </script>
 
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SortLife" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>" />
-    <script type="module" crossorigin src="/assets/index--KXng1yl.js"></script>
+    <script type="module" crossorigin src="/assets/index-gxiBLPfT.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/vendor-react-CTx_NVwV.js">
-    <link rel="modulepreload" crossorigin href="/assets/vendor-DuMqQWWV.js">
-    <link rel="modulepreload" crossorigin href="/assets/vendor-router-DBkHiAfZ.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-Dy7in3dq.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-router-B1UHnXW4.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-http-DhXgJQ-f.js">
-    <link rel="modulepreload" crossorigin href="/assets/vendor-date-DkJ3zR_N.js">
-    <link rel="modulepreload" crossorigin href="/assets/vendor-icons-Buy9JKpc.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-d6biCMMw.css">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-date-mMSpRQMk.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-icons-BMzVtZKq.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-BaNOrvKr.css">
   </head>
   <body>
     <div id="root"></div>
@@ -57,6 +111,6 @@
       <p style="font-family: system-ui, sans-serif; padding: 24px">
         SortLife needs JavaScript enabled to run.
       </p>
-    </noscript>
+    </noscript>
   </body>
 </html>

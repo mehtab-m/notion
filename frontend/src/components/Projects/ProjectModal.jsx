@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { createProject } from '../../utils/api';
 import './ProjectModal.css';
+import useFocusTrap from '../../hooks/useFocusTrap';
 
 const defaultForm = {
   title: '',
@@ -10,6 +11,9 @@ const defaultForm = {
 };
 
 export default function ProjectModal({ onClose, onSaved, onCreated }) {
+  /* Traps Tab inside the dialog and stops the page scrolling behind it —
+     on a phone the sheet used to slide over a page that kept moving. */
+  const cardRef = useFocusTrap(true, { onEscape: onClose, autoFocus: false });
   const [form, setForm] = useState(defaultForm);
   const [loading, setLoading] = useState(false);
 
@@ -54,7 +58,13 @@ export default function ProjectModal({ onClose, onSaved, onCreated }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card project-modal-card project-modal-simple" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        className="modal-card project-modal-card project-modal-simple"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h2>New Project</h2>
           <button className="modal-close" onClick={onClose}><X size={18} /></button>

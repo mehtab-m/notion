@@ -1,0 +1,340 @@
+/* ─── Insights ─────────────────────────────────────────────
+   Recap card, headline tiles, then the charts. Every colour
+   comes from the theme so the charts follow the palette.  */
+
+.analytics-page { max-width: 1240px; margin: 0 auto; }
+.analytics-block { margin-bottom: var(--sp-4); }
+
+.analytics-two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+
+/* ── Weekly recap ─────────────────────────────────────── */
+.weekly-card {
+  position: relative;
+  overflow: hidden;
+  padding: 20px 22px;
+  margin-bottom: var(--sp-5);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--grad-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.weekly-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-5);
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.weekly-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 11px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.weekly-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(146px, 100%), 1fr));
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-5);
+}
+
+.weekly-stats > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.weekly-stats strong {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.weekly-stats > div > span {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.weekly-stats em {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  margin-top: 3px;
+}
+
+.weekly-stats em.up { color: var(--accent-green); }
+.weekly-stats em.down { color: var(--accent-red); }
+
+.weekly-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 78px;
+}
+
+.weekly-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  height: 100%;
+}
+
+.weekly-bar > span {
+  width: 100%;
+  max-width: 44px;
+  border-radius: 5px 5px 2px 2px;
+  background: var(--grad-accent);
+  transition: transform var(--dur) var(--ease-spring), opacity var(--dur) var(--ease);
+  transform-origin: bottom;
+}
+
+.weekly-bar:hover > span { transform: scaleY(1.05); opacity: 0.85; }
+
+.weekly-bar em {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 650;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.weekly-note {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.weekly-note strong { color: var(--text-primary); font-weight: 650; }
+
+/* ── Heatmap ──────────────────────────────────────────── */
+.heatmap-scroll {
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+}
+
+.heatmap {
+  display: flex;
+  gap: 3px;
+  min-width: min-content;
+}
+
+.heatmap-week { display: flex; flex-direction: column; gap: 3px; }
+
+.heat {
+  display: block;
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  background: var(--bg-sunken);
+  transition: transform var(--dur-fast) var(--ease-spring), outline-color var(--dur-fast) var(--ease);
+  outline: 1px solid transparent;
+}
+
+.heat:hover { transform: scale(1.32); outline-color: var(--border-light); z-index: 1; }
+
+.heat.is-pad { background: transparent; pointer-events: none; }
+
+.heat.lvl-0 { background: var(--bg-sunken); }
+.heat.lvl-1 { background: color-mix(in srgb, var(--accent) 26%, var(--bg-sunken)); }
+.heat.lvl-2 { background: color-mix(in srgb, var(--accent) 48%, var(--bg-sunken)); }
+.heat.lvl-3 { background: color-mix(in srgb, var(--accent) 72%, var(--bg-sunken)); }
+.heat.lvl-4 { background: var(--accent); }
+
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: var(--sp-3);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.heatmap-legend i { width: 11px; height: 11px; border-radius: 3px; }
+.heatmap-legend span:last-child { margin-left: 2px; }
+
+/* ── Chart tooltip ────────────────────────────────────── */
+.chart-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-md);
+  font-size: 12px;
+}
+
+.chart-tip strong { font-size: 11.5px; color: var(--text-muted); font-weight: 600; }
+
+/* ── Goal velocity ────────────────────────────────────── */
+.velocity-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.velocity-list li { display: flex; flex-direction: column; gap: 7px; }
+.velocity-list li > .row-between > span { font-size: 13.5px; font-weight: 500; }
+
+.velocity-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 650;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.velocity-tag.ahead { color: var(--accent-green); background: color-mix(in srgb, var(--accent-green) 13%, transparent); }
+.velocity-tag.behind { color: var(--accent-red); background: color-mix(in srgb, var(--accent-red) 13%, transparent); }
+.velocity-tag.neutral { color: var(--text-muted); background: var(--bg-sunken); }
+
+.velocity-track {
+  position: relative;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--bg-sunken);
+  overflow: visible;
+}
+
+.velocity-actual {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--grad-accent);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+/* A tick showing where the goal *should* be by now, which is the whole
+   point of the chart — a bare progress bar cannot say "behind". */
+.velocity-expected {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 14px;
+  border-radius: 1px;
+  background: var(--text-secondary);
+  transform: translateX(-1px);
+}
+
+/* ── Leaderboard ──────────────────────────────────────── */
+.leaderboard { list-style: none; display: flex; flex-direction: column; gap: 1px; }
+
+.leaderboard li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease-out);
+}
+
+.leaderboard li:hover { background: var(--bg-hover); transform: translateX(2px); }
+
+.leaderboard-rank {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg-sunken);
+}
+
+.leaderboard .rank-1 .leaderboard-rank { background: #FDE68A; color: #78350F; }
+.leaderboard .rank-2 .leaderboard-rank { background: #E5E7EB; color: #374151; }
+.leaderboard .rank-3 .leaderboard-rank { background: #FED7AA; color: #7C2D12; }
+
+.leaderboard-icon { font-size: 16px; line-height: 1; flex-shrink: 0; }
+.leaderboard strong { display: block; font-size: 13.5px; font-weight: 600; }
+.leaderboard span:not(.leaderboard-rank):not(.leaderboard-streak) { font-size: 11.5px; color: var(--text-muted); }
+
+.leaderboard-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-yellow);
+  background: color-mix(in srgb, var(--accent-yellow) 13%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Consistency list ─────────────────────────────────── */
+.consistency-list { list-style: none; display: flex; flex-direction: column; gap: 11px; }
+
+.consistency-list li {
+  display: grid;
+  grid-template-columns: minmax(120px, 210px) 1fr 44px;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.consistency-name { font-size: 13.5px; }
+
+.consistency-value {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+/* ── Responsive ───────────────────────────────────────── */
+@media (max-width: 900px) {
+  .page-header-actions .segmented { overflow-x: auto; max-width: 100%; }
+}
+
+@media (max-width: 620px) {
+  .weekly-card { padding: 16px; }
+  .weekly-stats { gap: var(--sp-4); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .weekly-stats strong { font-size: 1.4rem; }
+  .weekly-bars { height: 62px; }
+  .heat { width: 11px; height: 11px; }
+
+  .consistency-list li {
+    grid-template-columns: 1fr 40px;
+    grid-template-areas: 'name value' 'bar bar';
+    row-gap: 6px;
+  }
+
+  .consistency-name { grid-area: name; }
+  .consistency-value { grid-area: value; }
+  .consistency-list .progress-bar { grid-area: bar; }
+}

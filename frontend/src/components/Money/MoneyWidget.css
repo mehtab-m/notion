@@ -1,7 +1,7 @@
 .money-fab {
   position: fixed;
-  bottom: 24px;
-  left: 24px;
+  bottom: var(--fab-bottom);
+  left: var(--fab-side);
   width: 48px;
   height: 48px;
   border-radius: 50%;
@@ -12,7 +12,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 160;
+  z-index: var(--z-fab);
   cursor: pointer;
   transition: transform 0.15s ease;
 }
@@ -34,17 +34,17 @@
 
 .money-widget-panel {
   position: fixed;
-  bottom: 84px;
-  left: 24px;
+  bottom: calc(var(--fab-bottom) + 60px);
+  left: var(--fab-side);
   width: 320px;
-  max-width: calc(100vw - 48px);
-  max-height: 70vh;
+  max-width: calc(100dvw - var(--fab-side) * 2);
+  max-height: min(70dvh, calc(100dvh - var(--fab-bottom) - 90px));
   overflow-y: auto;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 16px;
   box-shadow: var(--shadow-lg);
-  z-index: 161;
+  z-index: calc(var(--z-fab) + 1);
   padding: 14px;
   display: flex;
   flex-direction: column;

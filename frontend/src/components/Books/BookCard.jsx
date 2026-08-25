@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Pencil, Trash2, BookOpen, Star, ChevronUp, Lightbulb } from 'lucide-react';
 import { getApiBase } from '../../utils/api';
+import ItemActions from '../ItemActions';
 import './BookCard.css';
 
 const BACKEND = getApiBase();
@@ -18,7 +19,7 @@ export function resolveCoverUrl(coverImage) {
   return `${BACKEND}${coverImage.startsWith('/') ? '' : '/'}${coverImage}`;
 }
 
-export default function BookCard({ book, onEdit, onDelete, onIncrementPage, onLearningLine }) {
+export default function BookCard({ book, onEdit, onDelete, onIncrementPage, onLearningLine, onArchived }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [learningOpen, setLearningOpen] = useState(false);
   const [learningText, setLearningText] = useState('');
@@ -52,6 +53,14 @@ export default function BookCard({ book, onEdit, onDelete, onIncrementPage, onLe
           </div>
         )}
         <div className="book-card-actions">
+          <ItemActions
+            type="book"
+            id={book._id}
+            favorite={book.favorite}
+            onArchived={onArchived}
+            variant="card"
+            size={13}
+          />
           <button className="card-action-btn" onClick={() => setLearningOpen(true)} title="Add learning line">
             <Lightbulb size={13} />
           </button>

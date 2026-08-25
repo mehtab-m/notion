@@ -1,16 +1,31 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Zap, Mail, Lock, User, KeyRound, ArrowLeft } from 'lucide-react';
+import {
+  Mail, Lock, User, KeyRound, ArrowLeft, Sparkles, Eye, EyeOff,
+  Check, Sun, Moon, Flame, Timer, Palette,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { signup, verifyEmail, login, resendCode } from '../utils/api';
 import './AuthPage.css';
 
+/* The three lines on the brand panel. Kept short — this is the last
+   thing between someone and the app, not a second landing page. */
+const HIGHLIGHTS = [
+  { icon: Flame, text: 'Streaks you cannot fake — only today can be ticked.' },
+  { icon: Timer, text: 'A focus timer that keeps counting in the tab title.' },
+  { icon: Palette, text: 'Nine themes, and a builder for one of your own.' },
+];
+
 export default function AuthPage({ redirectTo, initialMode = 'login' }) {
   const { login: authLogin } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
-  const [mode, setMode] = useState(initialMode);  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState(initialMode);
+  const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', password: '', code: '' });
   const loadingTimers = useRef([]);
 
@@ -41,7 +56,8 @@ export default function AuthPage({ redirectTo, initialMode = 'login' }) {
     setMode(initialMode);
   }, [initialMode]);
 
-  const authError = (err, fallback) => {    if (err.code === 'ECONNABORTED') return 'Request timed out. The server may be starting — try again in a moment.';
+  const authError = (err, fallback) => {
+    if (err.code === 'ECONNABORTED') return 'Request timed out. The server may be starting — try again in a moment.';
     if (!err.response) return 'Cannot reach server. Check your connection or try again shortly.';
     return err.response?.data?.error || fallback;
   };
@@ -63,6 +79,7 @@ export default function AuthPage({ redirectTo, initialMode = 'login' }) {
   const goAfterAuth = () => {
     navigate(redirectTo || '/', { replace: true });
   };
+
   const handleVerify = async (e) => {
     e.preventDefault();
     startLoading('Verifying…');
@@ -108,80 +125,259 @@ export default function AuthPage({ redirectTo, initialMode = 'login' }) {
     }
   };
 
+  /* Rough strength read-out. Deliberately advisory — the server enforces
+     the only rule that matters, which is the 8-character minimum. */
+  const strength = (() => {
+    const value = form.password;
+    if (!value) return 0;
+    let score = 0;
+    if (value.length >= 8) score += 1;
+    if (value.length >= 12) score += 1;
+    if (/[A-Z]/.test(value) && /[a-z]/.test(value)) score += 1;
+    if (/\d/.test(value) && /[^A-Za-z0-9]/.test(value)) score += 1;
+    return score;
+  })();
+
+  const STRENGTH_LABELS = ['', 'Weak', 'Okay', 'Good', 'Strong'];
+
   return (
     <div className="auth-page">
-      <Link to="/" className="auth-back-link">
-        <ArrowLeft size={16} /> Back to home
-      </Link>
-      <div className="auth-card">
-        <div className="auth-logo">
-          <Zap size={26} className="auth-logo-icon" />
-          <h1>SortLife</h1>
+      {/* ── Brand panel ──────────────────────────────────── */}
+      <aside className="auth-aside">
+        <div className="auth-aside-glow" aria-hidden />
+
+        <Link to="/" className="auth-brand">
+          <span className="auth-brand-mark"><Sparkles size={17} /></span>
+          SortLife
+        </Link>
+
+        <div className="auth-aside-body">
+          <h2>Everything in one place, finally.</h2>
+          <p>
+            Notes, goals, habits, books, shows, projects and money — one workspace,
+            one theme, one export button. Free forever.
+          </p>
+
+          <ul className="auth-highlights">
+            {HIGHLIGHTS.map(({ icon: Icon, text }) => (
+              <li key={text}>
+                <span><Icon size={15} /></span>
+                {text}
+              </li>
+            ))}
+          </ul>
         </div>
 
-        <div className="auth-tabs">
-          <button className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); navigate('/login'); }}>Log in</button>
-          <button className={mode === 'signup' ? 'active' : ''} onClick={() => { setMode('signup'); navigate('/signup'); }}>Sign up</button>
-          {mode === 'verify' && <button className="active">Verify</button>}
+        <p className="auth-aside-foot">
+          <Check size={13} /> No credit card, no trial, no lock-in.
+        </p>
+      </aside>
+
+      {/* ── Form panel ───────────────────────────────────── */}
+      <main className="auth-main">
+        <div className="auth-topbar">
+          <Link to="/" className="auth-back-link">
+            <ArrowLeft size={15} /> Back to home
+          </Link>
+          <button
+            type="button"
+            className="auth-theme-btn"
+            onClick={toggleTheme}
+            aria-label={isDark ? 'Switch to a light theme' : 'Switch to a dark theme'}
+          >
+            {isDark ? <Moon size={16} /> : <Sun size={16} />}
+          </button>
         </div>
 
-        {mode === 'signup' && (
-          <form onSubmit={handleSignup} className="auth-form">
-            <div className="auth-field">
-              <User size={16} />
-              <input placeholder="Your name" value={form.name} onChange={set('name')} required />
-            </div>
-            <div className="auth-field">
-              <Mail size={16} />
-              <input type="email" placeholder="Email" value={form.email} onChange={set('email')} required />
-            </div>
-            <div className="auth-field">
-              <Lock size={16} />
-              <input type="password" placeholder="Password (min 8 characters)" value={form.password} onChange={set('password')} minLength={8} required />
-            </div>
-            <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
-              {loading ? loadingMsg || 'Creating…' : 'Create account'}
-            </button>
-            {/* {loading && <p className="auth-loading-hint">{loadingMsg}</p>} */}
-          </form>
-        )}
+        <div className="auth-card">
+          <div className="auth-card-head">
+            <h1>
+              {mode === 'signup' ? 'Create your workspace'
+                : mode === 'verify' ? 'Check your email'
+                  : 'Welcome back'}
+            </h1>
+            <p>
+              {mode === 'signup' ? 'It takes about thirty seconds.'
+                : mode === 'verify' ? `We sent a six-digit code to ${form.email || 'your inbox'}.`
+                  : 'Pick up exactly where you left off.'}
+            </p>
+          </div>
 
-        {mode === 'verify' && (
-          <form onSubmit={handleVerify} className="auth-form">
-            <p className="auth-hint">Enter the 6-digit code sent to <strong>{form.email}</strong></p>
-            <div className="auth-field">
-              <Mail size={16} />
-              <input type="email" placeholder="Email" value={form.email} onChange={set('email')} required />
+          {mode !== 'verify' && (
+            <div className="auth-tabs" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === 'login'}
+                className={mode === 'login' ? 'active' : ''}
+                onClick={() => { setMode('login'); navigate('/login'); }}
+              >
+                Log in
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === 'signup'}
+                className={mode === 'signup' ? 'active' : ''}
+                onClick={() => { setMode('signup'); navigate('/signup'); }}
+              >
+                Sign up
+              </button>
+              <span className={`auth-tabs-glide ${mode === 'signup' ? 'to-right' : ''}`} aria-hidden />
             </div>
-            <div className="auth-field">
-              <KeyRound size={16} />
-              <input placeholder="Confirmation code" value={form.code} onChange={set('code')} maxLength={6} required autoFocus />
-            </div>
-            <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
-              {loading ? loadingMsg || 'Verifying…' : 'Verify & continue'}
-            </button>
-            <button type="button" className="auth-link-btn" onClick={handleResend}>Resend code</button>
-          </form>
-        )}
+          )}
 
-        {mode === 'login' && (
-          <form onSubmit={handleLogin} className="auth-form">
-            <div className="auth-field">
-              <Mail size={16} />
-              <input type="email" placeholder="Email" value={form.email} onChange={set('email')} required autoFocus />
-            </div>
-            <div className="auth-field">
-              <Lock size={16} />
-              <input type="password" placeholder="Password" value={form.password} onChange={set('password')} required />
-            </div>
-            <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
-              {loading ? loadingMsg || 'Logging in…' : 'Log in'}
-            </button>
-           
-            <p className="auth-footer-note">Session stays active for 7 days</p>
-          </form>
-        )}
-      </div>
+          {mode === 'signup' && (
+            <form onSubmit={handleSignup} className="auth-form">
+              <div className="auth-field">
+                <User size={16} />
+                <input
+                  placeholder="Your name"
+                  value={form.name}
+                  onChange={set('name')}
+                  autoComplete="name"
+                  required
+                />
+              </div>
+              <div className="auth-field">
+                <Mail size={16} />
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={form.email}
+                  onChange={set('email')}
+                  autoComplete="email"
+                  required
+                />
+              </div>
+              <div className="auth-field">
+                <Lock size={16} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Password (min 8 characters)"
+                  value={form.password}
+                  onChange={set('password')}
+                  minLength={8}
+                  autoComplete="new-password"
+                  required
+                />
+                <button
+                  type="button"
+                  className="auth-eye"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+
+              {form.password && (
+                <div className={`auth-strength s-${strength}`}>
+                  <span /><span /><span /><span />
+                  <em>{STRENGTH_LABELS[strength]}</em>
+                </div>
+              )}
+
+              <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
+                {loading ? loadingMsg || 'Creating…' : 'Create account'}
+              </button>
+            </form>
+          )}
+
+          {mode === 'verify' && (
+            <form onSubmit={handleVerify} className="auth-form">
+              <div className="auth-field">
+                <Mail size={16} />
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={form.email}
+                  onChange={set('email')}
+                  autoComplete="email"
+                  required
+                />
+              </div>
+              <div className="auth-field">
+                <KeyRound size={16} />
+                <input
+                  className="auth-code"
+                  placeholder="000000"
+                  value={form.code}
+                  onChange={set('code')}
+                  maxLength={6}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  required
+                  autoFocus
+                />
+              </div>
+              <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
+                {loading ? loadingMsg || 'Verifying…' : 'Verify & continue'}
+              </button>
+              <div className="auth-links">
+                <button type="button" className="auth-link-btn" onClick={handleResend}>
+                  Resend the code
+                </button>
+                <button
+                  type="button"
+                  className="auth-link-btn"
+                  onClick={() => { setMode('login'); navigate('/login'); }}
+                >
+                  Back to log in
+                </button>
+              </div>
+            </form>
+          )}
+
+          {mode === 'login' && (
+            <form onSubmit={handleLogin} className="auth-form">
+              <div className="auth-field">
+                <Mail size={16} />
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={form.email}
+                  onChange={set('email')}
+                  autoComplete="email"
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="auth-field">
+                <Lock size={16} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Password"
+                  value={form.password}
+                  onChange={set('password')}
+                  autoComplete="current-password"
+                  required
+                />
+                <button
+                  type="button"
+                  className="auth-eye"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+              <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
+                {loading ? loadingMsg || 'Logging in…' : 'Log in'}
+              </button>
+              <p className="auth-footer-note">Your session stays active for 7 days.</p>
+            </form>
+          )}
+        </div>
+
+        <p className="auth-switch">
+          {mode === 'signup' ? (
+            <>Already have an account? <button type="button" onClick={() => { setMode('login'); navigate('/login'); }}>Log in</button></>
+          ) : mode === 'login' ? (
+            <>New here? <button type="button" onClick={() => { setMode('signup'); navigate('/signup'); }}>Create an account</button></>
+          ) : null}
+        </p>
+      </main>
     </div>
   );
 }
