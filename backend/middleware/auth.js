@@ -2,6 +2,13 @@ const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
 const { isAdminUser } = require('../utils/activity');
 
+/* A hardcoded fallback secret in production means anyone who has read
+   this file can mint a valid token for any account. Fail at boot
+   instead of shipping that silently. */
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET must be set in production');
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 const JWT_EXPIRES = '7d';
 

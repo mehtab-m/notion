@@ -6,13 +6,14 @@ const {
   ACTIVE_WEEKLY_THRESHOLD,
   GRACE_DAYS,
   INACTIVE_AFTER_DAYS,
-  recomputeActiveStatus,
+  recomputeActiveStatusBatch,
   isAdminUser,
   resolveEffectivePlan,
   defaultPlanExpiresAt,
   planMeta,
 } = require('../utils/activity');
 const { serialize } = require('../utils/serialize');
+const { asyncHandler, badRequest } = require('../middleware/errors');
 
 router.use(adminMiddleware);
 
@@ -22,165 +23,205 @@ function daysAgo(n) {
   return d;
 }
 
-async function buildUserAnalytics(user) {
+/* Never select password, verificationCode or resetCode into an admin
+   payload — the dashboard has no use for them. */
+const USER_ANALYTICS_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  role: true,
+  isDeveloper: true,
+  isVerified: true,
+  isActive: true,
+  activeGraceUntil: true,
+  lastActiveAt: true,
+  plan: true,
+  planExpiresAt: true,
+  loginCount: true,
+  followupEmailSentAt: true,
+  legalSettings: true,
+  createdAt: true,
+};
+
+/** Sum a groupBy result into a Map keyed by userId. */
+function countByUser(rows) {
+  return new Map(rows.map((r) => [r.userId, r._count._all]));
+}
+
+/** Nested Map: userId -> activity type -> count. */
+function countByUserAndType(rows) {
+  const out = new Map();
+  for (const r of rows) {
+    if (!out.has(r.userId)) out.set(r.userId, {});
+    out.get(r.userId)[r.type] = r._count._all;
+  }
+  return out;
+}
+
+/**
+ * Analytics for a list of users in a fixed 11 queries.
+ *
+ * The per-user version issued 15 queries each and was called inside a
+ * Promise.all over every verified user, so the admin dashboard fired
+ * 15 x N concurrent queries and exhausted the connection pool.
+ */
+async function buildUserAnalyticsBatch(users) {
+  if (!users?.length) return [];
+
   const weekAgo = daysAgo(7);
   const recentAgo = daysAgo(INACTIVE_AFTER_DAYS);
+  const userId = { in: users.map((u) => u.id) };
+  const tally = (model) =>
+    prisma[model].groupBy({ by: ['userId'], where: { userId }, _count: { _all: true } });
+
   const [
-    weekActivity,
-    weekLogins,
-    weekAppUses,
-    recentActivity,
-    totalActivity,
-    totalLogins,
-    totalAppUses,
-    booksCount,
-    showsCount,
-    habitsCount,
-    goalsCount,
-    projectsCount,
-    notesCount,
-    tablesCount,
-    stickyNotesCount,
+    weekByType,
+    recentAll,
+    totalByType,
+    books, shows, habits, goals, projects, notes, tables, stickyNotes,
   ] = await Promise.all([
-    prisma.userActivity.count({ where: { userId: user.id, createdAt: { gte: weekAgo } } }),
-    prisma.userActivity.count({ where: { userId: user.id, type: 'login', createdAt: { gte: weekAgo } } }),
-    prisma.userActivity.count({ where: { userId: user.id, type: 'app_use', createdAt: { gte: weekAgo } } }),
-    prisma.userActivity.count({ where: { userId: user.id, createdAt: { gte: recentAgo } } }),
-    prisma.userActivity.count({ where: { userId: user.id } }),
-    prisma.userActivity.count({ where: { userId: user.id, type: 'login' } }),
-    prisma.userActivity.count({ where: { userId: user.id, type: 'app_use' } }),
-    prisma.book.count({ where: { userId: user.id } }),
-    prisma.show.count({ where: { userId: user.id } }),
-    prisma.habit.count({ where: { userId: user.id } }),
-    prisma.goal.count({ where: { userId: user.id } }),
-    prisma.project.count({ where: { userId: user.id } }),
-    prisma.note.count({ where: { userId: user.id } }),
-    prisma.spreadsheet.count({ where: { userId: user.id } }),
-    prisma.stickyNote.count({ where: { userId: user.id } }),
+    prisma.userActivity.groupBy({
+      by: ['userId', 'type'],
+      where: { userId, createdAt: { gte: weekAgo } },
+      _count: { _all: true },
+    }),
+    prisma.userActivity.groupBy({
+      by: ['userId'],
+      where: { userId, createdAt: { gte: recentAgo } },
+      _count: { _all: true },
+    }),
+    prisma.userActivity.groupBy({
+      by: ['userId', 'type'],
+      where: { userId },
+      _count: { _all: true },
+    }),
+    tally('book'),
+    tally('show'),
+    tally('habit'),
+    tally('goal'),
+    tally('project'),
+    tally('note'),
+    tally('spreadsheet'),
+    tally('stickyNote'),
   ]);
 
-  const now = new Date();
-  const inGrace = user.activeGraceUntil ? now <= new Date(user.activeGraceUntil) : false;
-  const meta = planMeta(user);
-  const legal = (user.legalSettings && typeof user.legalSettings === 'object')
-    ? user.legalSettings
-    : {};
+  const week = countByUserAndType(weekByType);
+  const total = countByUserAndType(totalByType);
+  const recent = countByUser(recentAll);
+  const content = {
+    books: countByUser(books),
+    shows: countByUser(shows),
+    habits: countByUser(habits),
+    goals: countByUser(goals),
+    projects: countByUser(projects),
+    notes: countByUser(notes),
+    tables: countByUser(tables),
+    stickyNotes: countByUser(stickyNotes),
+  };
 
-  return {
-    _id: user.id,
-    name: user.name,
-    email: user.email,
-    role: isAdminUser(user) ? 'admin' : user.role,
-    isDeveloper: user.isDeveloper,
-    isVerified: user.isVerified,
-    isActive: user.isActive,
-    activeReason: inGrace
-      ? 'grace_period'
-      : recentActivity > 0 || weekActivity >= ACTIVE_WEEKLY_THRESHOLD
-        ? 'recent_activity'
-        : 'inactive',
-    activeGraceUntil: user.activeGraceUntil,
-    lastActiveAt: user.lastActiveAt,
-    createdAt: user.createdAt,
-    plan: meta.plan,
-    planRaw: meta.planRaw,
-    planExpiresAt: meta.planExpiresAt,
-    loginCount: meta.loginCount,
-    premiumStars: meta.premiumStars,
-    followupEmailSentAt: user.followupEmailSentAt || null,
-    legalSettings: {
-      marketingEmails: !!legal.marketingEmails,
-      dataProcessing: legal.dataProcessing !== false,
-      termsAccepted: !!legal.termsAccepted,
-      analyticsOptIn: !!legal.analyticsOptIn,
-      notes: typeof legal.notes === 'string' ? legal.notes : '',
-    },
-    weekActivityCount: weekActivity,
-    recentActivityCount: recentActivity,
-    weekLogins,
-    weekAppUses,
-    totalActivityCount: totalActivity,
-    totalLogins,
-    totalAppUses,
-    profile: {
+  const now = new Date();
+
+  return users.map((user) => {
+    const w = week.get(user.id) || {};
+    const t = total.get(user.id) || {};
+    const weekLogins = w.login || 0;
+    const weekAppUses = w.app_use || 0;
+    const weekActivity = weekLogins + weekAppUses;
+    const totalLogins = t.login || 0;
+    const totalAppUses = t.app_use || 0;
+    const recentActivity = recent.get(user.id) || 0;
+
+    const inGrace = user.activeGraceUntil ? now <= new Date(user.activeGraceUntil) : false;
+    const meta = planMeta(user);
+    const legal =
+      user.legalSettings && typeof user.legalSettings === 'object' ? user.legalSettings : {};
+
+    return {
+      _id: user.id,
       name: user.name,
       email: user.email,
       role: isAdminUser(user) ? 'admin' : user.role,
       isDeveloper: user.isDeveloper,
       isVerified: user.isVerified,
-      joinedAt: user.createdAt,
+      isActive: user.isActive,
+      activeReason: inGrace
+        ? 'grace_period'
+        : recentActivity > 0 || weekActivity >= ACTIVE_WEEKLY_THRESHOLD
+          ? 'recent_activity'
+          : 'inactive',
+      activeGraceUntil: user.activeGraceUntil,
       lastActiveAt: user.lastActiveAt,
-      graceEndsAt: user.activeGraceUntil,
+      createdAt: user.createdAt,
       plan: meta.plan,
+      planRaw: meta.planRaw,
+      planExpiresAt: meta.planExpiresAt,
       loginCount: meta.loginCount,
-    },
-    content: {
-      books: booksCount,
-      shows: showsCount,
-      habits: habitsCount,
-      goals: goalsCount,
-      projects: projectsCount,
-      notes: notesCount,
-      tables: tablesCount,
-      stickyNotes: stickyNotesCount,
-    },
-  };
+      premiumStars: meta.premiumStars,
+      followupEmailSentAt: user.followupEmailSentAt || null,
+      legalSettings: {
+        marketingEmails: !!legal.marketingEmails,
+        dataProcessing: legal.dataProcessing !== false,
+        termsAccepted: !!legal.termsAccepted,
+        analyticsOptIn: !!legal.analyticsOptIn,
+        notes: typeof legal.notes === 'string' ? legal.notes : '',
+      },
+      weekActivityCount: weekActivity,
+      recentActivityCount: recentActivity,
+      weekLogins,
+      weekAppUses,
+      totalActivityCount: totalLogins + totalAppUses,
+      totalLogins,
+      totalAppUses,
+      profile: {
+        name: user.name,
+        email: user.email,
+        role: isAdminUser(user) ? 'admin' : user.role,
+        isDeveloper: user.isDeveloper,
+        isVerified: user.isVerified,
+        joinedAt: user.createdAt,
+        lastActiveAt: user.lastActiveAt,
+        graceEndsAt: user.activeGraceUntil,
+        plan: meta.plan,
+        loginCount: meta.loginCount,
+      },
+      content: {
+        books: content.books.get(user.id) || 0,
+        shows: content.shows.get(user.id) || 0,
+        habits: content.habits.get(user.id) || 0,
+        goals: content.goals.get(user.id) || 0,
+        projects: content.projects.get(user.id) || 0,
+        notes: content.notes.get(user.id) || 0,
+        tables: content.tables.get(user.id) || 0,
+        stickyNotes: content.stickyNotes.get(user.id) || 0,
+      },
+    };
+  });
+}
+
+/** Single-user convenience wrapper. */
+async function buildUserAnalytics(user) {
+  const [row] = await buildUserAnalyticsBatch([user]);
+  return row;
 }
 
 // GET /api/admin/stats — product overview
-router.get('/stats', async (req, res) => {
-  try {
+router.get(
+  '/stats',
+  asyncHandler(async (req, res) => {
     const weekAgo = daysAgo(7);
     const monthAgo = daysAgo(30);
 
     const users = await prisma.user.findMany({
       where: { isVerified: true },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        isDeveloper: true,
-        isVerified: true,
-        isActive: true,
-        activeGraceUntil: true,
-        lastActiveAt: true,
-        plan: true,
-        planExpiresAt: true,
-        loginCount: true,
-        followupEmailSentAt: true,
-        legalSettings: true,
-        createdAt: true,
-      },
+      select: USER_ANALYTICS_SELECT,
       orderBy: { createdAt: 'desc' },
     });
 
-    // Refresh active flags for all users so dashboard is accurate
-    await Promise.all(users.map((u) => recomputeActiveStatus(u.id, { touchLastActive: false })));
+    // Refresh active flags in one batch. The batch returns the updated
+    // rows, so the second full read of the user table is unnecessary.
+    const refreshed = await recomputeActiveStatusBatch(users, { touchLastActive: false });
 
-    const refreshed = await prisma.user.findMany({
-      where: { isVerified: true },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        isDeveloper: true,
-        isVerified: true,
-        isActive: true,
-        activeGraceUntil: true,
-        lastActiveAt: true,
-        plan: true,
-        planExpiresAt: true,
-        loginCount: true,
-        followupEmailSentAt: true,
-        legalSettings: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    const userRows = await Promise.all(refreshed.map(buildUserAnalytics));
+    const userRows = await buildUserAnalyticsBatch(refreshed);
 
     const totalUsers = refreshed.length;
     const activeUsers = refreshed.filter((u) => u.isActive).length;
@@ -276,47 +317,27 @@ router.get('/stats', async (req, res) => {
         : [],
       users: userRows,
     });
-  } catch (err) {
-    console.error('Admin stats error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
+  })
+);
 
 // GET /api/admin/users — list users with analytics
-router.get('/users', async (req, res) => {
-  try {
+router.get(
+  '/users',
+  asyncHandler(async (req, res) => {
     const users = await prisma.user.findMany({
       where: { isVerified: true },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        isDeveloper: true,
-        isVerified: true,
-        isActive: true,
-        activeGraceUntil: true,
-        lastActiveAt: true,
-        plan: true,
-        planExpiresAt: true,
-        loginCount: true,
-        followupEmailSentAt: true,
-        legalSettings: true,
-        createdAt: true,
-      },
+      select: USER_ANALYTICS_SELECT,
       orderBy: { createdAt: 'desc' },
     });
-    const rows = await Promise.all(users.map(buildUserAnalytics));
-    res.json(serialize(rows));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+    res.json(serialize(await buildUserAnalyticsBatch(users)));
+  })
+);
 
 // PATCH /api/admin/users/:id — role, plan, active, legal settings
-router.patch('/users/:id', async (req, res) => {
-  try {
-    const { role, isActive, plan, planExpiresAt, legalSettings, isDeveloper } = req.body;
+router.patch(
+  '/users/:id',
+  asyncHandler(async (req, res) => {
+    const { role, isActive, plan, planExpiresAt, legalSettings, isDeveloper } = req.body || {};
     const data = {};
     if (role === 'admin' || role === 'user') data.role = role;
     if (typeof isActive === 'boolean') data.isActive = isActive;
@@ -342,17 +363,16 @@ router.patch('/users/:id', async (req, res) => {
     }
 
     if (Object.keys(data).length === 0) {
-      return res.status(400).json({ error: 'Provide role, plan, isActive, isDeveloper, and/or legalSettings' });
+      throw badRequest('Provide role, plan, isActive, isDeveloper, and/or legalSettings');
     }
 
     const updated = await prisma.user.update({
       where: { id: req.params.id },
       data,
+      select: USER_ANALYTICS_SELECT,
     });
     res.json({ user: await buildUserAnalytics(updated) });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
+  })
+);
 
 module.exports = router;

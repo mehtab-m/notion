@@ -4,19 +4,54 @@ const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
 const { accessibleProjectsWhere } = require('../utils/projectAccess');
 const { serialize } = require('../utils/serialize');
+const { asyncHandler } = require('../middleware/errors');
 
-router.get('/stats', async (req, res) => {
-  try {
+/* Only the columns the dashboard actually renders. Selecting the whole
+   row pulled note bodies, descriptions and cover blobs across the wire
+   on every page load. */
+const BOOK_FIELDS = {
+  id: true, title: true, author: true, status: true,
+  currentPage: true, totalPages: true, coverImage: true,
+};
+const GOAL_FIELDS = { id: true, title: true, category: true, status: true, progress: true };
+const HABIT_FIELDS = { id: true, name: true, streak: true, completedDates: true, color: true };
+const PROJECT_FIELDS = { id: true, title: true, progress: true, priority: true, status: true };
+
+/** Turn a Prisma groupBy result into a { value: count } lookup. */
+function tally(rows, key, keys) {
+  const out = Object.fromEntries(keys.map((k) => [k, 0]));
+  for (const row of rows) {
+    if (row[key] in out) out[row[key]] = row._count._all;
+  }
+  return out;
+}
+
+router.get(
+  '/stats',
+  asyncHandler(async (req, res) => {
     const filter = owned(req);
     const isDeveloper = req.user?.isDeveloper === true;
-    const [books, goals, habits, projects] = await Promise.all([
-      prisma.book.findMany({ where: filter }),
-      prisma.goal.findMany({ where: filter }),
-      prisma.habit.findMany({ where: filter }),
-      isDeveloper
-        ? prisma.project.findMany({ where: accessibleProjectsWhere(req.user) })
-        : Promise.resolve([]),
-    ]);
+    const projectFilter = accessibleProjectsWhere(req.user);
+
+    const [books, goals, habits, projects, booksGrouped, goalsGrouped, totals] =
+      await Promise.all([
+        prisma.book.findMany({ where: filter, select: BOOK_FIELDS }),
+        prisma.goal.findMany({ where: filter, select: GOAL_FIELDS }),
+        prisma.habit.findMany({ where: filter, select: HABIT_FIELDS }),
+        isDeveloper
+          ? prisma.project.findMany({
+              // The UI only charts active projects — filter in the DB.
+              where: { AND: [projectFilter, { status: 'active' }] },
+              select: PROJECT_FIELDS,
+            })
+          : Promise.resolve([]),
+        // Counting in the database beats counting in JS over full rows.
+        prisma.book.groupBy({ by: ['status'], where: filter, _count: { _all: true } }),
+        prisma.goal.groupBy({ by: ['status'], where: filter, _count: { _all: true } }),
+        isDeveloper
+          ? prisma.project.count({ where: projectFilter })
+          : Promise.resolve(0),
+      ]);
 
     const bookProgress = books.map((b) => ({
       _id: b.id,
@@ -45,28 +80,12 @@ router.get('/stats', async (req, res) => {
       color: h.color,
     }));
 
-    const projectProgress = projects
-      .filter((p) => p.status === 'active')
-      .map((p) => ({
-        _id: p.id,
-        title: p.title,
-        progress: p.progress,
-        priority: p.priority,
-      }));
-
-    const booksByStatus = {
-      reading: books.filter((b) => b.status === 'reading').length,
-      completed: books.filter((b) => b.status === 'completed').length,
-      'want-to-read': books.filter((b) => b.status === 'want-to-read').length,
-      paused: books.filter((b) => b.status === 'paused').length,
-    };
-
-    const goalsByStatus = {
-      'in-progress': goals.filter((g) => g.status === 'in-progress').length,
-      completed: goals.filter((g) => g.status === 'completed').length,
-      'not-started': goals.filter((g) => g.status === 'not-started').length,
-      abandoned: goals.filter((g) => g.status === 'abandoned').length,
-    };
+    const projectProgress = projects.map((p) => ({
+      _id: p.id,
+      title: p.title,
+      progress: p.progress,
+      priority: p.priority,
+    }));
 
     res.json(
       serialize({
@@ -74,19 +93,21 @@ router.get('/stats', async (req, res) => {
         goalProgress,
         habitStats,
         projectProgress,
-        booksByStatus,
-        goalsByStatus,
+        booksByStatus: tally(booksGrouped, 'status', [
+          'reading', 'completed', 'want-to-read', 'paused',
+        ]),
+        goalsByStatus: tally(goalsGrouped, 'status', [
+          'in-progress', 'completed', 'not-started', 'abandoned',
+        ]),
         totals: {
           books: books.length,
           goals: goals.length,
           habits: habits.length,
-          projects: projects.length,
+          projects: totals,
         },
       })
     );
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+  })
+);
 
 module.exports = router;

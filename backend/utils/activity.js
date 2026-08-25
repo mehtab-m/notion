@@ -131,6 +131,109 @@ async function recomputeActiveStatus(userId, { touchLastActive = true } = {}) {
   return updated;
 }
 
+/** Send the one-off "we miss you" mail when a user lapses. */
+function queueInactiveFollowup(user) {
+  sendInactiveFollowupEmail(user.email, user.name)
+    .then(async (result) => {
+      if (result?.sent) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { followupEmailSentAt: new Date() },
+        });
+      }
+    })
+    .catch(() => {});
+}
+
+/**
+ * Same rules as recomputeActiveStatus, but for a whole list of users in
+ * a fixed number of queries. The per-user version costs four round
+ * trips each, which turned the admin dashboard into thousands of
+ * concurrent queries once the user table grew.
+ *
+ * Returns the users with their recomputed fields applied.
+ */
+async function recomputeActiveStatusBatch(users, { touchLastActive = false } = {}) {
+  if (!users?.length) return [];
+
+  const now = new Date();
+  const inactiveSince = addDays(now, -INACTIVE_AFTER_DAYS);
+  const weekAgo = addDays(now, -7);
+  const userIds = users.map((u) => u.id);
+
+  const [recentRows, weekRows] = await Promise.all([
+    prisma.userActivity.groupBy({
+      by: ['userId'],
+      where: { userId: { in: userIds }, createdAt: { gte: inactiveSince } },
+      _count: { _all: true },
+    }),
+    prisma.userActivity.groupBy({
+      by: ['userId'],
+      where: { userId: { in: userIds }, createdAt: { gte: weekAgo } },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const recentBy = new Map(recentRows.map((r) => [r.userId, r._count._all]));
+  const weekBy = new Map(weekRows.map((r) => [r.userId, r._count._all]));
+
+  const updates = [];
+  const resolved = users.map((user) => {
+    const graceUntil = user.activeGraceUntil || graceUntilFrom(user.createdAt);
+    const inGrace = now <= new Date(graceUntil);
+    const recentCount = recentBy.get(user.id) || 0;
+    const weekCount = weekBy.get(user.id) || 0;
+    const recentlyActive =
+      recentCount > 0 || (user.lastActiveAt && new Date(user.lastActiveAt) >= inactiveSince);
+    const isActive = inGrace || !!recentlyActive || weekCount >= ACTIVE_WEEKLY_THRESHOLD;
+
+    const plan = resolveEffectivePlan(user);
+    const planExpiresAt = user.planExpiresAt || defaultPlanExpiresAt();
+
+    const wasActive = user.isActive !== false;
+
+    // Clearing the flag on recovery lets a future lapse notify once more,
+    // matching the single-user path.
+    const clearFollowup = !wasActive && isActive && user.followupEmailSentAt;
+
+    // Only write rows that actually changed.
+    if (
+      user.isActive !== isActive ||
+      !user.activeGraceUntil ||
+      user.plan !== plan ||
+      !user.planExpiresAt ||
+      clearFollowup
+    ) {
+      updates.push({
+        id: user.id,
+        data: {
+          isActive,
+          activeGraceUntil: graceUntil,
+          plan,
+          planExpiresAt,
+          ...(clearFollowup ? { followupEmailSentAt: null } : {}),
+          ...(touchLastActive && isActive ? { lastActiveAt: now } : {}),
+        },
+      });
+    }
+
+    if (wasActive && !isActive && !user.followupEmailSentAt) {
+      queueInactiveFollowup(user);
+    }
+
+    return { ...user, isActive, activeGraceUntil: graceUntil, plan, planExpiresAt, recentCount, weekCount };
+  });
+
+  if (updates.length) {
+    await prisma.$transaction(
+      updates.map((u) => prisma.user.update({ where: { id: u.id }, data: u.data }))
+    );
+  }
+
+  return resolved;
+}
+
+/** Records activity and returns the freshly-updated user record. */
 async function logActivity(userId, type = 'app_use') {
   if (!userId) return null;
 
@@ -144,11 +247,12 @@ async function logActivity(userId, type = 'app_use') {
       orderBy: { createdAt: 'desc' },
     });
     if (recent) {
-      await prisma.user.update({
+      // Already counted inside the throttle window: bump the timestamp
+      // and hand the user back so callers need no follow-up read.
+      return prisma.user.update({
         where: { id: userId },
         data: { lastActiveAt: new Date() },
       });
-      return recent;
     }
   }
 
@@ -189,6 +293,7 @@ module.exports = {
   resolveEffectivePlan,
   planMeta,
   recomputeActiveStatus,
+  recomputeActiveStatusBatch,
   logActivity,
   isAdminUser,
 };
