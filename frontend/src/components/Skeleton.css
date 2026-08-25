@@ -1,0 +1,84 @@
+.skeleton {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    var(--bg-hover) 25%,
+    color-mix(in srgb, var(--bg-hover) 55%, var(--border-light)) 37%,
+    var(--bg-hover) 63%
+  );
+  background-size: 400% 100%;
+  border-radius: 6px;
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-sweep {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+.skeleton-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.skeleton-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.skeleton-card-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+}
+
+.skeleton-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.skeleton-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.skeleton-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* The sweep is decorative; hold a flat tone when motion is unwelcome. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: var(--bg-hover);
+  }
+}

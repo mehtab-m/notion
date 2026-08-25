@@ -175,7 +175,7 @@ export default function SettingsPage() {
                 value={passwords.newPassword}
                 onChange={(e) => setPasswords((p) => ({ ...p, newPassword: e.target.value }))}
                 required
-                minLength={6}
+                minLength={8}
                 autoComplete="new-password"
               />
             </div>
@@ -186,7 +186,7 @@ export default function SettingsPage() {
                 value={passwords.confirm}
                 onChange={(e) => setPasswords((p) => ({ ...p, confirm: e.target.value }))}
                 required
-                minLength={6}
+                minLength={8}
                 autoComplete="new-password"
               />
             </div>

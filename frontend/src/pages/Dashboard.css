@@ -172,3 +172,12 @@
   border-radius: 50%;
   flex-shrink: 0;
 }
+
+/* Placeholder while the chart bundle loads — same footprint as the
+   real charts so the page below does not jump when they arrive. */
+.dashboard-charts-fallback {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}

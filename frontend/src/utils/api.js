@@ -174,6 +174,10 @@ export const toggleMilestone = (goalId, msId) =>
 export const toggleSubgoal = (goalId, msId, sgId) =>
   api.post(`/goals/${goalId}/milestones/${msId}/subgoals/${sgId}/toggle`).then((r) => r.data);
 
+// ── Search ───────────────────────────────────────────────
+export const searchAll = (q, { signal } = {}) =>
+  api.get('/search', { params: { q }, signal }).then((r) => r.data);
+
 // ── Dashboard ────────────────────────────────────────────
 export const getDashboardStats = () => api.get('/dashboard/stats').then((r) => r.data);
 

@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { AlertTriangle, X } from 'lucide-react';
+import useFocusTrap from '../hooks/useFocusTrap';
 import './ConfirmDialog.css';
 
 export default function ConfirmDialog({
@@ -12,26 +13,30 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }) {
-  useEffect(() => {
-    if (!open) return;
-    const handleKey = (e) => {
-      if (e.key === 'Escape') onCancel?.();
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [open, onCancel]);
+  /* Also handles Escape and restores focus to the trigger on close —
+     previously focus stayed on the page behind the dialog, which the
+     aria-modal attribute had already told assistive tech to ignore. */
+  const dialogRef = useFocusTrap(open, { onEscape: onCancel });
 
   if (!open) return null;
 
   return (
     <div className="confirm-dialog-overlay" onClick={onCancel}>
-      <div className="confirm-dialog" onClick={(e) => e.stopPropagation()} role="alertdialog" aria-modal="true">
+      <div
+        className="confirm-dialog"
+        ref={dialogRef}
+        onClick={(e) => e.stopPropagation()}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
+        aria-describedby="confirm-dialog-message"
+      >
         <div className="confirm-dialog-icon">
           <AlertTriangle size={22} />
         </div>
         <div className="confirm-dialog-body">
-          <h3>{title}</h3>
-          <p>{message}</p>
+          <h3 id="confirm-dialog-title">{title}</h3>
+          <p id="confirm-dialog-message">{message}</p>
         </div>
         <button className="confirm-dialog-close" onClick={onCancel} aria-label="Close">
           <X size={16} />

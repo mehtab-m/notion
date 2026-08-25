@@ -1,0 +1,1 @@
+const e=["yellow","purple","green"],r={yellow:{bg:"#fef9c3",text:"#713f12",border:"#fde047"},purple:{bg:"#f3e8ff",text:"#4a1d96",border:"#d8b4fe"},green:{bg:"#dcfce7",text:"#14532d",border:"#86efac"}};export{e as S,r as a};

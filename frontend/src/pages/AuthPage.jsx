@@ -137,7 +137,7 @@ export default function AuthPage({ redirectTo, initialMode = 'login' }) {
             </div>
             <div className="auth-field">
               <Lock size={16} />
-              <input type="password" placeholder="Password (min 6 chars)" value={form.password} onChange={set('password')} minLength={6} required />
+              <input type="password" placeholder="Password (min 8 characters)" value={form.password} onChange={set('password')} minLength={8} required />
             </div>
             <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
               {loading ? loadingMsg || 'Creating…' : 'Create account'}

@@ -4,6 +4,40 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SortLife — Totally free forever</title>
+    <meta
+      name="description"
+      content="SortLife keeps your notes, goals, habits, books, shows, projects and money in one calm workspace. Free forever."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#F7F8FA" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0A0C11" media="(prefers-color-scheme: dark)" />
+
+    <meta property="og:title" content="SortLife" />
+    <meta property="og:description" content="Your notes, goals, habits and projects in one calm workspace." />
+    <meta property="og:type" content="website" />
+
+    <!--
+      Applies the saved theme before first paint. Without this the
+      document renders light, then React sets data-theme on mount and
+      dark-mode users see a white flash on every load.
+    -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('sortlife_theme');
+          var theme =
+            saved === 'light' || saved === 'dark'
+              ? saved
+              : window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet" />
@@ -11,6 +45,11 @@
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <p style="font-family: system-ui, sans-serif; padding: 24px">
+        SortLife needs JavaScript enabled to run.
+      </p>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

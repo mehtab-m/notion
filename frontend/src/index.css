@@ -80,6 +80,95 @@ body, .app-layout, .app-main, .app-content,
 
 html {
   scroll-behavior: smooth;
+  /* Firefox has no ::-webkit-scrollbar; this is its equivalent. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+}
+
+/* ── Accessibility ─────────────────────────────────────────
+   Every interactive element needs a visible keyboard focus
+   indicator. :focus-visible keeps it off mouse clicks, so the
+   ring appears for keyboard users without adding noise for
+   everyone else.                                            */
+/* No border-radius here: outlines already follow the element's own
+   radius, and setting it would reshape square elements on focus. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Suppress the default ring only where :focus-visible applies,
+   so browsers without support keep their fallback outline. */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Visible only to screen readers. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* First tab stop on the page: jump past the nav to the content. */
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2000;
+  padding: 10px 18px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 0 0 var(--radius-sm) 0;
+  transform: translateY(-120%);
+  transition: transform 0.15s ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+#main-content:focus {
+  outline: none;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+  color: var(--text-primary);
+}
+
+/* ── Reduced motion ────────────────────────────────────────
+   Honour the OS-level preference. Animations are collapsed to
+   near-zero rather than removed so transition-dependent code
+   still receives its end events.                             */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Loading indicators still need to read as "in progress". */
+  .spinner,
+  .cmdk-spin {
+    animation-duration: 1.2s !important;
+    animation-iteration-count: infinite !important;
+  }
 }
 
 body {

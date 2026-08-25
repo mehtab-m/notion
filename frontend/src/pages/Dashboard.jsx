@@ -1,15 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { FolderKanban, BookOpen, Tv, Table } from 'lucide-react';
+import React, { Suspense, lazy, useState, useEffect, useCallback } from 'react';
+import { FolderKanban, BookOpen, Tv, Table, AlertTriangle, RotateCcw } from 'lucide-react';
 import { getProjects, getBooks, getShows, getTables, getDashboardStats } from '../utils/api';
 import StatsCard from '../components/Dashboard/StatsCard';
 import ProgressRing from '../components/Dashboard/ProgressRing';
 import QuickAdd from '../components/Dashboard/QuickAdd';
-import DashboardCharts from '../components/Dashboard/DashboardCharts';
+import { Skeleton, SkeletonRows } from '../components/Skeleton';
 import useMediaQuery, { MOBILE_QUERY } from '../hooks/useMediaQuery';
 import { useAuth } from '../context/AuthContext';
 import { resolvePosterUrl } from '../components/Shows/ShowCard';
 import { resolveCoverUrl } from '../components/Books/BookCard';
 import './Dashboard.css';
+
+/* Recharts plus its d3 dependencies are ~380 KB — larger than the rest
+   of the app combined. Loading it lazily lets the stat cards and lists
+   paint first, with the charts streaming in a moment later. */
+const DashboardCharts = lazy(() => import('../components/Dashboard/DashboardCharts'));
 
 function priorityColor(priority) {
   if (priority === 'high') return 'var(--accent-red)';
@@ -17,16 +22,47 @@ function priorityColor(priority) {
   return 'var(--accent-green)';
 }
 
+function ChartsFallback() {
+  return (
+    <div className="dashboard-charts-fallback" aria-hidden="true">
+      <Skeleton height={240} radius="var(--radius)" />
+      <Skeleton height={240} radius="var(--radius)" />
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="dashboard" role="status" aria-label="Loading dashboard">
+      <div className="dashboard-stats">
+        {Array.from({ length: 4 }, (_, i) => (
+          <Skeleton key={i} height={94} radius="var(--radius)" />
+        ))}
+      </div>
+      <div className="dashboard-section">
+        <Skeleton height={72} radius="var(--radius)" />
+      </div>
+      <ChartsFallback />
+      <div className="dashboard-section">
+        <SkeletonRows count={3} />
+      </div>
+      <span className="sr-only">Loading your dashboard…</span>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [data, setData] = useState({ projects: [], books: [], shows: [], tables: [] });
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const { isDeveloper } = useAuth();
   const showProjects = isDeveloper && !isMobile;
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       if (isDeveloper) {
         const [projects, books, shows, tables, dashStats] = await Promise.all([
@@ -49,7 +85,10 @@ export default function Dashboard() {
         setStats(dashStats);
       }
     } catch (err) {
+      // Previously this only logged, leaving an empty dashboard that
+      // looked like a brand-new account rather than a failed load.
       console.error('Dashboard fetch error', err);
+      setError(err.response?.data?.error || 'We could not load your dashboard.');
     } finally {
       setLoading(false);
     }
@@ -63,10 +102,18 @@ export default function Dashboard() {
   const readingBooks = books.filter((b) => b.status === 'reading');
   const watchingShows = shows.filter((s) => s.status === 'watching');
 
-  if (loading) {
+  if (loading) return <DashboardSkeleton />;
+
+  if (error) {
     return (
-      <div className="spinner-container">
-        <div className="spinner" />
+      <div className="empty-state" role="alert">
+        <AlertTriangle size={34} />
+        <h3>Could not load your dashboard</h3>
+        <p>{error}</p>
+        <button type="button" className="btn btn-primary" style={{ marginTop: 16 }} onClick={fetchAll}>
+          <RotateCcw size={15} />
+          Try again
+        </button>
       </div>
     );
   }
@@ -110,7 +157,9 @@ export default function Dashboard() {
         <QuickAdd onAdded={fetchAll} hideProjects={!showProjects} />
       </div>
 
-      <DashboardCharts stats={stats} />
+      <Suspense fallback={<ChartsFallback />}>
+        <DashboardCharts stats={stats} />
+      </Suspense>
 
       <div className="dashboard-grid">
         <div className="dashboard-left">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Menu, LogOut, Settings, Crown, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -12,8 +12,10 @@ function getGreeting() {
   return 'Good evening';
 }
 
-export default function Navbar({ title, onMenuClick }) {
-  const [searchVal, setSearchVal] = useState('');
+const IS_MAC =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || '');
+
+export default function Navbar({ title, onMenuClick, onSearchClick }) {
   const { user, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const plan = user?.plan || 'common';
@@ -26,16 +28,19 @@ export default function Navbar({ title, onMenuClick }) {
       </button>
       <h1 className="navbar-title">{title}</h1>
 
-      <div className="navbar-search">
-        <Search size={15} className="navbar-search-icon" />
-        <input
-          type="text"
-          placeholder="Search..."
-          value={searchVal}
-          onChange={(e) => setSearchVal(e.target.value)}
-          className="navbar-search-input"
-        />
-      </div>
+      {/* A button, not an input: typing happens in the command palette,
+          so the control that opens it should announce itself as such. */}
+      <button
+        type="button"
+        className="navbar-search"
+        onClick={onSearchClick}
+        aria-label="Search"
+        aria-keyshortcuts={IS_MAC ? 'Meta+K' : 'Control+K'}
+      >
+        <Search size={15} className="navbar-search-icon" aria-hidden="true" />
+        <span className="navbar-search-label">Search…</span>
+        <kbd className="navbar-search-kbd">{IS_MAC ? '⌘' : 'Ctrl'} K</kbd>
+      </button>
 
       <div className="navbar-right">
         {user && (
@@ -59,7 +64,8 @@ export default function Navbar({ title, onMenuClick }) {
           className="theme-toggle"
           onClick={toggleTheme}
           title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-          aria-label="Toggle theme"
+          aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          aria-pressed={isDark}
         >
           <span className="theme-toggle-track">
             <span className="theme-toggle-thumb">
@@ -72,7 +78,7 @@ export default function Navbar({ title, onMenuClick }) {
           <Settings size={16} />
         </Link>
 
-        <button className="navbar-logout" onClick={logout} title="Log out">
+        <button className="navbar-logout" onClick={logout} title="Log out" aria-label="Log out">
           <LogOut size={16} />
         </button>
       </div>
