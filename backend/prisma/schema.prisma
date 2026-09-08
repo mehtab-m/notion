@@ -27,9 +27,29 @@ model User {
   activeGraceUntil    DateTime?
   lastActiveAt        DateTime?
   /// "common" | "premium" | "platinum"
-  plan                String    @default("premium")
-  /// Premium entitlement ends at this date (default 2027-03-15)
-  planExpiresAt       DateTime?
+plan                String    @default("common")
+
+/// Premium/Platinum entitlement ends at this date
+planExpiresAt       DateTime?
+
+/// Stripe Customer ID
+stripeCustomerId         String?   @unique
+
+/// Stripe Subscription ID
+stripeSubscriptionId     String?   @unique
+
+/// Stripe subscription status
+/// e.g. active, trialing, past_due, canceled, unpaid
+stripeSubscriptionStatus String?
+
+/// Stripe Price ID currently attached to the subscription
+stripePriceId            String?
+
+/// Current Stripe billing period end
+stripeCurrentPeriodEnd   DateTime?
+
+/// Whether subscription cancellation is scheduled for period end
+stripeCancelAtPeriodEnd  Boolean   @default(false)
   /// Successful login count (for premium stars welcome animation)
   loginCount          Int       @default(0)
   /// When inactive follow-up email was last sent

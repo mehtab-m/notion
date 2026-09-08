@@ -1,0 +1,701 @@
+/* =========================================================
+   STRIPE PAYMENT PAGE
+   ========================================================= */
+
+.stripe-page {
+  min-height: calc(100vh - 70px);
+  padding: 36px 28px 60px;
+  background:
+    radial-gradient(
+      circle at 50% 0%,
+      color-mix(in srgb, var(--accent) 8%, transparent),
+      transparent 42%
+    ),
+    var(--bg-page, #f7f8fc);
+}
+
+.stripe-payment-shell {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+
+/* =========================================================
+   BACK LINK
+   ========================================================= */
+
+.stripe-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  padding: 7px 0;
+  margin-bottom: 22px;
+
+  border: none;
+  background: transparent;
+
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+.stripe-back-link:hover {
+  color: var(--text-primary);
+  transform: translateX(-2px);
+}
+
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+
+.stripe-page-header {
+  text-align: center;
+  max-width: 680px;
+  margin: 0 auto 34px;
+}
+
+.stripe-secure-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  padding: 6px 12px;
+
+  border-radius: var(--radius-full);
+
+  background: var(--accent-soft);
+  color: var(--accent);
+
+  border: 1px solid
+    color-mix(
+      in srgb,
+      var(--accent) 20%,
+      transparent
+    );
+
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+
+  margin-bottom: 14px;
+}
+
+.stripe-lock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 17px;
+  height: 17px;
+
+  border-radius: 50%;
+
+  background: var(--accent);
+  color: var(--accent-contrast);
+
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.stripe-page-header h1 {
+  margin: 0 0 12px;
+
+  color: var(--text-primary);
+
+  font-size: clamp(
+    1.8rem,
+    4vw,
+    2.5rem
+  );
+
+  line-height: 1.1;
+  letter-spacing: -0.045em;
+}
+
+.stripe-page-header p {
+  max-width: 620px;
+  margin: 0 auto;
+
+  color: var(--text-secondary);
+
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+
+/* =========================================================
+   MAIN GRID
+   ========================================================= */
+
+.stripe-checkout-grid {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1fr)
+    340px;
+
+  align-items: start;
+
+  gap: 24px;
+}
+
+
+/* =========================================================
+   PAYMENT CARD
+   ========================================================= */
+
+.stripe-payment-card {
+  min-width: 0;
+
+  border: 1px solid var(--border);
+
+  border-radius: var(--radius-xl);
+
+  background: var(--bg-card);
+
+  box-shadow: var(--shadow-sm);
+
+  overflow: hidden;
+}
+
+.stripe-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  padding: 24px 26px;
+
+  border-bottom: 1px solid var(--border);
+
+  background:
+    linear-gradient(
+      180deg,
+      var(--bg-card),
+      var(--bg-sunken)
+    );
+}
+
+.stripe-card-header h2 {
+  margin: 0 0 5px;
+
+  font-size: 17px;
+  font-weight: 700;
+
+  letter-spacing: -0.02em;
+}
+
+.stripe-card-header p {
+  margin: 0;
+
+  color: var(--text-muted);
+
+  font-size: 12.5px;
+}
+
+.stripe-powered {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+
+  flex-shrink: 0;
+
+  color: var(--text-muted);
+
+  font-size: 10px;
+}
+
+.stripe-powered strong {
+  color: #635bff;
+
+  font-size: 18px;
+
+  letter-spacing: -0.04em;
+}
+
+
+/* =========================================================
+   STRIPE ELEMENT CONTAINER
+   ========================================================= */
+
+.stripe-checkout-container {
+  padding: 26px;
+}
+
+
+/* =========================================================
+   ORDER SUMMARY
+   ========================================================= */
+
+.stripe-order-card {
+  position: sticky;
+  top: 94px;
+
+  padding: 24px;
+
+  border: 1px solid var(--border);
+
+  border-radius: var(--radius-xl);
+
+  background: var(--bg-card);
+
+  box-shadow: var(--shadow-sm);
+}
+
+.stripe-order-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 22px;
+
+  color: var(--text-muted);
+
+  font-size: 11px;
+  font-weight: 700;
+
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stripe-checkmark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 22px;
+  height: 22px;
+
+  border-radius: 50%;
+
+  background: var(--accent-soft);
+  color: var(--accent);
+
+  font-size: 11px;
+  font-weight: 800;
+}
+
+
+/* =========================================================
+   PLAN ICON
+   ========================================================= */
+
+.stripe-plan-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 48px;
+  height: 48px;
+
+  margin-bottom: 15px;
+
+  border-radius: 14px;
+
+  font-size: 23px;
+  font-weight: 700;
+}
+
+.stripe-plan-premium {
+  background:
+    color-mix(
+      in srgb,
+      #f59e0b 12%,
+      transparent
+    );
+
+  color: #d97706;
+
+  border: 1px solid
+    color-mix(
+      in srgb,
+      #f59e0b 25%,
+      transparent
+    );
+}
+
+.stripe-plan-platinum {
+  background:
+    color-mix(
+      in srgb,
+      #a855f7 12%,
+      transparent
+    );
+
+  color: #9333ea;
+
+  border: 1px solid
+    color-mix(
+      in srgb,
+      #a855f7 25%,
+      transparent
+    );
+}
+
+.stripe-order-card h2 {
+  margin: 0 0 8px;
+
+  font-size: 22px;
+  letter-spacing: -0.035em;
+}
+
+.stripe-plan-description {
+  margin: 0;
+
+  color: var(--text-secondary);
+
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+
+/* =========================================================
+   DIVIDER
+   ========================================================= */
+
+.stripe-divider {
+  height: 1px;
+
+  margin: 22px 0;
+
+  background: var(--border);
+}
+
+
+/* =========================================================
+   SUMMARY ROWS
+   ========================================================= */
+
+.stripe-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 12px;
+
+  font-size: 13px;
+}
+
+.stripe-summary-row:last-child {
+  margin-bottom: 0;
+}
+
+.stripe-summary-row span {
+  color: var(--text-muted);
+}
+
+.stripe-summary-row strong {
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+
+/* =========================================================
+   TOTAL
+   ========================================================= */
+
+.stripe-total-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+
+  gap: 20px;
+}
+
+.stripe-total-row > span {
+  color: var(--text-secondary);
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stripe-total-row > div {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.stripe-total-row strong {
+  color: var(--text-primary);
+
+  font-size: 28px;
+  line-height: 1;
+
+  letter-spacing: -0.04em;
+}
+
+.stripe-total-row small {
+  color: var(--text-muted);
+
+  font-size: 11px;
+}
+
+
+/* =========================================================
+   SECURE NOTE
+   ========================================================= */
+
+.stripe-secure-note {
+  display: flex;
+  align-items: flex-start;
+
+  gap: 9px;
+
+  margin-top: 24px;
+  padding: 12px;
+
+  border-radius: var(--radius);
+
+  background: var(--bg-sunken);
+
+  border: 1px solid var(--border);
+}
+
+.stripe-secure-note span {
+  flex-shrink: 0;
+
+  font-size: 13px;
+}
+
+.stripe-secure-note p {
+  margin: 0;
+
+  color: var(--text-muted);
+
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
+
+.stripe-page-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  gap: 10px;
+
+  margin-top: 24px;
+
+  color: var(--text-muted);
+
+  font-size: 11px;
+}
+
+
+/* =========================================================
+   LOADING
+   ========================================================= */
+
+.stripe-loading-card {
+  max-width: 520px;
+
+  margin: 100px auto;
+
+  padding: 48px 32px;
+
+  text-align: center;
+
+  border: 1px solid var(--border);
+
+  border-radius: var(--radius-xl);
+
+  background: var(--bg-card);
+
+  box-shadow: var(--shadow-sm);
+}
+
+.stripe-spinner {
+  width: 38px;
+  height: 38px;
+
+  margin: 0 auto 22px;
+
+  border-radius: 50%;
+
+  border: 3px solid var(--border);
+
+  border-top-color: var(--accent);
+
+  animation: stripe-spin 0.8s linear infinite;
+}
+
+@keyframes stripe-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.stripe-loading-card h1 {
+  margin: 0 0 10px;
+
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+
+.stripe-loading-card p {
+  margin: 0 0 8px;
+
+  color: var(--text-secondary);
+
+  font-size: 13px;
+}
+
+.stripe-loading-card span {
+  color: var(--text-muted);
+
+  font-size: 11px;
+}
+
+
+/* =========================================================
+   ERROR
+   ========================================================= */
+
+.stripe-error-card {
+  max-width: 520px;
+
+  margin: 100px auto;
+
+  padding: 42px 32px;
+
+  text-align: center;
+
+  border: 1px solid var(--border);
+
+  border-radius: var(--radius-xl);
+
+  background: var(--bg-card);
+
+  box-shadow: var(--shadow-sm);
+}
+
+.stripe-error-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 48px;
+  height: 48px;
+
+  margin: 0 auto 18px;
+
+  border-radius: 50%;
+
+  background: color-mix(
+    in srgb,
+    #ef4444 10%,
+    transparent
+  );
+
+  color: #dc2626;
+
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.stripe-error-card h1 {
+  margin: 0 0 10px;
+
+  font-size: 21px;
+  letter-spacing: -0.03em;
+}
+
+.stripe-error-card p {
+  margin: 0 auto 24px;
+
+  max-width: 420px;
+
+  color: var(--text-secondary);
+
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.stripe-back-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 42px;
+
+  padding: 0 20px;
+
+  border: none;
+  border-radius: var(--radius);
+
+  background: var(--accent);
+  color: var(--accent-contrast);
+
+  font-size: 13px;
+  font-weight: 650;
+
+  cursor: pointer;
+
+  transition:
+    transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+.stripe-back-button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 900px) {
+  .stripe-checkout-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stripe-order-card {
+    position: static;
+    order: -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .stripe-page {
+    padding: 24px 16px 44px;
+  }
+
+  .stripe-card-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .stripe-powered {
+    align-self: flex-start;
+  }
+
+  .stripe-checkout-container {
+    padding: 18px;
+  }
+
+  .stripe-order-card {
+    padding: 20px;
+  }
+
+  .stripe-page-footer {
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+}

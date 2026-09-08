@@ -13,6 +13,7 @@ import QuickCapture from './components/QuickCapture';
 import ShortcutsOverlay from './components/ShortcutsOverlay';
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts';
 import { PageSkeleton } from './components/Skeleton';
+import StripePaymentPage from './pages/StripePaymentPage';
 
 /* Routes are split so the first paint downloads only the shell plus the
    page actually being visited. Previously every page — including the
@@ -193,6 +194,7 @@ function AppShell() {
                   <Route path="/analytics" element={<AnalyticsPage />} />
                   <Route path="/archive" element={<ArchivePage />} />
                   <Route path="/upgrade" element={<UpgradePage />} />
+                  <Route path="/stripe-payment" element={<StripePaymentPage />}/>
                   <Route
                     path="/projects"
                     element={(

@@ -8,6 +8,8 @@ const path = require('path');
 const prisma = require('./lib/prisma');
 
 const authRouter = require('./routes/auth');
+const stripeRouter = require('./routes/stripe');
+const { handleStripeWebhook } = require('./services/stripeWebhook');
 const { authMiddleware } = require('./middleware/auth');
 const { notFound, errorHandler, asyncHandler } = require('./middleware/errors');
 const { apiLimiter } = require('./middleware/rateLimit');
@@ -77,7 +79,21 @@ app.use(
 
 /* ─── Payload handling ──────────────────────────────────── */
 app.use(compression());
-// Note bodies embed base64 images, so the ceiling has to be generous —
+
+/*
+ * Stripe webhook MUST receive the raw request body.
+ *
+ * This route is intentionally before express.json().
+ * It is also intentionally outside authMiddleware because
+ * Stripe cannot send our application's JWT.
+ */
+app.post(
+  '/api/stripe/webhook',
+  express.raw({ type: 'application/json' }),
+  handleStripeWebhook
+);
+
+// Note bodies embed base64 images, so the ceiling has to be generous â€”
 // but 50mb of JSON per request was an easy way to exhaust memory.
 app.use(express.json({ limit: '12mb' }));
 app.use(express.urlencoded({ extended: true, limit: '12mb' }));
@@ -111,6 +127,7 @@ app.get(
 app.use('/api/auth', authRouter);
 
 app.use('/api', authMiddleware, apiLimiter);
+app.use('/api/stripe', stripeRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/projects', projectsRouter);

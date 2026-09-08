@@ -275,3 +275,7 @@ export const exportCsv = (collection) =>
   api
     .get('/data/export.csv', { params: { collection }, responseType: 'blob' })
     .then((r) => r.data);
+
+
+export const createStripeSubscription = (data) =>
+  api.post('/stripe/create-subscription', data).then((r) => r.data);

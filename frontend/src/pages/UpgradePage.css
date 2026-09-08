@@ -1,7 +1,8 @@
 /* ─── Plans ────────────────────────────────────────────────
-   Not a checkout page — SortLife's plans are granted, not
-   sold — so this leads with what the themes actually look
-   like rather than with a price.                          */
+   SortLife subscription plans.
+   Common is free; Premium and Platinum are paid through
+   Stripe subscriptions. The page also showcases themes.
+*/                         
 
 .upgrade-page { max-width: 1080px; margin: 0 auto; }
 
@@ -358,4 +359,252 @@
   .upgrade-custom-swatches i { width: 26px; height: 38px; }
   .upgrade-cta-actions .btn { width: 100%; justify-content: center; }
   .upgrade-theme-grid { grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr)); }
+}
+
+
+/* ── Plan cards ───────────────────────────────────────── */
+
+.upgrade-plan-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-10);
+  align-items: stretch;
+}
+
+.upgrade-plan-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 26px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease);
+}
+
+.upgrade-plan-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-light);
+}
+
+/* Current plan */
+.upgrade-plan-card.is-current {
+  border-color: color-mix(
+    in srgb,
+    var(--accent) 45%,
+    var(--border)
+  );
+  box-shadow:
+    0 0 0 1px color-mix(
+      in srgb,
+      var(--accent) 12%,
+      transparent
+    ),
+    var(--shadow-md);
+}
+
+/* Platinum highlighted card */
+.upgrade-plan-card.is-highlight {
+  border-color: color-mix(
+    in srgb,
+    #f59e0b 45%,
+    var(--border)
+  );
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, #f59e0b 5%, var(--bg-card)),
+      var(--bg-card) 42%
+    );
+}
+
+.upgrade-plan-card.is-highlight:hover {
+  border-color: color-mix(
+    in srgb,
+    #f59e0b 65%,
+    var(--border)
+  );
+}
+
+/* Card header */
+.upgrade-plan-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+
+.upgrade-plan-card-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.upgrade-plan-card.is-highlight
+  .upgrade-plan-card-header
+  h2 {
+  color: #d97706;
+}
+
+.upgrade-plan-card-header h2 svg {
+  color: #f59e0b;
+}
+
+/* Price */
+.upgrade-price {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-bottom: 5px;
+  color: var(--text-primary);
+}
+
+.upgrade-price strong {
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 750;
+  letter-spacing: -0.045em;
+}
+
+.upgrade-price span {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.upgrade-plan-card > .upgrade-price {
+  margin-bottom: 6px;
+}
+
+/* Yearly price */
+.upgrade-yearly-price {
+  margin-bottom: var(--sp-4);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Description */
+.upgrade-plan-card > p {
+  min-height: 44px;
+  margin: 0 0 var(--sp-5);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+/* Current badge */
+.upgrade-plan-card .matrix-plan-current {
+  align-self: flex-start;
+  margin-top: auto;
+  margin-bottom: 0;
+}
+
+/* Buttons container */
+.upgrade-card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-top: auto;
+}
+
+/* Buttons */
+.upgrade-card-actions .btn {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+/* Premium primary button */
+.upgrade-plan-card:not(.is-highlight)
+  .upgrade-card-actions
+  .btn-primary {
+  font-weight: 700;
+}
+
+/* Platinum buttons */
+.upgrade-plan-card.is-highlight
+  .upgrade-card-actions
+  .btn-primary {
+  background: linear-gradient(
+    135deg,
+    #f59e0b,
+    #d97706
+  );
+  border-color: transparent;
+  color: #1a1206;
+}
+
+.upgrade-plan-card.is-highlight
+  .upgrade-card-actions
+  .btn-primary:hover {
+  filter: brightness(1.05);
+}
+
+/* Common card */
+.upgrade-plan-card:first-child {
+  justify-content: flex-start;
+}
+
+.upgrade-plan-card:first-child .upgrade-price {
+  margin-bottom: var(--sp-4);
+}
+
+.upgrade-plan-card:first-child p {
+  min-height: 0;
+}
+
+/* ── Better visual separation before themes ───────────── */
+
+.upgrade-plan-cards + .upgrade-themes {
+  margin-top: var(--sp-2);
+}
+
+/* ── Mobile plan cards ────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .upgrade-plan-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .upgrade-plan-card {
+    padding: 22px 20px;
+  }
+
+  .upgrade-plan-card > p {
+    min-height: 0;
+  }
+
+  .upgrade-card-actions {
+    max-width: 520px;
+  }
+}
+
+@media (max-width: 520px) {
+  .upgrade-card-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .upgrade-card-actions .btn {
+    width: 100%;
+  }
+
+  .upgrade-price strong {
+    font-size: 28px;
+  }
 }

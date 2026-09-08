@@ -1,0 +1,150 @@
+/* ─────────────────────────────────────────────
+   Stripe Checkout
+───────────────────────────────────────────── */
+
+.stripe-checkout-form {
+  width: 100%;
+}
+
+/* Stripe's PaymentElement container */
+
+.stripe-payment-element {
+  width: 100%;
+  padding: 4px 0;
+}
+
+/* Error */
+
+.stripe-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  margin-top: 18px;
+  padding: 13px 15px;
+
+  border-radius: 10px;
+
+  color: #b42318;
+  background: #fef3f2;
+  border: 1px solid #fecdca;
+
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.stripe-error-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 21px;
+  height: 21px;
+
+  flex-shrink: 0;
+
+  border-radius: 50%;
+
+  background: #d92d20;
+  color: white;
+
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* Pay button */
+
+.stripe-pay-button {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  margin-top: 22px;
+  padding: 15px 20px;
+
+  border: none;
+  border-radius: 10px;
+
+  background: var(--accent);
+  color: var(--accent-contrast);
+
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease;
+}
+
+.stripe-pay-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.stripe-pay-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.stripe-pay-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.stripe-button-arrow {
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* Loading spinner */
+
+.stripe-spinner {
+  width: 16px;
+  height: 16px;
+
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+
+  border-radius: 50%;
+
+  animation: stripe-spin 0.7s linear infinite;
+}
+
+@keyframes stripe-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Secure note */
+
+.stripe-secure-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  margin-top: 13px;
+
+  color: var(--text-muted);
+
+  font-size: 11.5px;
+}
+
+.stripe-secure-note span:first-child {
+  font-size: 11px;
+}
+
+/* Mobile */
+
+@media (max-width: 600px) {
+  .stripe-pay-button {
+    padding: 14px 16px;
+  }
+}
