@@ -65,8 +65,8 @@ router.get(
           select: { id: true, createdAt: true, updatedAt: true, tags: true },
         }),
         prisma.focusSession.findMany({
-          where: owned(req, { startedAt: { gte: since }, kind: 'focus' }),
-          select: { seconds: true, completed: true, startedAt: true },
+          where: owned(req, { startedAt: { gte: since }, kind: { in: ['focus', 'run'] } }),
+          select: { kind: true, seconds: true, completed: true, startedAt: true, label: true },
         }),
         prisma.moneyTransaction.findMany({
           where: owned(req, { createdAt: { gte: since } }),
@@ -75,9 +75,12 @@ router.get(
         }),
         prisma.inboxItem.findMany({
           where: owned(req),
-          select: { status: true, createdAt: true, completedAt: true },
+          select: { status: true, priority: true, createdAt: true, completedAt: true },
         }),
       ]);
+
+    const runs = sessions.filter((s) => s.kind === 'run');
+    const focusOnly = sessions.filter((s) => s.kind !== 'run');
 
     /* ── Habit heatmap ───────────────────────────────────
        One row per habit plus a combined per-day intensity
@@ -154,7 +157,7 @@ router.get(
 
     /* ── Focus per day ───────────────────────────────────── */
     const focusByDay = new Map(window.map((d) => [d, 0]));
-    for (const s of sessions) {
+    for (const s of focusOnly) {
       const key = dayKey(s.startedAt);
       if (focusByDay.has(key)) {
         focusByDay.set(key, focusByDay.get(key) + Math.round((s.seconds || 0) / 60));
@@ -173,6 +176,67 @@ router.get(
       .slice(0, 10);
 
     const totalCompletions = habitBreakdown.reduce((s, h) => s + h.completions, 0);
+
+    /* ── Bubble race ─────────────────────────────────────
+       Weekly frames of cumulative check-ins per habit: x =
+       check-ins so far, y = active days that week, z = streak. */
+    const habitRace = [];
+    for (let end = 6; end < window.length + 6; end += 7) {
+      const upto = window.slice(0, Math.min(end + 1, window.length));
+      const weekSlice = upto.slice(-7);
+      const uptoSet = new Set(upto);
+      const weekSet = new Set(weekSlice);
+      habitRace.push({
+        label: upto[upto.length - 1],
+        points: habits.slice(0, 10).map((h) => {
+          const dates = h.completedDates || [];
+          const cum = dates.filter((d) => uptoSet.has(d)).length;
+          const wk = dates.filter((d) => weekSet.has(d)).length;
+          return { name: h.name, x: cum, y: wk, z: Math.max(1, cum) };
+        }),
+      });
+      if (end + 1 >= window.length) break;
+    }
+
+    /* ── Venn: days you did habits / focused / wrote ──── */
+    const habitDays = new Set(heatmap.filter((d) => d.done > 0).map((d) => d.date));
+    const focusDays = new Set(focusOnly.map((s) => dayKey(s.startedAt)).filter((d) => windowSet.has(d)));
+    const noteDays = new Set(notes.map((n) => dayKey(n.updatedAt)).filter((d) => windowSet.has(d)));
+    const both = (a, b) => [...a].filter((d) => b.has(d));
+    const venn = {
+      sets: [
+        { name: 'Habits', size: habitDays.size },
+        { name: 'Focus', size: focusDays.size },
+        { name: 'Notes', size: noteDays.size },
+      ],
+      overlaps: {
+        ab: both(habitDays, focusDays).length,
+        ac: both(habitDays, noteDays).length,
+        bc: both(focusDays, noteDays).length,
+        abc: both(habitDays, focusDays).filter((d) => noteDays.has(d)).length,
+      },
+    };
+
+    /* ── Scatter: when in the day you focus ───────────── */
+    const focusScatter = focusOnly.map((s) => {
+      const d = new Date(s.startedAt);
+      return { x: d.getHours() + d.getMinutes() / 60, y: Math.round((s.seconds || 0) / 60), name: s.label || 'Focus' };
+    });
+
+    /* ── Running ─────────────────────────────────────── */
+    const runByDay = new Map(window.map((d) => [d, 0]));
+    for (const r of runs) {
+      const key = dayKey(r.startedAt);
+      if (runByDay.has(key)) runByDay.set(key, runByDay.get(key) + Math.round((r.seconds || 0) / 60));
+    }
+
+    const countBy = (rows, key) => rows.reduce((acc, r) => {
+      const k = r[key] || 'other';
+      acc[k] = (acc[k] || 0) + 1;
+      return acc;
+    }, {});
+    const tagCounts = {};
+    for (const n of notes) for (const t of n.tags || []) tagCounts[t] = (tagCounts[t] || 0) + 1;
     const focusMinutes = [...focusByDay.values()].reduce((a, b) => a + b, 0);
 
     res.json(
@@ -197,7 +261,7 @@ router.get(
           showsWatching: shows.filter((s) => s.status === 'watching').length,
           notes: notes.length,
           focusMinutes,
-          focusSessions: sessions.length,
+          focusSessions: focusOnly.length,
           inboxOpen: inbox.filter((i) => i.status === 'open').length,
           inboxDone: inbox.filter((i) => i.status === 'done').length,
         },
@@ -205,7 +269,27 @@ router.get(
         habitBreakdown,
         goalVelocity,
         moneyTrend,
-        focusDaily: [...focusByDay.entries()].map(([date, minutes]) => ({ date, minutes })),
+        focusDaily: [...focusByDay.entries()].map(([date, minutes]) => ({
+          date, minutes, run: runByDay.get(date) || 0,
+        })),
+        habitRace,
+        venn,
+        focusScatter,
+        runs: {
+          count: runs.length,
+          minutes: Math.round(runs.reduce((s, r) => s + (r.seconds || 0), 0) / 60),
+        },
+        breakdowns: {
+          goalsByCategory: countBy(goals, 'category'),
+          goalsByStatus: countBy(goals, 'status'),
+          goalsByHorizon: countBy(goals, 'horizon'),
+          booksByStatus: countBy(books, 'status'),
+          showsByStatus: countBy(shows, 'status'),
+          showsByType: countBy(shows, 'mediaType'),
+          inboxByStatus: countBy(inbox, 'status'),
+          inboxByPriority: countBy(inbox.filter((i) => i.status === 'open'), 'priority'),
+          noteTags: tagCounts,
+        },
         leaderboard,
       })
     );

@@ -87,8 +87,10 @@ model FocusSession {
   id        String    @id @default(cuid())
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  /// "focus" | "short-break" | "long-break"
+  /// "focus" | "short-break" | "long-break" | "run"
   kind      String    @default("focus")
+  /// Kilometres covered — only set for runs
+  distance  Float?
   /// Planned length in minutes
   minutes   Int       @default(25)
   /// Seconds actually elapsed before it ended

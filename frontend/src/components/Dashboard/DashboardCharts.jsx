@@ -1,201 +1,126 @@
 import React, { useMemo } from 'react';
+import { format, parseISO } from 'date-fns';
+import { BookOpen, Target, Flame, Inbox, Timer, Radar as RadarIcon, Tv, FolderKanban } from 'lucide-react';
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend, RadarChart, Radar, PolarGrid, PolarAngleAxis, ComposedChart, Line,
-} from 'recharts';
-import './DashboardCharts.css';
+  ChartCard, ChartGrid, DonutChart, ConcentricRings, BubbleChart, AreaTrend,
+  TapeDiagram, RadarWeb, TreemapChart, Gauge,
+} from '../Charts/ChartKit';
 
-const PALETTE = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
-
-function FancyTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="chart-tooltip fancy">
-      <strong>{label || payload[0]?.payload?.fullTitle || payload[0]?.name}</strong>
-      {payload.map((p) => (
-        <div key={p.dataKey} className="chart-tooltip-row">
-          <i style={{ background: p.color || p.fill }} />
-          <span>{p.name}: <b>{p.value}{p.unit || (p.dataKey === 'progress' || p.dataKey === 'streak' ? '' : '')}{['progress'].includes(p.dataKey) ? '%' : ''}</b></span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ChartShell({ title, subtitle, children, wide }) {
-  return (
-    <div className={`chart-card featured ${wide ? 'chart-card--wide' : ''}`}>
-      <div className="chart-card-head">
-        <div>
-          <h3 className="chart-title">{title}</h3>
-          {subtitle && <p className="chart-sub">{subtitle}</p>}
-        </div>
-      </div>
-      {children}
-    </div>
-  );
-}
+const pretty = (s) => String(s).replace(/-/g, ' ');
+const short = (s, n = 14) => (s.length > n ? `${s.slice(0, n)}…` : s);
+const toSlices = (obj) => Object.entries(obj || {})
+  .filter(([, v]) => v > 0)
+  .map(([name, value]) => ({ name: pretty(name), value }));
 
 export default function DashboardCharts({ stats }) {
-  if (!stats) return null;
+  const {
+    bookProgress = [], goalProgress = [], habitStats = [], projectProgress = [],
+    booksByStatus = {}, goalsByStatus = {}, showsByStatus = {},
+    inboxByStatus = {}, inboxByPriority = {}, focusDaily = [],
+  } = stats || {};
 
-  const { bookProgress = [], goalProgress = [], habitStats = [], booksByStatus = {}, goalsByStatus = {} } = stats;
+  const bookPie = useMemo(() => toSlices(booksByStatus), [booksByStatus]);
+  const showPie = useMemo(() => toSlices(showsByStatus), [showsByStatus]);
 
-  const bookArea = useMemo(() => bookProgress
-    .filter((b) => b.totalPages > 0)
-    .slice(0, 8)
-    .map((b) => ({
-      title: b.title.length > 12 ? `${b.title.slice(0, 12)}…` : b.title,
-      fullTitle: b.title,
-      progress: b.progress,
-      pages: b.currentPage || 0,
-    })), [bookProgress]);
-
-  const bookPie = useMemo(() => Object.entries(booksByStatus)
-    .filter(([, v]) => v > 0)
-    .map(([name, value]) => ({ name: name.replace(/-/g, ' '), value })), [booksByStatus]);
-
-  const goalPie = useMemo(() => Object.entries(goalsByStatus)
-    .filter(([, v]) => v > 0)
-    .map(([name, value]) => ({ name: name.replace(/-/g, ' '), value })), [goalsByStatus]);
-
-  const goalBars = useMemo(() => goalProgress
+  const goalRings = useMemo(() => goalProgress
     .filter((g) => g.status !== 'abandoned')
-    .slice(0, 7)
-    .map((g) => ({
-      title: g.title.length > 14 ? `${g.title.slice(0, 14)}…` : g.title,
-      fullTitle: g.title,
-      progress: g.progress,
-    })), [goalProgress]);
-
-  const habitMix = useMemo(() => habitStats
-    .slice()
-    .sort((a, b) => b.streak - a.streak)
     .slice(0, 6)
-    .map((h) => ({
-      name: h.name.length > 10 ? `${h.name.slice(0, 10)}…` : h.name,
-      streak: h.streak,
-      completed: h.completedCount,
-    })), [habitStats]);
+    .map((g) => ({ name: short(g.title), value: g.progress || 0 })), [goalProgress]);
+
+  const habitBubbles = useMemo(() => habitStats.map((h) => ({
+    name: h.name,
+    x: h.streak || 0,
+    y: h.completedCount || 0,
+    z: Math.max(1, (h.streak || 0) + (h.completedCount || 0)),
+    color: h.color || undefined,
+  })), [habitStats]);
+
+  const tapeRows = useMemo(() => [
+    { label: 'Goals', segments: toSlices(goalsByStatus) },
+    { label: 'Inbox', segments: toSlices(inboxByStatus) },
+    { label: 'Open inbox by priority', segments: [
+      { name: 'high', value: inboxByPriority.high || 0, color: 'var(--accent-red, #EF4444)' },
+      { name: 'medium', value: inboxByPriority.medium || 0, color: 'var(--accent-yellow, #F59E0B)' },
+      { name: 'low', value: inboxByPriority.low || 0, color: 'var(--accent-green, #10B981)' },
+    ] },
+  ], [goalsByStatus, inboxByStatus, inboxByPriority]);
+
+  const readingTree = useMemo(() => bookProgress
+    .filter((b) => (b.currentPage || 0) > 0)
+    .map((b) => ({ name: b.title, value: b.currentPage })), [bookProgress]);
 
   const radar = useMemo(() => {
-    const avgBook = bookProgress.length
-      ? Math.round(bookProgress.reduce((s, b) => s + (b.progress || 0), 0) / bookProgress.length)
-      : 0;
-    const avgGoal = goalProgress.length
-      ? Math.round(goalProgress.reduce((s, g) => s + (g.progress || 0), 0) / goalProgress.length)
-      : 0;
+    const avg = (arr, k) => (arr.length ? Math.round(arr.reduce((s, x) => s + (x[k] || 0), 0) / arr.length) : 0);
     const topStreak = habitStats.reduce((m, h) => Math.max(m, h.streak || 0), 0);
+    const focusMin = focusDaily.reduce((s, d) => s + d.focus, 0);
+    const runMin = focusDaily.reduce((s, d) => s + d.run, 0);
     return [
-      { metric: 'Reading', score: avgBook },
-      { metric: 'Goals', score: avgGoal },
-      { metric: 'Streaks', score: Math.min(100, topStreak * 10) },
-      { metric: 'Focus', score: Math.min(100, (habitStats.length || 0) * 12) },
-      { metric: 'Library', score: Math.min(100, bookProgress.length * 8) },
+      { metric: 'Reading', score: avg(bookProgress, 'progress') },
+      { metric: 'Goals', score: avg(goalProgress, 'progress') },
+      { metric: 'Streaks', score: Math.min(100, topStreak * 7) },
+      { metric: 'Focus', score: Math.min(100, Math.round(focusMin / 6)) },
+      { metric: 'Fitness', score: Math.min(100, Math.round(runMin / 3)) },
+      { metric: 'Projects', score: avg(projectProgress, 'progress') },
     ];
-  }, [bookProgress, goalProgress, habitStats]);
+  }, [bookProgress, goalProgress, habitStats, focusDaily, projectProgress]);
 
-  const hasAny = bookArea.length || bookPie.length || goalPie.length || goalBars.length || habitMix.length;
+  const inboxTotal = (inboxByStatus.open || 0) + (inboxByStatus.done || 0);
+  const inboxRate = inboxTotal ? Math.round(((inboxByStatus.done || 0) / inboxTotal) * 100) : 0;
+  const hasFocus = focusDaily.some((d) => d.focus || d.run);
 
-  if (!hasAny) {
-    return (
-      <div className="chart-card featured empty-charts">
-        <h3 className="chart-title">Your signal board</h3>
-        <p className="chart-sub">Add books, goals, or habits — live analytics appear here.</p>
-      </div>
-    );
-  }
+  if (!stats) return null;
 
   return (
-    <div className="dashboard-charts featured-grid">
-      {bookArea.length > 0 && (
-        <ChartShell title="Reading momentum" subtitle="Progress across your library" wide>
-          <ResponsiveContainer width="100%" height={240}>
-            <AreaChart data={bookArea} margin={{ top: 10, right: 8, left: -12, bottom: 0 }}>
-              <defs>
-                <linearGradient id="readFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.55} />
-                  <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="title" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
-              <Tooltip content={<FancyTooltip />} />
-              <Area type="monotone" dataKey="progress" name="Progress" stroke="var(--chart-1)" fill="url(#readFill)" strokeWidth={2.5} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </ChartShell>
+    <div className="dashboard-charts-kit">
+      <ChartGrid cols={3}>
+        <ChartCard title="Library mix" subtitle="Books by status" icon={BookOpen} empty={!bookPie.length} emptyText="Add a book to see your library mix.">
+          <DonutChart data={bookPie} centerLabel="books" />
+        </ChartCard>
+        <ChartCard title="Watchlist" subtitle="Shows by status" icon={Tv} empty={!showPie.length} emptyText="Add a show to fill this pie.">
+          <DonutChart data={showPie} full />
+        </ChartCard>
+        <ChartCard title="Inbox cleared" subtitle="Done vs everything captured" icon={Inbox}>
+          <Gauge value={inboxRate} label={`${inboxByStatus.open || 0} still open`} height={200} color="var(--chart-4)" />
+        </ChartCard>
+      </ChartGrid>
+
+      <ChartGrid cols={2}>
+        <ChartCard title="Goal orbits" subtitle="Each ring is one goal's progress" icon={Target} empty={!goalRings.length} emptyText="Set a goal and it becomes a ring here.">
+          <ConcentricRings data={goalRings} />
+        </ChartCard>
+        <ChartCard title="Habit bubbles" subtitle="Streak → total check-ins, size = effort" icon={Flame} empty={!habitBubbles.length} emptyText="Track a habit to see its bubble.">
+          <BubbleChart data={habitBubbles} xLabel="Current streak" yLabel="Check-ins" zLabel="Effort" />
+        </ChartCard>
+      </ChartGrid>
+
+      <ChartGrid cols={1}>
+        <ChartCard title="Focus & running" subtitle="Minutes per day, last 14 days" icon={Timer} empty={!hasFocus} emptyText="Start a focus block or log a run to fill this area.">
+          <AreaTrend
+            data={focusDaily}
+            series={[{ key: 'focus', name: 'Focus' }, { key: 'run', name: 'Running', color: 'var(--chart-4)' }]}
+            stacked
+            unit=" min"
+            xFormatter={(v) => (v ? format(parseISO(v), 'd MMM') : '')}
+          />
+        </ChartCard>
+      </ChartGrid>
+
+      <ChartGrid cols={2}>
+        <ChartCard title="Where things stand" subtitle="Tape diagram of every pipeline" icon={FolderKanban}>
+          <TapeDiagram rows={tapeRows} />
+        </ChartCard>
+        <ChartCard title="Life radar" subtitle="Composite signal across modules" icon={RadarIcon}>
+          <RadarWeb data={radar} />
+        </ChartCard>
+      </ChartGrid>
+
+      {readingTree.length > 0 && (
+        <ChartGrid cols={1}>
+          <ChartCard title="Pages read" subtitle="Treemap — bigger tile, more pages" icon={BookOpen}>
+            <TreemapChart data={readingTree} />
+          </ChartCard>
+        </ChartGrid>
       )}
-
-      <div className="chart-row">
-        {bookPie.length > 0 && (
-          <ChartShell title="Library mix" subtitle="Books by status">
-            <ResponsiveContainer width="100%" height={210}>
-              <PieChart>
-                <Pie data={bookPie} dataKey="value" nameKey="name" innerRadius={52} outerRadius={78} paddingAngle={3} stroke="none">
-                  {bookPie.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </ChartShell>
-        )}
-        {goalPie.length > 0 && (
-          <ChartShell title="Goal orbits" subtitle="Status distribution">
-            <ResponsiveContainer width="100%" height={210}>
-              <PieChart>
-                <Pie data={goalPie} dataKey="value" nameKey="name" innerRadius={52} outerRadius={78} paddingAngle={3} stroke="none">
-                  {goalPie.map((_, i) => <Cell key={i} fill={PALETTE[(i + 2) % PALETTE.length]} />)}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </ChartShell>
-        )}
-      </div>
-
-      {goalBars.length > 0 && (
-        <ChartShell title="Goal success lanes" subtitle="Completion toward each north star" wide>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={goalBars} layout="vertical" margin={{ top: 4, right: 16, left: 4, bottom: 4 }}>
-              <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} />
-              <YAxis type="category" dataKey="title" width={90} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
-              <Tooltip content={<FancyTooltip />} />
-              <Bar dataKey="progress" name="Progress" fill="var(--chart-2)" radius={[0, 8, 8, 0]} barSize={14} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartShell>
-      )}
-
-      <div className="chart-row">
-        {habitMix.length > 0 && (
-          <ChartShell title="Habit engine" subtitle="Streak vs total completions" wide>
-            <ResponsiveContainer width="100%" height={230}>
-              <ComposedChart data={habitMix} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
-                <Tooltip content={<FancyTooltip />} />
-                <Bar dataKey="completed" name="Total done" fill="var(--chart-2)" radius={[6, 6, 0, 0]} barSize={18} />
-                <Line type="monotone" dataKey="streak" name="Streak" stroke="var(--chart-3)" strokeWidth={3} dot={{ r: 4 }} />
-                <Legend />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </ChartShell>
-        )}
-
-        <ChartShell title="Life radar" subtitle="Composite signal across modules">
-          <ResponsiveContainer width="100%" height={230}>
-            <RadarChart data={radar}>
-              <PolarGrid stroke="var(--border)" />
-              <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-              <Radar dataKey="score" name="Score" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.35} />
-              <Tooltip />
-            </RadarChart>
-          </ResponsiveContainer>
-        </ChartShell>
-      </div>
     </div>
   );
 }

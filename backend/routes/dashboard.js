@@ -34,7 +34,12 @@ router.get(
     const isDeveloper = req.user?.isDeveloper === true;
     const projectFilter = accessibleProjectsWhere(req.user);
 
-    const [books, goals, habits, projects, booksGrouped, goalsGrouped, totals] =
+    const since = new Date();
+    since.setHours(0, 0, 0, 0);
+    since.setDate(since.getDate() - 13);
+
+    const [books, goals, habits, projects, booksGrouped, goalsGrouped, totals,
+      showsGrouped, inboxGrouped, focusRows, notesCount] =
       await Promise.all([
         prisma.book.findMany({ where: filter, select: BOOK_FIELDS }),
         prisma.goal.findMany({ where: filter, select: GOAL_FIELDS }),
@@ -52,7 +57,42 @@ router.get(
         isDeveloper
           ? prisma.project.count({ where: projectFilter })
           : Promise.resolve(0),
+        prisma.show.groupBy({ by: ['status'], where: filter, _count: { _all: true } }),
+        prisma.inboxItem.groupBy({ by: ['status', 'priority'], where: owned(req), _count: { _all: true } }),
+        prisma.focusSession.findMany({
+          where: owned(req, { startedAt: { gte: since } }),
+          select: { kind: true, seconds: true, startedAt: true },
+        }),
+        prisma.note.count({ where: filter }),
       ]);
+
+    /* Fourteen days of focus vs running minutes for the area chart. */
+    const dayKey = (d) => {
+      const x = new Date(d);
+      return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+    };
+    const focusDaily = Array.from({ length: 14 }, (_, i) => {
+      const d = new Date(since);
+      d.setDate(d.getDate() + i);
+      return { date: dayKey(d), focus: 0, run: 0 };
+    });
+    const byDay = new Map(focusDaily.map((r) => [r.date, r]));
+    for (const f of focusRows) {
+      const row = byDay.get(dayKey(f.startedAt));
+      if (!row) continue;
+      const mins = Math.round((f.seconds || 0) / 60);
+      if (f.kind === 'focus') row.focus += mins;
+      else if (f.kind === 'run') row.run += mins;
+    }
+
+    const inboxByStatus = { open: 0, done: 0, archived: 0 };
+    const inboxByPriority = { high: 0, medium: 0, low: 0 };
+    for (const row of inboxGrouped) {
+      if (row.status in inboxByStatus) inboxByStatus[row.status] += row._count._all;
+      if (row.status === 'open' && row.priority in inboxByPriority) {
+        inboxByPriority[row.priority] += row._count._all;
+      }
+    }
 
     const bookProgress = books.map((b) => ({
       _id: b.id,
@@ -100,7 +140,12 @@ router.get(
         goalsByStatus: tally(goalsGrouped, 'status', [
           'in-progress', 'completed', 'not-started', 'abandoned',
         ]),
+        showsByStatus: Object.fromEntries(showsGrouped.map((r) => [r.status, r._count._all])),
+        inboxByStatus,
+        inboxByPriority,
+        focusDaily,
         totals: {
+          notes: notesCount,
           books: books.length,
           goals: goals.length,
           habits: habits.length,

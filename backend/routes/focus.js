@@ -11,9 +11,11 @@ const { asyncHandler, badRequest, notFoundError } = require('../middleware/error
 
 const router = express.Router();
 
-const KINDS = ['focus', 'short-break', 'long-break'];
+const KINDS = ['focus', 'short-break', 'long-break', 'run'];
 const LINK_TYPES = ['goal', 'habit', 'project', 'note', 'inbox', 'book'];
 const MAX_MINUTES = 240;
+/* A run is a stopwatch, not a pomodoro — allow long outings. */
+const MAX_RUN_MINUTES = 600;
 
 /** Local-midnight boundary N days back, so "today" means the user's day. */
 function startOfDay(offsetDays = 0) {
@@ -72,9 +74,32 @@ router.get(
       if (byDay.has(key)) byDay.set(key, byDay.get(key) + Math.round((s.seconds || 0) / 60));
     }
 
+    const runs = sessions.filter((s) => s.kind === 'run');
+    const runByDay = new Map([...byDay.keys()].map((k) => [k, 0]));
+    for (const r of runs) {
+      const key = dayKey(r.startedAt);
+      if (runByDay.has(key)) runByDay.set(key, runByDay.get(key) + Math.round((r.seconds || 0) / 60));
+    }
+    const runDays = new Set(runs.map((r) => dayKey(r.startedAt)));
+    let runStreak = 0;
+    const cur = new Date();
+    cur.setHours(0, 0, 0, 0);
+    if (!runDays.has(dayKey(cur))) cur.setDate(cur.getDate() - 1);
+    while (runDays.has(dayKey(cur))) { runStreak += 1; cur.setDate(cur.getDate() - 1); }
+
     res.json(
       serialize({
         sessions: sessions.slice(0, 60),
+        runStats: {
+          totalRuns: runs.length,
+          totalMinutes: Math.round(runs.reduce((s, r) => s + (r.seconds || 0), 0) / 60),
+          totalDistance: Math.round(runs.reduce((s, r) => s + (r.distance || 0), 0) * 100) / 100,
+          longestMinutes: Math.round(Math.max(0, ...runs.map((r) => r.seconds || 0)) / 60),
+          todayMinutes: Math.round(
+            runs.filter((r) => dayKey(r.startedAt) === todayKey).reduce((s, r) => s + (r.seconds || 0), 0) / 60
+          ),
+          streak: runStreak,
+        },
         stats: {
           totalSessions: focusOnly.length,
           completedSessions: focusOnly.filter((s) => s.completed).length,
@@ -85,7 +110,7 @@ router.get(
           ),
           streak: focusStreak(sessions),
         },
-        daily: [...byDay.entries()].map(([date, minutes]) => ({ date, minutes })),
+        daily: [...byDay.entries()].map(([date, minutes]) => ({ date, minutes, run: runByDay.get(date) || 0 })),
       })
     );
   })
@@ -100,9 +125,17 @@ router.post(
     const kind = body.kind || 'focus';
     if (!KINDS.includes(kind)) throw badRequest('Invalid session kind');
 
+    const cap = kind === 'run' ? MAX_RUN_MINUTES : MAX_MINUTES;
     const minutes = parseInt(body.minutes, 10);
-    if (!Number.isFinite(minutes) || minutes < 1 || minutes > MAX_MINUTES) {
-      throw badRequest(`Minutes must be between 1 and ${MAX_MINUTES}`);
+    if (!Number.isFinite(minutes) || minutes < 1 || minutes > cap) {
+      throw badRequest(`Minutes must be between 1 and ${cap}`);
+    }
+
+    let distance = null;
+    if (kind === 'run' && body.distance !== undefined && body.distance !== null && body.distance !== '') {
+      distance = Number(body.distance);
+      if (!Number.isFinite(distance) || distance < 0 || distance > 500) throw badRequest('Invalid distance');
+      distance = Math.round(distance * 100) / 100;
     }
 
     const seconds = Math.max(0, Math.min(parseInt(body.seconds, 10) || 0, minutes * 60));
@@ -122,6 +155,7 @@ router.post(
         label: String(body.label || '').slice(0, 200),
         linkType,
         linkId: linkType ? String(body.linkId || '') || null : null,
+        distance,
         endedAt: new Date(),
         userId: req.user.id,
       },
