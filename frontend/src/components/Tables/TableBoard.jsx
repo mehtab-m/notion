@@ -96,6 +96,7 @@ export default function TableBoard({
   const [openIds, setOpenIds] = useState(() => new Set());
   const sectionRefs = useRef({});
   const prevIdsRef = useRef(new Set());
+  const autoOpenedRef = useRef(false);
 
   useEffect(() => {
     const prevIds = prevIdsRef.current;
@@ -104,10 +105,15 @@ export default function TableBoard({
     setOpenIds((prev) => {
       if (isMobile) return new Set();
 
-      // Keep tables collapsed by default; only preserve already-open ones
+      // Preserve already-open tables; on first load open the first one so
+      // the page never lands on a wall of collapsed headers.
       const next = new Set();
       for (const id of prev) {
         if (currentIds.includes(id)) next.add(id);
+      }
+      if (!autoOpenedRef.current && currentIds.length) {
+        autoOpenedRef.current = true;
+        if (!next.size) next.add(currentIds[0]);
       }
       return next;
     });

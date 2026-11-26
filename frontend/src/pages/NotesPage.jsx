@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus, Trash2, Pin, Search, ChevronRight, ChevronDown,
-  Book, FileText, ImagePlus, GripVertical,
+  Book, FileText, ImagePlus, GripVertical, ArrowLeft,
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { formatDistanceToNow } from 'date-fns';
 import {
@@ -175,10 +176,27 @@ export default function NotesPage() {
 
   useEffect(() => { fetchNotes(); }, [fetchNotes]);
 
-  // Open first notebook (or its first page) by default — no empty prompt
+  /* No auto-open: the page lands on a gallery of every notebook and you
+     pick one. A deep link (?note=id, e.g. from Inbox → Note) still opens
+     that page straight away. */
+  const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
-    if (loading || activeNote) return;
-    const notebooks = notes.filter((n) => n.isNotebook);
+    const target = searchParams.get('note');
+    if (loading || !target) return;
+    const found = notes.find((n) => String(n._id) === String(target));
+    if (found) {
+      setActiveNote(found);
+      if (found.notebookId) setExpanded((prev) => ({ ...prev, [found.notebookId]: true }));
+    }
+    setSearchParams({}, { replace: true });
+  }, [loading, notes, searchParams, setSearchParams]);
+
+  const openNotebook = (nb) => {
+    setActiveNote(nb);
+    setExpanded((prev) => ({ ...prev, [nb._id]: true }));
+  };
+
+  const notebooks = notes.filter((n) => n.isNotebook);
     if (!notebooks.length) return;
     const firstNb = notebooks[0];
     const pages = notes.filter(
@@ -325,17 +343,58 @@ export default function NotesPage() {
 
       <div className="notes-editor">
         {!activeNote ? (
-          <div className="empty-state">
-            <Book size={48} strokeWidth={1} />
-            <h3>Select a notebook or page</h3>
-            <p>Create a notebook, then add pages inside it.</p>
-            <button className="btn btn-primary" onClick={handleNewNotebook} style={{ marginTop: 16 }}>
-              <Plus size={14} /> New Notebook
-            </button>
+          <div className="nb-gallery">
+            <div className="nb-gallery-head">
+              <div>
+                <h2>Your notebooks</h2>
+                <p>{notebooks.length} notebook{notebooks.length === 1 ? '' : 's'} · {pages.length} page{pages.length === 1 ? '' : 's'} — pick one to open it.</p>
+              </div>
+              <button className="btn btn-primary" onClick={handleNewNotebook}>
+                <Plus size={14} /> New notebook
+              </button>
+            </div>
+            {filteredNotebooks.length === 0 ? (
+              <div className="empty-state">
+                <Book size={48} strokeWidth={1} />
+                <h3>{search ? 'No notebook matches that' : 'No notebooks yet'}</h3>
+                <p>Create a notebook, then add pages inside it.</p>
+              </div>
+            ) : (
+              <div className="nb-grid">
+                {filteredNotebooks.map((nb, i) => {
+                  const nbPages = getNotebookPages(nb._id);
+                  return (
+                    <button
+                      key={nb._id}
+                      type="button"
+                      className="nb-card"
+                      style={{ '--nb-color': nb.color || `var(--chart-${(i % 5) + 1})` }}
+                      onClick={() => openNotebook(nb)}
+                    >
+                      <span className="nb-card-spine" />
+                      <span className="nb-card-body">
+                        <Book size={20} />
+                        <strong>{nb.title || 'Untitled notebook'}</strong>
+                        <em>{nbPages.length} page{nbPages.length === 1 ? '' : 's'}</em>
+                        {nbPages.length > 0 && (
+                          <span className="nb-card-pages">
+                            {nbPages.slice(0, 3).map((p) => <span key={p._id}>{p.title || 'Untitled'}</span>)}
+                          </span>
+                        )}
+                        <small>Updated {new Date(nb.updatedAt || nb.createdAt).toLocaleDateString()}</small>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         ) : (
           <>
             <div className="notes-editor-toolbar">
+              <button className="btn btn-secondary btn-sm" onClick={() => setActiveNote(null)} title="Back to all notebooks">
+                <ArrowLeft size={13} /> All notebooks
+              </button>
               <div className="notes-color-row">
                 {NOTE_COLORS.map((c) => (
                   <button
