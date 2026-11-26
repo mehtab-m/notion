@@ -3,12 +3,15 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import {
   Play, Pause, RotateCcw, SkipForward, Timer, Flame, Clock,
-  CheckCircle2, Settings2, Trash2, Volume2, VolumeX,
+  CheckCircle2, Settings2, Trash2, Volume2, VolumeX, Footprints, Brain,
 } from 'lucide-react';
 import { getFocusSessions, logFocusSession, deleteFocusSession } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import EmptyState from '../components/EmptyState';
+import RunTracker from '../components/Focus/RunTracker';
 import './FocusPage.css';
+
+const MODE_KEY = 'sortlife_focus_mode';
 
 /* Classic pomodoro lengths, editable below. `long` fires after every
    fourth focus block, which is what makes the cycle a cycle. */
@@ -76,6 +79,14 @@ export default function FocusPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  /* A run in progress wins: reopening the page mid-run lands on the run. */
+  const [mode, setMode] = useState(() => {
+    try {
+      if (localStorage.getItem('sortlife_active_run')) return 'run';
+      return localStorage.getItem(MODE_KEY) || 'focus';
+    } catch { return 'focus'; }
+  });
+  useEffect(() => { try { localStorage.setItem(MODE_KEY, mode); } catch { /* ignore */ } }, [mode]);
 
   /* The timer is driven by a wall-clock deadline, not by counting
      setInterval ticks: a backgrounded tab throttles timers, and a
@@ -235,11 +246,14 @@ export default function FocusPage() {
     <div className="focus-page page-enter">
       <header className="page-header">
         <div>
-          <h1>Focus</h1>
+          <h1>{mode === 'run' ? 'Run' : 'Focus'}</h1>
           <p className="page-header-sub">
-            {LONG_BREAK_EVERY} blocks, then a long break. Nothing else on screen.
+            {mode === 'run'
+              ? 'Time your workout outside — it keeps counting even if you close the tab.'
+              : `${LONG_BREAK_EVERY} blocks, then a long break. Nothing else on screen.`}
           </p>
         </div>
+        {mode === 'focus' && (
         <div className="page-header-actions">
           <button
             type="button"
@@ -260,8 +274,21 @@ export default function FocusPage() {
             <Settings2 size={17} />
           </button>
         </div>
+        )}
       </header>
 
+      <div className="focus-mode-switch" role="tablist" aria-label="Mode">
+        <button type="button" role="tab" aria-selected={mode === 'focus'} className={mode === 'focus' ? 'active' : ''} onClick={() => setMode('focus')}>
+          <Brain size={15} /> Deep focus
+        </button>
+        <button type="button" role="tab" aria-selected={mode === 'run'} className={mode === 'run' ? 'active run' : ''} onClick={() => setMode('run')}>
+          <Footprints size={15} /> Running
+        </button>
+      </div>
+
+      {mode === 'run' ? (
+        <RunTracker data={data} onChanged={load} />
+      ) : (
       <div className="focus-layout">
         {/* ── Timer ────────────────────────────────────── */}
         <section className={`focus-timer phase-${phase} ${running ? 'is-running' : ''}`}>
@@ -435,7 +462,7 @@ export default function FocusPage() {
               />
             ) : (
               <ul className="focus-log">
-                {data.sessions.slice(0, 12).map((session) => (
+                {data.sessions.filter((s) => s.kind !== 'run').slice(0, 12).map((session) => (
                   <li key={session._id} className={session.completed ? 'is-complete' : ''}>
                     <span className={`focus-log-dot kind-${session.kind}`} />
                     <div className="grow">
@@ -462,6 +489,7 @@ export default function FocusPage() {
           </section>
         </div>
       </div>
+      )}
     </div>
   );
 }
