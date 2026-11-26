@@ -1,30 +1,15 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  Users, UserCheck, UserX, Code2, Activity, BookOpen, Tv, Flame, Target, FolderKanban, PenLine,
-  Table2, StickyNote, ShieldCheck, Crown, X, Scale,
+  Users, UserCheck, UserX, Code2, Activity, ShieldCheck, Crown, X, Scale, RefreshCw, Radio,
+  Orbit, Layers, Signal, Database, Cpu, Search, LayoutGrid, List, TrendingDown,
 } from 'lucide-react';
-import {
-  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell,
-} from 'recharts';
 import toast from 'react-hot-toast';
 import { format, parseISO } from 'date-fns';
 import { getAdminStats, updateAdminUser } from '../utils/api';
+import {
+  BubbleChart, DonutChart, Waterfall, VennDiagram, AreaTrend, TreemapChart, TapeDiagram,
+} from '../components/Charts/ChartKit';
 import './AdminDashboard.css';
-
-const PIE_COLORS = ['var(--accent-green)', 'var(--accent-red)'];
-
-function StatTile({ icon: Icon, label, value, sub }) {
-  return (
-    <div className="ent-stat">
-      <div className="ent-stat-icon"><Icon size={16} /></div>
-      <div>
-        <p className="ent-stat-value">{value}</p>
-        <p className="ent-stat-label">{label}</p>
-        {sub && <p className="ent-stat-sub">{sub}</p>}
-      </div>
-    </div>
-  );
-}
 
 function reasonLabel(reason, days) {
   if (reason === 'grace_period') return 'New (grace)';
@@ -59,8 +44,8 @@ function UserDrawer({ user, onClose, onSaved }) {
   };
 
   return (
-    <div className="ent-drawer-overlay" onClick={onClose}>
-      <aside className="ent-drawer" onClick={(e) => e.stopPropagation()}>
+    <div className="ent-drawer-overlay mc-drawer-overlay" onClick={onClose}>
+      <aside className="ent-drawer mc-drawer" onClick={(e) => e.stopPropagation()}>
         <header className="ent-drawer-head">
           <div>
             <h2>{user.name}</h2>
@@ -161,17 +146,111 @@ function UserDrawer({ user, onClose, onSaved }) {
   );
 }
 
+/* ─── Mission Control ──────────────────────────────────────
+   The admin page as a dark ops console: radar sweep for live
+   health, a user galaxy (bubble chart), funnel waterfall, Venn of
+   segments, content treemap, and crew badges for every account. */
+
+function Radar({ active, total }) {
+  const pct = total ? Math.round((active / total) * 100) : 0;
+  const r = 86;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className="mc-radar" role="img" aria-label={`${pct}% of users active`}>
+      <svg viewBox="0 0 220 220">
+        <defs>
+          <radialGradient id="mcRadarBg" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="rgba(34,211,238,.18)" />
+            <stop offset="100%" stopColor="rgba(34,211,238,0)" />
+          </radialGradient>
+          <linearGradient id="mcSweep" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="rgba(34,211,238,0)" />
+            <stop offset="100%" stopColor="rgba(34,211,238,.55)" />
+          </linearGradient>
+        </defs>
+        <circle cx="110" cy="110" r="104" fill="url(#mcRadarBg)" />
+        {[30, 55, 80, 104].map((rr) => <circle key={rr} cx="110" cy="110" r={rr} className="mc-radar-ring" />)}
+        <line x1="6" y1="110" x2="214" y2="110" className="mc-radar-ring" />
+        <line x1="110" y1="6" x2="110" y2="214" className="mc-radar-ring" />
+        <g className="mc-radar-sweep">
+          <path d="M110 110 L214 110 A104 104 0 0 0 183.5 36.5 Z" fill="url(#mcSweep)" />
+        </g>
+        <circle cx="110" cy="110" r={r} className="mc-radar-track" />
+        <circle
+          cx="110" cy="110" r={r}
+          className="mc-radar-value"
+          strokeDasharray={c}
+          strokeDashoffset={c * (1 - pct / 100)}
+          transform="rotate(-90 110 110)"
+        />
+      </svg>
+      <div className="mc-radar-copy">
+        <strong>{pct}%</strong>
+        <span>active</span>
+      </div>
+    </div>
+  );
+}
+
+function Readout({ icon: Icon, label, value, sub, tone = 'cyan' }) {
+  return (
+    <div className={`mc-readout mc-${tone}`}>
+      <div className="mc-readout-top">
+        <Icon size={14} />
+        <span>{label}</span>
+      </div>
+      <strong>{value}</strong>
+      {sub && <em>{sub}</em>}
+    </div>
+  );
+}
+
+function initials(name) {
+  return (name || '?').split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function CrewBadge({ user, inactiveDays, onOpen }) {
+  const total = Object.values(user.content || {}).reduce((s, n) => s + (n || 0), 0);
+  const heat = Math.min(100, (user.weekActivityCount || 0) * 8);
+  return (
+    <button type="button" className={`mc-badge plan-${user.plan} ${user.isActive ? 'is-on' : 'is-off'}`} onClick={() => onOpen(user)}>
+      <span className="mc-badge-glow" />
+      <div className="mc-badge-top">
+        <span className="mc-badge-avatar">{initials(user.name)}</span>
+        <span className={`mc-led ${user.isActive ? 'on' : 'off'}`} title={reasonLabel(user.activeReason, inactiveDays)} />
+      </div>
+      <strong className="mc-badge-name">{user.name}</strong>
+      <span className="mc-badge-mail">{user.email}</span>
+      <div className="mc-badge-tags">
+        <span className={`mc-tag plan-${user.plan}`}>{user.plan}</span>
+        {user.role === 'admin' && <span className="mc-tag admin">admin</span>}
+        {user.isDeveloper && <span className="mc-tag dev">dev</span>}
+      </div>
+      <div className="mc-badge-meter" title={`${user.weekActivityCount} events this week`}>
+        <i style={{ width: `${heat}%` }} />
+      </div>
+      <div className="mc-badge-foot">
+        <span>{user.weekActivityCount}<em>/wk</em></span>
+        <span>{total}<em> items</em></span>
+        <span>{user.loginCount || 0}<em> logins</em></span>
+      </div>
+    </button>
+  );
+}
+
 export default function AdminDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [query, setQuery] = useState('');
+  const [view, setView] = useState('badges');
   const [selected, setSelected] = useState(null);
+  const [clock, setClock] = useState(() => new Date());
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const stats = await getAdminStats();
-      setData(stats);
+      setData(await getAdminStats());
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to load admin stats');
     } finally {
@@ -180,9 +259,67 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const id = setInterval(() => setClock(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const derived = useMemo(() => {
+    if (!data) return null;
+    const { overview, users, contentTotals, signupsByDay } = data;
+    const now = Date.now();
+    const galaxy = users.map((u) => ({
+      name: u.name,
+      x: Math.max(0, Math.round((now - new Date(u.createdAt).getTime()) / 86400000)),
+      y: u.weekActivityCount || 0,
+      z: Math.max(1, Object.values(u.content || {}).reduce((s, n) => s + (n || 0), 0)),
+      color: u.plan === 'platinum' ? '#E879F9' : u.plan === 'premium' ? '#FBBF24' : u.isActive ? '#22D3EE' : '#64748B',
+    }));
+    const paid = (u) => u.plan === 'premium' || u.plan === 'platinum';
+    const dev = users.filter((u) => u.isDeveloper === true);
+    const act = users.filter((u) => u.isActive);
+    const pay = users.filter(paid);
+    const venn = {
+      sets: [{ name: 'Active', size: act.length }, { name: 'Developers', size: dev.length }, { name: 'Paid', size: pay.length }],
+      overlaps: {
+        ab: users.filter((u) => u.isActive && u.isDeveloper === true).length,
+        ac: users.filter((u) => u.isActive && paid(u)).length,
+        bc: users.filter((u) => u.isDeveloper === true && paid(u)).length,
+        abc: users.filter((u) => u.isActive && u.isDeveloper === true && paid(u)).length,
+      },
+    };
+    const funnel = [
+      { name: 'Signed up', value: overview.totalUsers },
+      { name: 'Inactive', value: -overview.inactiveUsers },
+      { name: 'Free', value: -(act.filter((u) => !paid(u)).length) },
+    ];
+    const plans = [
+      { name: 'Common', value: overview.commonUsers || 0, color: '#64748B' },
+      { name: 'Premium', value: overview.premiumUsers || 0, color: '#FBBF24' },
+      { name: 'Platinum', value: overview.platinumUsers || 0, color: '#E879F9' },
+    ].filter((p) => p.value > 0);
+    const tree = Object.entries(contentTotals).filter(([, v]) => v > 0).map(([name, value]) => ({ name, value }));
+    const signups = (signupsByDay || []).map((d) => ({ date: d.day, signups: d.count }));
+    const tape = [
+      { label: 'Developer choice', segments: [
+        { name: 'developer', value: overview.developers, color: '#22D3EE' },
+        { name: 'non-dev', value: overview.nonDevelopers, color: '#A78BFA' },
+        { name: 'undecided', value: overview.undecidedDeveloper, color: '#475569' },
+      ] },
+      { label: 'Weekly events', segments: [
+        { name: 'logins', value: overview.weeklyLogins || 0, color: '#34D399' },
+        { name: 'app uses', value: overview.weeklyAppUses || 0, color: '#F472B6' },
+      ] },
+    ];
+    return { galaxy, venn, funnel, plans, tree, signups, tape };
+  }, [data]);
 
   if (loading && !data) {
-    return <div className="spinner-container"><div className="spinner" /></div>;
+    return (
+      <div className="mc mc-loading">
+        <div className="mc-boot"><Radio size={22} /> Establishing uplink…</div>
+      </div>
+    );
   }
 
   if (!data) {
@@ -194,15 +331,11 @@ export default function AdminDashboard() {
     );
   }
 
-  const { overview, contentTotals, signupsByDay, users, ethicalDataPolicy } = data;
+  const { overview, contentTotals, users, ethicalDataPolicy } = data;
   const inactiveDays = overview.inactiveAfterDays || 3;
-
-  const activityPie = [
-    { name: 'Active', value: overview.activeUsers },
-    { name: 'Inactive', value: overview.inactiveUsers },
-  ];
-
+  const q = query.trim().toLowerCase();
   const filteredUsers = users.filter((u) => {
+    if (q && !`${u.name} ${u.email}`.toLowerCase().includes(q)) return false;
     if (filter === 'active') return u.isActive;
     if (filter === 'inactive') return !u.isActive;
     if (filter === 'developers') return u.isDeveloper === true;
@@ -210,181 +343,148 @@ export default function AdminDashboard() {
     return true;
   });
 
-  const chartData = (signupsByDay || []).map((d) => ({
-    day: d.day,
-    label: (() => {
-      try { return format(parseISO(d.day), 'MMM d'); } catch { return d.day; }
-    })(),
-    count: d.count,
-  }));
+  const ticker = [
+    `USERS ${overview.totalUsers}`,
+    `ACTIVE ${overview.activeUsers}`,
+    `NEW/7D ${overview.newThisWeek}`,
+    `NEW/30D ${overview.newThisMonth}`,
+    `LOGINS/7D ${overview.weeklyLogins || 0}`,
+    `EVENTS/7D ${overview.weeklyActivityEvents}`,
+    ...Object.entries(contentTotals).map(([k, v]) => `${k.toUpperCase()} ${v}`),
+  ];
 
   return (
-    <div className="ent-admin">
-      <header className="ent-header">
-        <div>
-          <p className="ent-eyebrow">Operations</p>
-          <h1>Product Admin</h1>
-          <p className="ent-lede">
-            Enterprise user intelligence · inactive after {inactiveDays} days without activity · follow-up email on lapse
-          </p>
+    <div className="mc">
+      <div className="mc-grid-bg" aria-hidden />
+
+      <header className="mc-head">
+        <div className="mc-head-left">
+          <span className="mc-chip"><span className="mc-led on" /> SYSTEM NOMINAL</span>
+          <h1>Mission <span>Control</span></h1>
+          <p>SortLife operations console · inactive after {inactiveDays}d · {format(clock, 'EEE d MMM · HH:mm:ss')}</p>
         </div>
-        <button type="button" className="btn btn-secondary" onClick={load} disabled={loading}>
-          {loading ? 'Refreshing…' : 'Refresh analytics'}
-        </button>
+        <div className="mc-head-right">
+          <Radar active={overview.activeUsers} total={overview.totalUsers} />
+          <button type="button" className="mc-btn" onClick={load} disabled={loading}>
+            <RefreshCw size={14} className={loading ? 'mc-spin' : ''} /> {loading ? 'Syncing' : 'Resync'}
+          </button>
+        </div>
       </header>
 
-      <div className="ent-stat-grid">
-        <StatTile icon={Users} label="Total users" value={overview.totalUsers} />
-        <StatTile icon={UserCheck} label="Active" value={overview.activeUsers} sub={`${overview.inGracePeriod} in grace`} />
-        <StatTile icon={UserX} label="Inactive" value={overview.inactiveUsers} />
-        <StatTile icon={Crown} label="Premium / Platinum" value={`${overview.premiumUsers || 0} / ${overview.platinumUsers || 0}`} sub={`${overview.commonUsers || 0} common`} />
-        <StatTile icon={Code2} label="Developers" value={overview.developers} />
-        <StatTile icon={Activity} label="Week events" value={overview.weeklyActivityEvents} sub={`${overview.weeklyLogins || 0} logins · ${overview.weeklyAppUses || 0} uses`} />
+      <div className="mc-ticker" aria-hidden>
+        <div className="mc-ticker-track">
+          {[...ticker, ...ticker].map((t, i) => <span key={i}>{t}</span>)}
+        </div>
+      </div>
+
+      <div className="mc-readouts">
+        <Readout icon={Users} label="Total crew" value={overview.totalUsers} sub={`+${overview.newThisWeek} this week`} />
+        <Readout icon={UserCheck} label="Active" value={overview.activeUsers} sub={`${overview.inGracePeriod} in grace`} tone="green" />
+        <Readout icon={UserX} label="Dormant" value={overview.inactiveUsers} sub="follow-up emailed" tone="red" />
+        <Readout icon={Crown} label="Paid" value={(overview.premiumUsers || 0) + (overview.platinumUsers || 0)} sub={`${overview.premiumUsers || 0} premium · ${overview.platinumUsers || 0} platinum`} tone="gold" />
+        <Readout icon={Code2} label="Developers" value={overview.developers} sub={`${overview.undecidedDeveloper} undecided`} tone="violet" />
+        <Readout icon={Activity} label="Events / 7d" value={overview.weeklyActivityEvents} sub={`${overview.weeklyLogins || 0} logins`} tone="pink" />
+      </div>
+
+      <div className="mc-panels">
+        <section className="mc-panel mc-panel--wide">
+          <header><Orbit size={14} /> User galaxy <em>x: days since join · y: events this week · size: content</em></header>
+          <BubbleChart data={derived.galaxy} height={280} xLabel="Days since signup" yLabel="Events / week" zLabel="Items" zRange={[40, 700]} />
+        </section>
+        <section className="mc-panel">
+          <header><Crown size={14} /> Plan mix</header>
+          <DonutChart data={derived.plans} height={250} centerLabel="users" />
+        </section>
+      </div>
+
+      <div className="mc-panels mc-panels--3">
+        <section className="mc-panel">
+          <header><TrendingDown size={14} /> Conversion waterfall</header>
+          <Waterfall data={derived.funnel} height={240} />
+        </section>
+        <section className="mc-panel">
+          <header><Layers size={14} /> Segment overlap</header>
+          <VennDiagram sets={derived.venn.sets} overlaps={derived.venn.overlaps} height={240} />
+        </section>
+        <section className="mc-panel">
+          <header><Signal size={14} /> Signups · 30d</header>
+          {derived.signups.length ? (
+            <AreaTrend data={derived.signups} series={[{ key: 'signups', name: 'Signups', color: '#22D3EE' }]} height={240}
+              xFormatter={(v) => { try { return format(parseISO(v), 'd MMM'); } catch { return v; } }} />
+          ) : <div className="kit-empty">No signups in this window.</div>}
+        </section>
+      </div>
+
+      <div className="mc-panels">
+        <section className="mc-panel mc-panel--wide">
+          <header><Database size={14} /> Content mass</header>
+          <TreemapChart data={derived.tree} height={220} />
+        </section>
+        <section className="mc-panel">
+          <header><Cpu size={14} /> Telemetry tapes</header>
+          <TapeDiagram rows={derived.tape} />
+        </section>
       </div>
 
       {ethicalDataPolicy && (
-        <div className="ent-policy">
+        <div className="mc-policy">
           <ShieldCheck size={16} />
           <div>
-            <strong>Data & ethics policy</strong>
+            <strong>Data &amp; ethics protocol</strong>
             <p>{ethicalDataPolicy.activeRule}</p>
-            <p className="ent-muted">Collected: {(ethicalDataPolicy.collected || []).join(' · ')}</p>
+            <p className="mc-dim">Collected: {(ethicalDataPolicy.collected || []).join(' · ')} — never: {(ethicalDataPolicy.notCollected || []).join(' · ')}</p>
           </div>
         </div>
       )}
 
-      <div className="ent-totals">
-        <span><BookOpen size={13} /> {contentTotals.books} books</span>
-        <span><Tv size={13} /> {contentTotals.shows} shows</span>
-        <span><Flame size={13} /> {contentTotals.habits} habits</span>
-        <span><Target size={13} /> {contentTotals.goals} goals</span>
-        <span><FolderKanban size={13} /> {contentTotals.projects} projects</span>
-        <span><PenLine size={13} /> {contentTotals.notes} notes</span>
-        <span><Table2 size={13} /> {contentTotals.tables || 0} tables</span>
-        <span><StickyNote size={13} /> {contentTotals.stickyNotes || 0} stickies</span>
-      </div>
-
-      <div className="ent-charts">
-        <div className="ent-panel">
-          <h2>Signups · 30 days</h2>
-          {chartData.length === 0 ? (
-            <p className="ent-muted">No signups in this window.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="signupFillEnt" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
-                <Tooltip />
-                <Area type="monotone" dataKey="count" stroke="var(--accent)" fill="url(#signupFillEnt)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-        <div className="ent-panel">
-          <h2>Active vs inactive</h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={activityPie} dataKey="value" nameKey="name" innerRadius={55} outerRadius={80} paddingAngle={3}>
-                {activityPie.map((entry, i) => (
-                  <Cell key={entry.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="ent-table-head">
-        <h2>Directory</h2>
-        <div className="ent-filters">
-          {[
-            ['all', 'All'],
-            ['active', 'Active'],
-            ['inactive', 'Inactive'],
-            ['premium', 'Premium+'],
-            ['developers', 'Developers'],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              className={filter === key ? 'active' : ''}
-              onClick={() => setFilter(key)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="ent-table-wrap">
-        <table className="ent-table">
-          <thead>
-            <tr>
-              <th>User</th>
-              <th>Status</th>
-              <th>Plan</th>
-              <th>Activity</th>
-              <th>Content</th>
-              <th>Legal</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {filteredUsers.map((u) => (
-              <tr key={u._id}>
-                <td>
-                  <strong>{u.name}</strong>
-                  <span className="ent-muted block">{u.email}</span>
-                </td>
-                <td>
-                  <span className={`ent-pill ${u.isActive ? 'on' : 'off'}`}>
-                    {u.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                  <span className="ent-muted block">{reasonLabel(u.activeReason, inactiveDays)}</span>
-                </td>
-                <td>
-                  <span className={`ent-plan ${u.plan}`}>{u.plan}</span>
-                </td>
-                <td>
-                  <strong>{u.weekActivityCount}</strong> / wk
-                  <span className="ent-muted block">{u.weekLogins || 0}L · {u.weekAppUses || 0}U · {u.loginCount || 0} logins</span>
-                </td>
-                <td className="ent-mono">
-                  B{u.content.books} S{u.content.shows} H{u.content.habits} G{u.content.goals}
-                </td>
-                <td>
-                  {u.legalSettings?.termsAccepted ? 'Terms ✓' : 'Terms —'}
-                  <span className="ent-muted block">
-                    {u.legalSettings?.marketingEmails ? 'Mkt' : 'No mkt'} · {u.legalSettings?.dataProcessing !== false ? 'DP' : 'No DP'}
-                  </span>
-                </td>
-                <td>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSelected(u)}>
-                    Manage
-                  </button>
-                </td>
-              </tr>
+      <div className="mc-crew-head">
+        <h2><Users size={16} /> Crew manifest <em>{filteredUsers.length}</em></h2>
+        <div className="mc-crew-tools">
+          <div className="mc-search">
+            <Search size={13} />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="search name or email" />
+          </div>
+          <div className="mc-seg">
+            {[['all', 'All'], ['active', 'Active'], ['inactive', 'Dormant'], ['premium', 'Paid'], ['developers', 'Devs']].map(([key, label]) => (
+              <button key={key} type="button" className={filter === key ? 'active' : ''} onClick={() => setFilter(key)}>{label}</button>
             ))}
-            {filteredUsers.length === 0 && (
-              <tr>
-                <td colSpan={7} className="ent-empty">No users match this filter.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+          </div>
+          <div className="mc-seg">
+            <button type="button" className={view === 'badges' ? 'active' : ''} onClick={() => setView('badges')} aria-label="Badge view"><LayoutGrid size={13} /></button>
+            <button type="button" className={view === 'table' ? 'active' : ''} onClick={() => setView('table')} aria-label="Table view"><List size={13} /></button>
+          </div>
+        </div>
       </div>
 
-      {selected && (
-        <UserDrawer user={selected} onClose={() => setSelected(null)} onSaved={load} />
+      {view === 'badges' ? (
+        <div className="mc-crew">
+          {filteredUsers.map((u) => <CrewBadge key={u._id} user={u} inactiveDays={inactiveDays} onOpen={setSelected} />)}
+          {filteredUsers.length === 0 && <p className="mc-dim">No crew match this filter.</p>}
+        </div>
+      ) : (
+        <div className="mc-table-wrap">
+          <table className="mc-table">
+            <thead>
+              <tr><th>User</th><th>Status</th><th>Plan</th><th>Activity</th><th>Content</th><th>Legal</th><th /></tr>
+            </thead>
+            <tbody>
+              {filteredUsers.map((u) => (
+                <tr key={u._id}>
+                  <td><strong>{u.name}</strong><span className="mc-dim block">{u.email}</span></td>
+                  <td><span className={`mc-led ${u.isActive ? 'on' : 'off'}`} /> {reasonLabel(u.activeReason, inactiveDays)}</td>
+                  <td><span className={`mc-tag plan-${u.plan}`}>{u.plan}</span></td>
+                  <td><strong>{u.weekActivityCount}</strong>/wk<span className="mc-dim block">{u.weekLogins || 0}L · {u.weekAppUses || 0}U</span></td>
+                  <td className="mc-mono">B{u.content.books} S{u.content.shows} H{u.content.habits} G{u.content.goals} N{u.content.notes}</td>
+                  <td>{u.legalSettings?.termsAccepted ? 'Terms ✓' : 'Terms —'}<span className="mc-dim block">{u.legalSettings?.marketingEmails ? 'Mkt' : 'No mkt'}</span></td>
+                  <td><button type="button" className="mc-btn mc-btn--sm" onClick={() => setSelected(u)}>Manage</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
+
+      {selected && <UserDrawer user={selected} onClose={() => setSelected(null)} onSaved={load} />}
     </div>
   );
 }
