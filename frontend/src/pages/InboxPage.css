@@ -1,244 +1,217 @@
 /* ─── Inbox ────────────────────────────────────────────────
-   A capture bar that is always the first thing under the
-   heading, then a flat list. Rows expand in place rather than
-   opening a modal — sorting an inbox is a rapid loop.      */
+   Grouped by what needs you first. Every state change is one
+   visible, labelled click — nothing hides behind an expand. */
 
-.inbox-page { max-width: 860px; margin: 0 auto; }
+.ibx-page { max-width: 1040px; margin: 0 auto; }
 
-/* ── Capture bar ──────────────────────────────────────── */
-.inbox-capture {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: 7px 7px 7px 12px;
-  margin-bottom: var(--sp-4);
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  box-shadow: var(--shadow-xs);
-  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
-}
-
-.inbox-capture:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--ring);
-}
-
-.inbox-capture-icon {
-  display: grid;
-  place-items: center;
-  color: var(--text-muted);
-  flex-shrink: 0;
-  transition: color var(--dur) var(--ease), transform var(--dur) var(--ease-spring);
-}
-
-.inbox-capture:focus-within .inbox-capture-icon {
-  color: var(--accent);
-  transform: rotate(90deg);
-}
-
-.inbox-capture input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  padding: 8px 0;
-  font-size: 14.5px;
-}
-
-.inbox-capture input:focus { box-shadow: none; background: transparent; }
-
-/* ── Toolbar ──────────────────────────────────────────── */
-.inbox-toolbar {
+.ibx-hero {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--sp-3);
-  margin-bottom: var(--sp-4);
-  flex-wrap: wrap;
-}
-
-.inbox-toolbar .filter-btn em {
-  font-style: normal;
-  opacity: 0.7;
-  font-variant-numeric: tabular-nums;
-}
-
-/* The search pill itself is `.filter-search` in index.css — Archive
-   uses it too, and a per-page copy would only ship with that page. */
-
-/* ── List ─────────────────────────────────────────────── */
-.inbox-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.inbox-item {
-  position: relative;
-  border-radius: var(--radius);
+  gap: 20px;
+  padding: 22px 24px;
+  margin-bottom: 14px;
+  border-radius: 22px;
   border: 1px solid var(--border);
-  background: var(--bg-card);
-  overflow: hidden;
-  transition: border-color var(--dur-fast) var(--ease),
-              box-shadow var(--dur) var(--ease-out),
-              transform var(--dur-fast) var(--ease-out);
-  animation: fadeInUp var(--dur) var(--ease-out);
+  background:
+    radial-gradient(90% 140% at 100% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
+    var(--bg-card);
+}
+.ibx-hero h1 { margin: 0 0 4px; font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
+.ibx-hero p { margin: 0; color: var(--text-secondary); font-size: 14px; }
+.ibx-hero strong { color: var(--text-primary); }
+.t-red { color: var(--accent-red, #EF4444) !important; }
+.t-amber { color: var(--accent-yellow, #D97706) !important; }
+.ibx-hero-stats { display: flex; gap: 10px; }
+.ibx-hero-stats div {
+  min-width: 74px; text-align: center; padding: 10px 12px; border-radius: 14px;
+  background: var(--bg-secondary, var(--bg-primary)); border: 1px solid var(--border);
+}
+.ibx-hero-stats strong { display: block; font-size: 22px; font-weight: 800; }
+.ibx-hero-stats span { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+
+.ibx-guide {
+  position: relative;
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 44px 14px 16px; margin-bottom: 14px;
+  border-radius: 16px; border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-card));
+}
+.ibx-step { flex: 1; display: flex; gap: 10px; align-items: flex-start; min-width: 0; }
+.ibx-step > span {
+  flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--accent); color: #fff; font-weight: 800; font-size: 13px;
+}
+.ibx-step strong { display: block; font-size: 13.5px; }
+.ibx-step em { display: block; font-style: normal; font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
+.ibx-step-arrow { flex: none; color: var(--text-muted); }
+.ibx-guide-close {
+  position: absolute; top: 8px; right: 8px; border: 0; background: none; cursor: pointer;
+  color: var(--text-muted); padding: 4px; border-radius: 6px;
 }
 
-.inbox-item:hover {
-  border-color: var(--border-light);
-  box-shadow: var(--shadow-sm);
-  transform: translateY(-1px);
+.ibx-capture {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 14px; margin-bottom: 18px; border-radius: 18px;
+  background: var(--bg-card); border: 1.5px solid var(--border);
+  box-shadow: var(--shadow-sm, none);
+  transition: border-color .15s;
+}
+.ibx-capture:focus-within { border-color: var(--accent); }
+.ibx-capture > input {
+  border: 0; outline: none; background: transparent; font-size: 16px; padding: 4px 2px; color: var(--text-primary);
+}
+.ibx-capture-opts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ibx-capture-btn {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 10px; border: 0; cursor: pointer;
+  background: var(--accent); color: #fff; font-weight: 700; font-size: 13px;
+}
+.ibx-capture-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.ibx-group { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.ibx-pri, .ibx-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--border); background: transparent; color: var(--text-secondary); cursor: pointer;
+}
+.ibx-pri:hover, .ibx-pill:hover { border-color: var(--text-muted); color: var(--text-primary); }
+.ibx-pri.active { color: #fff; border-color: transparent; }
+.ibx-pri--high.active { background: var(--accent-red, #EF4444); }
+.ibx-pri--medium.active { background: var(--accent-blue, #3B82F6); }
+.ibx-pri--low.active { background: var(--accent-green, #10B981); }
+.ibx-pill.active { background: var(--accent-soft, color-mix(in srgb, var(--accent) 14%, transparent)); color: var(--accent); border-color: var(--accent); }
+.ibx-date { position: relative; padding-right: 6px; }
+.ibx-date input {
+  border: 0; background: transparent; color: inherit; font: inherit; outline: none; width: 118px; cursor: pointer;
 }
 
-.inbox-item.is-open {
-  border-color: var(--accent);
-  box-shadow: var(--shadow-sm);
+.ibx-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-bottom: 12px; flex-wrap: wrap;
 }
-
-/* A priority stripe down the left edge — readable at a glance
-   without spending a whole column on a badge. */
-.inbox-item::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: transparent;
-  transition: background-color var(--dur) var(--ease);
+.ibx-tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 14px; background: var(--bg-secondary, var(--bg-card)); border: 1px solid var(--border); }
+.ibx-tabs button {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 0; background: transparent; padding: 7px 13px; border-radius: 10px;
+  font-size: 13px; font-weight: 600; color: var(--text-secondary); cursor: pointer;
 }
-
-.inbox-item.pri-high::before { background: var(--accent-red); }
-.inbox-item.pri-medium::before { background: var(--accent); }
-.inbox-item.pri-low::before { background: var(--accent-blue); }
-
-.inbox-item.is-pinned { background: var(--accent-soft); }
-.inbox-item.is-done { opacity: 0.6; }
-
-.inbox-item-main {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 12px 11px 14px;
+.ibx-tabs button em {
+  font-style: normal; font-size: 11px; padding: 1px 7px; border-radius: 999px;
+  background: var(--bg-card); color: var(--text-muted);
 }
-
-.inbox-check {
-  display: grid;
-  place-items: center;
-  width: 21px;
-  height: 21px;
-  flex-shrink: 0;
-  border-radius: 7px;
-  border: 1.5px solid var(--border-light);
-  color: transparent;
-  transition: all var(--dur) var(--ease-spring);
+.ibx-tabs button.active { background: var(--bg-card); color: var(--text-primary); box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,.08)); }
+.ibx-tabs button.active em { background: var(--accent); color: #fff; }
+.ibx-toolbar-right { display: flex; align-items: center; gap: 8px; }
+.ibx-search {
+  display: flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 11px;
+  border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted);
 }
-
-.inbox-check:hover { border-color: var(--accent); transform: scale(1.1); }
-
-.inbox-item.is-done .inbox-check {
-  background: var(--accent-green);
-  border-color: var(--accent-green);
-  color: #fff;
+.ibx-search input { border: 0; outline: none; background: transparent; color: var(--text-primary); width: 160px; font-size: 13px; }
+.ibx-search button { border: 0; background: none; color: var(--text-muted); cursor: pointer; display: grid; }
+.ibx-action {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: 10px; font-size: 12.5px; font-weight: 600;
+  border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); cursor: pointer;
 }
+.ibx-action:hover { color: var(--text-primary); border-color: var(--text-muted); }
+.ibx-action--primary { background: var(--accent); color: #fff; border-color: transparent; }
+.ibx-action--primary:hover { color: #fff; filter: brightness(1.05); }
 
-.inbox-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  text-align: left;
-}
-
-.inbox-text {
-  font-size: 14px;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  transition: color var(--dur) var(--ease);
-}
-
-.inbox-item.is-done .inbox-text {
-  text-decoration: line-through;
-  color: var(--text-muted);
-}
-
-.inbox-meta {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11.5px;
-  color: var(--text-muted);
-}
-
-.inbox-meta em { font-style: normal; }
-
-.inbox-actions {
-  display: flex;
-  gap: 2px;
-  flex-shrink: 0;
-  opacity: 0;
-  transform: translateX(4px);
-  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease-out);
-}
-
-.inbox-item:hover .inbox-actions,
-.inbox-item:focus-within .inbox-actions {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-/* ── Expanded ─────────────────────────────────────────── */
-.inbox-expand {
-  padding: 0 14px 14px 45px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  animation: fadeInUp var(--dur) var(--ease-out);
-}
-
-.inbox-note {
-  font-size: 13px;
+.ibx-bucket { margin-bottom: 20px; }
+.ibx-bucket > header {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 0 4px;
   color: var(--text-secondary);
-  line-height: 1.6;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-sunken);
-  white-space: pre-wrap;
+}
+.ibx-bucket > header h2 { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.ibx-bucket > header em { font-style: normal; font-size: 12px; color: var(--text-muted); margin-left: 4px; }
+.ibx-count { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--bg-secondary, var(--border)); }
+.ibx-bucket--overdue > header svg, .ibx-bucket--overdue > header h2 { color: var(--accent-red, #EF4444); }
+.ibx-bucket--today > header svg { color: var(--accent-yellow, #D97706); }
+.ibx-bucket--urgent > header svg { color: var(--accent-red, #EF4444); }
+.ibx-bucket--pinned > header svg { color: var(--accent); }
+
+.ibx-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.ibx-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  transition: border-color .15s, box-shadow .15s, opacity .2s;
+}
+.ibx-card:hover { box-shadow: var(--shadow-sm, 0 2px 8px rgba(0,0,0,.06)); }
+.ibx-card.pri-high { border-left-color: var(--accent-red, #EF4444); }
+.ibx-card.pri-medium { border-left-color: var(--accent-blue, #3B82F6); }
+.ibx-card.pri-low { border-left-color: var(--accent-green, #10B981); }
+.ibx-card.is-done, .ibx-card.is-archived { opacity: .7; border-left-color: var(--border); }
+.ibx-card.is-done .ibx-text { text-decoration: line-through; color: var(--text-muted); }
+.ibx-card.is-highlight { box-shadow: 0 0 0 2px var(--accent); }
+
+.ibx-done {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  width: 54px; padding: 8px 0; border-radius: 12px; cursor: pointer;
+  border: 1.5px dashed var(--border); background: transparent; color: var(--text-muted);
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+}
+.ibx-done:hover { border-color: var(--accent-green, #10B981); color: var(--accent-green, #10B981); border-style: solid; }
+.ibx-done[aria-pressed='true'] { background: var(--accent-green, #10B981); color: #fff; border: 1.5px solid transparent; }
+
+.ibx-main { min-width: 0; }
+.ibx-text { font-size: 15px; font-weight: 600; color: var(--text-primary); line-height: 1.4; word-break: break-word; }
+.ibx-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; font-size: 12px; color: var(--text-muted); }
+.ibx-chip { padding: 1px 8px; border-radius: 999px; background: var(--bg-secondary, var(--border)); }
+.ibx-due { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; font-weight: 600; }
+.ibx-due--overdue { background: color-mix(in srgb, var(--accent-red, #EF4444) 15%, transparent); color: var(--accent-red, #EF4444); }
+.ibx-due--today { background: color-mix(in srgb, var(--accent-yellow, #F59E0B) 18%, transparent); color: var(--accent-yellow, #B45309); }
+.ibx-due--soon, .ibx-due--later { background: var(--bg-secondary, var(--border)); color: var(--text-secondary); }
+
+.ibx-note {
+  display: block; width: 100%; text-align: left; margin-top: 8px; padding: 8px 10px;
+  border-radius: 10px; border: 0; background: var(--bg-secondary, var(--bg-primary));
+  color: var(--text-secondary); font-size: 13px; white-space: pre-wrap; cursor: text;
+}
+.ibx-note-edit {
+  width: 100%; margin-top: 8px; min-height: 70px; padding: 8px 10px; border-radius: 10px;
+  border: 1px solid var(--accent); background: var(--bg-primary); color: var(--text-primary); font: inherit; font-size: 13px; resize: vertical;
 }
 
-.inbox-expand-row {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  flex-wrap: wrap;
+.ibx-controls { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-top: 10px; }
+
+.ibx-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.ibx-convert { position: relative; }
+.ibx-convert-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; width: 250px;
+  padding: 6px; border-radius: 14px; background: var(--bg-elevated, var(--bg-card));
+  border: 1px solid var(--border); box-shadow: var(--shadow-md, 0 10px 30px rgba(0,0,0,.15));
 }
-
-.inbox-expand-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 84px;
-  font-size: 11.5px;
-  font-weight: 650;
-  letter-spacing: 0.03em;
-  color: var(--text-muted);
+.ibx-convert-menu button {
+  display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left;
+  padding: 8px 10px; border: 0; border-radius: 10px; background: transparent; cursor: pointer; color: var(--text-primary);
 }
+.ibx-convert-menu button:hover { background: var(--bg-hover, var(--bg-secondary)); }
+.ibx-convert-menu svg { margin-top: 2px; color: var(--accent); }
+.ibx-convert-menu strong { display: block; font-size: 13px; }
+.ibx-convert-menu em { display: block; font-style: normal; font-size: 11.5px; color: var(--text-muted); }
+.ibx-icons { display: flex; gap: 4px; }
+.ibx-icon {
+  display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px;
+  border: 1px solid transparent; background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.ibx-icon:hover { background: var(--bg-secondary, var(--border)); color: var(--text-primary); }
+.ibx-icon.active { color: var(--accent); background: var(--accent-soft, transparent); }
+.ibx-icon--danger:hover { color: var(--accent-red, #EF4444); }
 
-.inbox-convert { display: flex; gap: 6px; flex-wrap: wrap; }
-
-/* ── Responsive ───────────────────────────────────────── */
-@media (max-width: 600px) {
-  .inbox-toolbar { flex-direction: column; align-items: stretch; }
-
-  /* Touch has no hover, so the row actions have to stay visible. */
-  .inbox-actions { opacity: 1; transform: none; }
-
-  .inbox-expand { padding-left: 14px; }
-  .inbox-expand-row { flex-direction: column; align-items: stretch; }
-  .inbox-convert .btn { flex: 1; justify-content: center; }
-  .inbox-capture { flex-wrap: wrap; }
-  .inbox-capture input { min-width: 0; }
+@media (max-width: 760px) {
+  .ibx-hero { flex-direction: column; align-items: flex-start; }
+  .ibx-guide { flex-direction: column; align-items: stretch; }
+  .ibx-step-arrow { display: none; }
+  .ibx-card { grid-template-columns: auto minmax(0, 1fr); }
+  .ibx-side { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; width: 100%; }
+  .ibx-search input { width: 110px; }
 }
