@@ -78,6 +78,13 @@ export default function ProjectCard({ project, onDelete }) {
       <div className="project-card-v2-body">
         <div className="project-card-v2-main">
           <h3 className="project-card-v2-title">{project.title}</h3>
+          {(project.accountType || project.projectType) && (
+            <div className="project-card-tags">
+              {project.accountType && <span className={`pc-tag pc-tag--${project.accountType}`}>{project.accountType.replace('-', ' ')}</span>}
+              {project.organization && <span className="pc-tag pc-tag--org">{project.organization}</span>}
+              {project.projectType && project.projectType !== 'other' && <span className="pc-tag">{project.projectType}</span>}
+            </div>
+          )}
           {project.description && <p className="project-card-v2-desc">{project.description}</p>}
 
           {dueDate && (

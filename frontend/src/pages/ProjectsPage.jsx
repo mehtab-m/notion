@@ -8,7 +8,7 @@ import {
   acceptProjectInvite, declineProjectInvite,
 } from '../utils/api';
 import ProjectCard from '../components/Projects/ProjectCard';
-import ProjectModal from '../components/Projects/ProjectModal';
+import ProjectModal, { ACCOUNT_TYPES } from '../components/Projects/ProjectModal';
 import './ProjectsPage.css';
 
 const STATUS_FILTERS = ['all', 'active', 'planned', 'on-hold', 'completed'];
@@ -18,6 +18,7 @@ export default function ProjectsPage() {
   const { data: projects, loading, refetch } = useApi(getProjects);
   const { data: invites, refetch: refetchInvites } = useApi(getPendingInvitations);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [accountFilter, setAccountFilter] = useState('all');
   const [modalOpen, setModalOpen] = useState(false);
 
   const handleDelete = async (id) => {
@@ -61,8 +62,14 @@ export default function ProjectsPage() {
   };
 
   const filtered = (projects || []).filter(
-    (p) => statusFilter === 'all' || p.status === statusFilter
+    (p) => (statusFilter === 'all' || p.status === statusFilter)
+      && (accountFilter === 'all' || (p.accountType || 'personal') === accountFilter)
   );
+  const accountCounts = (projects || []).reduce((acc, p) => {
+    const k = p.accountType || 'personal';
+    acc[k] = (acc[k] || 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <div className="projects-page">
@@ -106,6 +113,17 @@ export default function ProjectsPage() {
             onClick={() => setStatusFilter(s)}
           >
             {s.charAt(0).toUpperCase() + s.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      <div className="filter-bar projects-account-filter">
+        <button className={`filter-btn ${accountFilter === 'all' ? 'active' : ''}`} onClick={() => setAccountFilter('all')}>
+          All workspaces
+        </button>
+        {ACCOUNT_TYPES.filter((a) => accountCounts[a.id]).map(({ id, label, icon: Icon }) => (
+          <button key={id} className={`filter-btn ${accountFilter === id ? 'active' : ''}`} onClick={() => setAccountFilter(id)}>
+            <Icon size={13} /> {label} <em>· {accountCounts[id]}</em>
           </button>
         ))}
       </div>

@@ -3,7 +3,7 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const prisma = require('../lib/prisma');
 const { owned } = require('../utils/scope');
-const { cleanBody } = require('../utils/body');
+const { cleanBody, parseDate } = require('../utils/body');
 const { serialize, serializeTablePart } = require('../utils/serialize');
 const { findAccessibleProject, findEditableProject, findOwnedProject, acceptedAssignees, accessibleProjectsWhere } = require('../utils/projectAccess');
 const { sendProjectInviteEmail } = require('../utils/email');
@@ -145,14 +145,52 @@ router.get('/', async (req, res) => {
   }
 });
 
+const ACCOUNT_TYPES = ['company', 'personal', 'freelance', 'client', 'study', 'open-source'];
+const PROJECT_TYPES = ['software', 'design', 'marketing', 'research', 'content', 'operations', 'event', 'other'];
+const STATUSES = ['active', 'planned', 'on-hold', 'completed'];
+const PRIORITIES = ['low', 'medium', 'high'];
+
+/* Whitelist what a client may set on a project. The old handler spread the
+   raw body into Prisma, so a plain "2026-12-01" from <input type="date">
+   (not a full ISO DateTime) or any unknown key made create fail. */
+function projectFields(body, { partial = false } = {}) {
+  const b = body || {};
+  const data = {};
+  const str = (v, max) => String(v ?? '').trim().slice(0, max);
+  if (b.title !== undefined || !partial) {
+    const title = str(b.title, 200);
+    if (!title) throw new Error('Project name is required');
+    data.title = title;
+  }
+  if (b.description !== undefined) data.description = str(b.description, 5000);
+  if (b.status !== undefined) data.status = STATUSES.includes(b.status) ? b.status : 'active';
+  if (b.priority !== undefined) data.priority = PRIORITIES.includes(b.priority) ? b.priority : 'medium';
+  if (b.accountType !== undefined) data.accountType = ACCOUNT_TYPES.includes(b.accountType) ? b.accountType : 'personal';
+  if (b.projectType !== undefined) data.projectType = PROJECT_TYPES.includes(b.projectType) ? b.projectType : 'other';
+  if (b.organization !== undefined) data.organization = str(b.organization, 160);
+  if (b.role !== undefined) data.role = str(b.role, 120);
+  if (b.color !== undefined) data.color = str(b.color, 32);
+  if (b.dueDate !== undefined) data.dueDate = parseDate(b.dueDate) ?? null;
+  if (b.startDate !== undefined) data.startDate = parseDate(b.startDate) ?? null;
+  if (b.budget !== undefined) {
+    const n = b.budget === '' || b.budget == null ? null : Number(b.budget);
+    data.budget = Number.isFinite(n) ? n : null;
+  }
+  if (b.tags !== undefined) {
+    data.tags = (Array.isArray(b.tags) ? b.tags : String(b.tags).split(','))
+      .map((t) => String(t).trim()).filter(Boolean).slice(0, 20);
+  }
+  return data;
+}
+
 router.post('/', async (req, res) => {
   try {
-    const body = cleanBody(req.body);
+    const data = projectFields(req.body);
     const saved = await prisma.project.create({
       data: {
-        ...body,
-        tasks: body.tasks || [],
-        dataTables: body.dataTables || [],
+        ...data,
+        tasks: Array.isArray(req.body?.tasks) ? req.body.tasks : [],
+        dataTables: Array.isArray(req.body?.dataTables) ? req.body.dataTables : [],
         userId: req.user.id,
       },
     });
@@ -177,6 +215,13 @@ router.put('/:id', async (req, res) => {
     const existing = await loadProject(req, req.params.id, { requireEdit: true });
     if (!existing) return res.status(404).json({ error: 'Project not found' });
     const patch = cleanBody(req.body, ['members', 'user', 'isOwner', 'messages']);
+    for (const key of ['dueDate', 'startDate']) {
+      if (key in patch) patch[key] = parseDate(patch[key]) ?? null;
+    }
+    if ('budget' in patch) {
+      const n = patch.budget === '' || patch.budget == null ? null : Number(patch.budget);
+      patch.budget = Number.isFinite(n) ? n : null;
+    }
     const full = await saveProject(existing, patch, req.user);
     replyProject(res, full, req.user.id);
   } catch (err) {

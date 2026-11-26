@@ -156,6 +156,16 @@ model Project {
   team        String[]         @default([])
   assignees   String[]         @default([])
   color       String           @default("")
+  /// Whose work this is: "company" | "personal" | "freelance" | "client" | "study" | "open-source"
+  accountType String           @default("personal")
+  /// Company, client or school the project belongs to
+  organization String          @default("")
+  /// "software" | "design" | "marketing" | "research" | "content" | "operations" | "event" | "other"
+  projectType String           @default("other")
+  /// Your role on it, e.g. "Lead developer"
+  role        String           @default("")
+  startDate   DateTime?
+  budget      Float?
   userId      String
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime         @default(now())

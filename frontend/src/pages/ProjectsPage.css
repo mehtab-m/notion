@@ -57,3 +57,16 @@
     grid-template-columns: 1fr;
   }
 }
+
+.projects-account-filter .filter-btn { display: inline-flex; align-items: center; gap: 5px; }
+.projects-account-filter em { font-style: normal; opacity: .7; }
+.project-card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 6px; }
+.pc-tag {
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; text-transform: capitalize;
+  background: var(--bg-secondary, var(--bg-hover)); color: var(--text-secondary);
+}
+.pc-tag--company { background: color-mix(in srgb, var(--chart-2) 16%, transparent); color: var(--chart-2); }
+.pc-tag--personal { background: color-mix(in srgb, var(--chart-4) 16%, transparent); color: var(--chart-4); }
+.pc-tag--freelance, .pc-tag--client { background: color-mix(in srgb, var(--chart-3) 18%, transparent); color: var(--chart-3); }
+.pc-tag--study { background: color-mix(in srgb, var(--chart-5) 16%, transparent); color: var(--chart-5); }
+.pc-tag--org { text-transform: none; }
