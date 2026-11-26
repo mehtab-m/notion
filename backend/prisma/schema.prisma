@@ -61,6 +61,8 @@ stripeCancelAtPeriodEnd  Boolean   @default(false)
   themeSettings       Json      @default("{}")
   /// { weeklySummary, productUpdates, habitReminders, focusChime, soundEffects }
   notificationPrefs   Json      @default("{}")
+  /// { readIds: [alert ids], lastDigestAt } — server-side notification state
+  notificationState   Json      @default("{}")
   /// Uploaded avatar path ("/uploads/…") or remote URL
   avatarUrl           String?
   createdAt           DateTime  @default(now())

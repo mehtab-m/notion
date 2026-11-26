@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { getApiBase } from '../utils/api';
+import NotificationBell from './NotificationBell';
 import './Navbar.css';
 
 function getGreeting() {
@@ -107,6 +108,8 @@ export default function Navbar({ title, subtitle, onMenuClick, onSearchClick, on
         >
           <Search size={18} />
         </button>
+
+        <NotificationBell />
 
         {/* Quick light/dark flip — the palette gallery is one click deeper. */}
         <button

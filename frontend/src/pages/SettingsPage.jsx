@@ -4,13 +4,13 @@ import toast from 'react-hot-toast';
 import {
   User, Lock, Palette, Code2, Crown, Shield, Bell, Database,
   Download, Upload, Trash2, Camera, AlertTriangle, Check, FileJson, FileSpreadsheet,
-  Smartphone,
+  Smartphone, BellRing, Mail, Moon, Volume2, AlarmClock, ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
   updateProfile, updatePassword, updatePreferences, updateNotifications,
   uploadAvatar, removeAvatar, deleteAccount, getDataSummary, exportData,
-  exportCsv, importData, getApiBase,
+  exportCsv, importData, getApiBase, getNotifications, sendTestDigest,
 } from '../utils/api';
 import ThemeStudio from '../components/ThemeStudio';
 import { onInstallAvailable, promptInstall, isStandalone } from '../utils/pwa';
@@ -18,21 +18,42 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import './SettingsPage.css';
 
 const SECTIONS = [
-  { id: 'profile', label: 'Profile', icon: User },
-  { id: 'appearance', label: 'Appearance', icon: Palette },
-  { id: 'notifications', label: 'Notifications', icon: Bell },
-  { id: 'workspace', label: 'Workspace', icon: Code2 },
-  { id: 'data', label: 'Your data', icon: Database },
-  { id: 'security', label: 'Security', icon: Lock },
+  { id: 'profile', label: 'Profile', hint: 'Name, email, photo', icon: User },
+  { id: 'appearance', label: 'Appearance', hint: 'Themes & palettes', icon: Palette },
+  { id: 'notifications', label: 'Notifications', hint: 'Emails & alerts', icon: Bell },
+  { id: 'workspace', label: 'Workspace', hint: 'Modules & app', icon: Code2 },
+  { id: 'data', label: 'Your data', hint: 'Export, import, delete', icon: Database },
+  { id: 'security', label: 'Security', hint: 'Password', icon: Lock },
 ];
 
-const NOTIFICATION_FIELDS = [
-  { key: 'weeklySummary', label: 'Weekly recap email', hint: 'A Monday summary of the week just gone.' },
-  { key: 'productUpdates', label: 'Product updates', hint: 'Occasional email when something new ships.' },
-  { key: 'habitReminders', label: 'Habit reminders', hint: 'A nudge for habits still unchecked late in the day.' },
-  { key: 'focusChime', label: 'Focus chime', hint: 'Play a short tone when a focus block ends.' },
-  { key: 'soundEffects', label: 'Sound effects', hint: 'Small sounds when you complete things.' },
-  { key: 'desktopNotifications', label: 'Desktop notifications', hint: 'Requires permission from your browser.' },
+const NOTIFICATION_GROUPS = [
+  {
+    title: 'Email',
+    hint: 'Sent to the address on your profile',
+    icon: Mail,
+    fields: [
+      { key: 'weeklySummary', label: 'Weekly summary', hint: 'Every Monday morning: habits, focus, runs, inbox and your closest goals.' },
+      { key: 'productUpdates', label: 'Product updates', hint: 'Occasional email when something new ships.' },
+    ],
+  },
+  {
+    title: 'In-app alerts',
+    hint: 'Shown under the bell in the top bar',
+    icon: AlarmClock,
+    fields: [
+      { key: 'deadlineAlerts', label: 'Deadlines & follow-ups', hint: 'Overdue or due-today inbox items, goal follow-ups, sub-goals and goal deadlines.' },
+      { key: 'habitReminders', label: 'Habit reminders', hint: 'After 6pm, a nudge for habits still unchecked — especially streaks at risk.' },
+    ],
+  },
+  {
+    title: 'Sounds',
+    hint: 'Played in this browser',
+    icon: Volume2,
+    fields: [
+      { key: 'focusChime', label: 'Focus chime', hint: 'A short tone when a focus block ends.' },
+      { key: 'soundEffects', label: 'Sound effects', hint: 'Small sounds when you complete things.' },
+    ],
+  },
 ];
 
 const COLLECTION_LABELS = {
@@ -74,6 +95,7 @@ export default function SettingsPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteForm, setDeleteForm] = useState({ password: '', confirm: '' });
   const [canInstallApp, setCanInstallApp] = useState(false);
+  const [alertPreview, setAlertPreview] = useState(null);
   const avatarInput = useRef(null);
   const importInput = useRef(null);
 
@@ -158,24 +180,41 @@ export default function SettingsPage() {
     }
   };
 
+  const refreshAlertPreview = useCallback(async () => {
+    try {
+      const data = await getNotifications();
+      setAlertPreview({ unread: data.unread, quiet: data.quiet });
+    } catch {
+      setAlertPreview({ unread: 0, quiet: false });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (section === 'notifications') refreshAlertPreview();
+  }, [section, refreshAlertPreview]);
+
+  const sendTestEmail = async () => {
+    busy('testEmail', true);
+    try {
+      const data = await sendTestDigest();
+      toast.success(data.message || 'Sent');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not send the email');
+    } finally {
+      busy('testEmail', false);
+    }
+  };
+
   const toggleNotification = async (key) => {
     const next = { ...notifications, [key]: !notifications[key] };
     setNotifications(next);
 
-    /* Desktop notifications are meaningless without OS permission, so
-       ask for it the moment the switch goes on. */
-    if (key === 'desktopNotifications' && next[key] && 'Notification' in window) {
-      const result = await Notification.requestPermission();
-      if (result !== 'granted') {
-        setNotifications((prev) => ({ ...prev, [key]: false }));
-        toast.error('Your browser blocked notifications');
-        return;
-      }
-    }
-
     try {
       const data = await updateNotifications({ [key]: next[key] });
       updateUser(data.user);
+      toast.success(`${next[key] ? 'Turned on' : 'Turned off'}`, { id: 'notif-pref', duration: 1500 });
+      refreshAlertPreview();
+      window.dispatchEvent(new Event('sortlife:notifications-changed'));
     } catch (err) {
       setNotifications(notifications);
       toast.error(err.response?.data?.error || 'Could not save that preference');
@@ -358,15 +397,19 @@ export default function SettingsPage() {
       <div className="settings-layout">
         {/* ── Section nav ────────────────────────────────── */}
         <nav className="settings-nav" aria-label="Settings sections">
-          {SECTIONS.map(({ id, label, icon: Icon }) => (
+          {SECTIONS.map(({ id, label, hint, icon: Icon }) => (
             <button
               key={id}
               type="button"
               className={`settings-nav-item ${section === id ? 'active' : ''}`}
               onClick={() => setSection(id)}
             >
-              <Icon size={16} />
-              <span>{label}</span>
+              <span className="settings-nav-icon"><Icon size={16} /></span>
+              <span className="settings-nav-copy">
+                <span>{label}</span>
+                <em>{hint}</em>
+              </span>
+              <ChevronRight size={14} className="settings-nav-caret" />
             </button>
           ))}
         </nav>
@@ -430,75 +473,82 @@ export default function SettingsPage() {
                 <h2>Notifications</h2>
               </div>
               <p className="settings-hint">
-                Email settings apply to the address on your profile. In-app nudges respect
-                your quiet hours.
+                Everything here is saved to your account and acted on by the server — emails go
+                to <strong>{user?.email}</strong>, in-app alerts appear under the bell in the top bar.
               </p>
 
-              <div className="settings-switches">
-                {NOTIFICATION_FIELDS.map((field) => (
-                  <div key={field.key} className="switch-row">
-                    <div className="switch-row-copy">
-                      <strong>{field.label}</strong>
-                      <span>{field.hint}</span>
-                    </div>
-                    <button
-                      type="button"
-                      className="switch"
-                      role="switch"
-                      aria-checked={!!notifications[field.key]}
-                      aria-label={field.label}
-                      onClick={() => toggleNotification(field.key)}
-                    />
+              <div className="notif-live">
+                <div className="notif-live-stat">
+                  <BellRing size={18} />
+                  <div>
+                    <strong>{alertPreview == null ? '…' : alertPreview.unread}</strong>
+                    <span>unread alert{alertPreview?.unread === 1 ? '' : 's'} right now{alertPreview?.quiet ? ' · quiet hours' : ''}</span>
                   </div>
-                ))}
+                </div>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={sendTestEmail} disabled={saving.testEmail}>
+                  <Mail size={14} /> {saving.testEmail ? 'Sending…' : 'Email me this week’s summary'}
+                </button>
               </div>
+
+              {NOTIFICATION_GROUPS.map((group) => (
+                <div key={group.title} className="notif-group">
+                  <div className="notif-group-head">
+                    <group.icon size={15} />
+                    <div>
+                      <strong>{group.title}</strong>
+                      <span>{group.hint}</span>
+                    </div>
+                  </div>
+                  <div className="settings-switches">
+                    {group.fields.map((field) => (
+                      <div key={field.key} className="switch-row">
+                        <div className="switch-row-copy">
+                          <strong>{field.label}</strong>
+                          <span>{field.hint}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="switch"
+                          role="switch"
+                          aria-checked={!!notifications[field.key]}
+                          aria-label={field.label}
+                          onClick={() => toggleNotification(field.key)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
 
               <div className="settings-quiet">
                 <div className="switch-row-copy">
-                  <strong>Quiet hours</strong>
-                  <span>In-app nudges stay silent between these times.</span>
+                  <strong><Moon size={14} style={{ verticalAlign: '-2px' }} /> Quiet hours</strong>
+                  <span>Habit nudges stay silent between these times (your local time).</span>
                 </div>
                 <div className="settings-quiet-inputs">
-                  <label>
-                    From
-                    <select
-                      value={notifications.quietHoursStart ?? 22}
-                      onChange={async (e) => {
-                        const value = Number(e.target.value);
-                        setNotifications((p) => ({ ...p, quietHoursStart: value }));
-                        try {
-                          const data = await updateNotifications({ quietHoursStart: value });
-                          updateUser(data.user);
-                        } catch {
-                          toast.error('Could not save quiet hours');
-                        }
-                      }}
-                    >
-                      {Array.from({ length: 24 }, (_, h) => (
-                        <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    To
-                    <select
-                      value={notifications.quietHoursEnd ?? 8}
-                      onChange={async (e) => {
-                        const value = Number(e.target.value);
-                        setNotifications((p) => ({ ...p, quietHoursEnd: value }));
-                        try {
-                          const data = await updateNotifications({ quietHoursEnd: value });
-                          updateUser(data.user);
-                        } catch {
-                          toast.error('Could not save quiet hours');
-                        }
-                      }}
-                    >
-                      {Array.from({ length: 24 }, (_, h) => (
-                        <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
-                      ))}
-                    </select>
-                  </label>
+                  {[['quietHoursStart', 'From', 22], ['quietHoursEnd', 'To', 8]].map(([key, label, fallback]) => (
+                    <label key={key}>
+                      {label}
+                      <select
+                        value={notifications[key] ?? fallback}
+                        onChange={async (e) => {
+                          const value = Number(e.target.value);
+                          setNotifications((p) => ({ ...p, [key]: value }));
+                          try {
+                            const data = await updateNotifications({ [key]: value });
+                            updateUser(data.user);
+                            refreshAlertPreview();
+                          } catch {
+                            toast.error('Could not save quiet hours');
+                          }
+                        }}
+                      >
+                        {Array.from({ length: 24 }, (_, h) => (
+                          <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
                 </div>
               </div>
             </section>

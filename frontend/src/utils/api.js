@@ -208,6 +208,13 @@ export const getApiBase = () => resolveApiBase().replace(/\/api$/, '') || 'http:
 export const updateTheme = (data) => api.patch('/auth/theme', data).then((r) => r.data);
 
 // ── Account ──────────────────────────────────────────────
+// In-app alerts + weekly digest (backend/routes/notifications.js)
+export const getNotifications = () =>
+  api.get('/notifications', { params: { hour: new Date().getHours() } }).then((r) => r.data);
+export const markNotificationsRead = (ids) => api.post('/notifications/read', { ids }).then((r) => r.data);
+export const markAllNotificationsRead = () =>
+  api.post('/notifications/read-all', { hour: new Date().getHours() }).then((r) => r.data);
+export const sendTestDigest = () => api.post('/notifications/test-email').then((r) => r.data);
 export const updateNotifications = (data) =>
   api.patch('/auth/notifications', data).then((r) => r.data);
 export const uploadAvatar = (file) => {

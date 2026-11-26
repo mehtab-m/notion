@@ -1,0 +1,42 @@
+.nbell { position: relative; }
+.nbell-btn { position: relative; }
+.nbell-badge {
+  position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px;
+  display: grid; place-items: center; border-radius: 999px; font-size: 10px; font-weight: 800;
+  background: var(--accent-red, #EF4444); color: #fff; box-shadow: 0 0 0 2px var(--bg-primary, #fff);
+}
+.nbell-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; width: min(380px, 92vw);
+  border-radius: 16px; background: var(--bg-elevated, var(--bg-card)); border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg, 0 18px 40px rgba(0,0,0,.18)); overflow: hidden;
+}
+.nbell-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.nbell-head strong { font-size: 14px; }
+.nbell-head > div { display: flex; align-items: center; gap: 8px; }
+.nbell-head button, .nbell-head a {
+  display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; cursor: pointer;
+  color: var(--accent); font-size: 12px; font-weight: 600; text-decoration: none;
+}
+.nbell-head a { color: var(--text-muted); }
+.nbell-list { list-style: none; margin: 0; padding: 6px; max-height: 420px; overflow: auto; }
+.nbell-item {
+  position: relative; display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left;
+  padding: 10px; border: 0; border-radius: 12px; background: transparent; cursor: pointer; color: var(--text-primary);
+}
+.nbell-item:hover { background: var(--bg-hover, var(--bg-secondary)); }
+.nbell-item.is-read { opacity: .6; }
+.nbell-icon {
+  flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px;
+  background: var(--bg-secondary, var(--bg-hover)); color: var(--text-secondary);
+}
+.t-overdue .nbell-icon { background: color-mix(in srgb, var(--accent-red, #EF4444) 15%, transparent); color: var(--accent-red, #EF4444); }
+.t-due .nbell-icon { background: color-mix(in srgb, var(--accent-yellow, #F59E0B) 18%, transparent); color: var(--accent-yellow, #B45309); }
+.t-habit .nbell-icon { background: color-mix(in srgb, var(--chart-5) 15%, transparent); color: var(--chart-5); }
+.t-reminder .nbell-icon { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.nbell-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.nbell-copy strong { font-size: 13px; line-height: 1.3; }
+.nbell-copy em { font-style: normal; font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nbell-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-top: 6px; }
+.nbell-empty { padding: 28px 20px; text-align: center; color: var(--text-muted); }
+.nbell-empty p { margin: 8px 0 2px; font-weight: 600; color: var(--text-primary); }
+.nbell-empty span { font-size: 12px; }

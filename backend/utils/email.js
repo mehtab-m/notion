@@ -120,5 +120,5 @@ async function sendInactiveFollowupEmail(to, name) {
   });
 }
 
-module.exports = { sendVerificationEmail, sendProjectInviteEmail, sendInactiveFollowupEmail };
+module.exports = { sendEmail, sendVerificationEmail, sendProjectInviteEmail, sendInactiveFollowupEmail };
 

@@ -9,7 +9,7 @@ const { sendVerificationEmail } = require('../utils/email');
 const { seedDefaultHabits } = require('../utils/defaultHabits');
 const { graceUntilFrom, logActivity, isAdminUser, defaultPlanExpiresAt, planMeta, resolveEffectivePlan } = require('../utils/activity');
 const { sanitizeThemeSettings, resolveThemeSettings } = require('../utils/themes');
-const { DEFAULT_NOTIFICATION_PREFS, sanitizeNotificationPrefs } = require('../utils/notifications');
+const { sanitizeNotificationPrefs, pickKnown } = require('../utils/notifications');
 const upload = require('../middleware/upload');
 const { uploadLimiter } = require('../middleware/rateLimit');
 
@@ -78,7 +78,7 @@ function publicUser(user) {
     /* Resolved, not raw: a downgraded account must not keep reporting a
        Platinum theme the client would then try to render. */
     themeSettings: resolveThemeSettings({ ...user, plan: meta.plan }),
-    notificationPrefs: { ...DEFAULT_NOTIFICATION_PREFS, ...(user.notificationPrefs || {}) },
+    notificationPrefs: pickKnown(user.notificationPrefs || {}),
     avatarUrl: user.avatarUrl || null,
     createdAt: user.createdAt,
   };
