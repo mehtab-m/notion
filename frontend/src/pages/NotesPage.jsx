@@ -197,18 +197,6 @@ export default function NotesPage() {
   };
 
   const notebooks = notes.filter((n) => n.isNotebook);
-    if (!notebooks.length) return;
-    const firstNb = notebooks[0];
-    const pages = notes.filter(
-      (n) => !n.isNotebook
-        && String(n.notebookId) === String(firstNb._id)
-        && String(n.parentId) === String(firstNb._id)
-    ).sort((a, b) => (a.order || 0) - (b.order || 0));
-    setActiveNote(pages[0] || firstNb);
-    setExpanded((prev) => ({ ...prev, [firstNb._id]: true }));
-  }, [loading, notes, activeNote]);
-
-  const notebooks = notes.filter((n) => n.isNotebook);
   const pages = notes.filter((n) => !n.isNotebook);
   const legacyNotes = pages.filter((n) => !n.notebookId && !n.parentId);
 

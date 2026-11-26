@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  X, Building2, User, Briefcase, Handshake, GraduationCap, GitBranch,
+  X, Building2, User, Briefcase, Users as Handshake, GraduationCap, GitBranch,
   Code2, Palette, Megaphone, FlaskConical, PenTool, Settings2, CalendarHeart, Shapes,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
