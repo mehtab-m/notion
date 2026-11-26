@@ -3,8 +3,7 @@ import { NavLink, Link } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, BookOpen, Tv, Table, PenLine, StickyNote,
   Target, Flame, ChevronDown, X, Shield, Settings, IndianRupee, Sun,
-  Inbox, Timer, BarChart3, Archive, Sparkles, PanelLeftClose, PanelLeft,
-  Crown, Plus,
+  Inbox, Timer, BarChart3, Archive, Sparkles, Crown,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import useMediaQuery, { MOBILE_QUERY } from '../hooks/useMediaQuery';
@@ -20,6 +19,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/today', icon: Sun, label: 'My Day' },
       { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
+      { to: '/analytics', icon: BarChart3, label: 'Insights' },
       { to: '/inbox', icon: Inbox, label: 'Inbox' },
       { to: '/focus', icon: Timer, label: 'Focus' },
     ],
@@ -38,7 +38,6 @@ const NAV_GROUPS = [
     items: [
       { to: '/goals', icon: Target, label: 'Goals' },
       { to: '/habits', icon: Flame, label: 'Habits' },
-      { to: '/analytics', icon: BarChart3, label: 'Insights' },
       { to: '/money', icon: IndianRupee, label: 'Money' },
     ],
   },
@@ -71,14 +70,15 @@ function readJson(key, fallback) {
   }
 }
 
-export default function Sidebar({ open, onClose, onQuickCapture }) {
+export default function Sidebar({ open, onClose }) {
   const today = format(new Date(), 'EEE, MMM d');
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const { isDeveloper, isAdmin, user, plan } = useAuth();
 
   const [collapsedGroups, setCollapsedGroups] = useState(() => readJson(GROUPS_KEY, {}));
   // The rail is a desktop affordance; on mobile the drawer is the answer.
-  const [railed, setRailed] = useState(() => readJson(COLLAPSE_KEY, false));
+  // The docked sidebar is always expanded now; the old rail toggle is gone.
+  const railed = false;
 
   useEffect(() => {
     try { localStorage.setItem(GROUPS_KEY, JSON.stringify(collapsedGroups)); } catch { /* ignore */ }
@@ -134,25 +134,10 @@ export default function Sidebar({ open, onClose, onQuickCapture }) {
           <span className="sidebar-brand-text">SortLife</span>
         </Link>
 
-        <button
-          className="sidebar-rail-btn"
-          onClick={() => setRailed((v) => !v)}
-          aria-label={isRail ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={isRail ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {isRail ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
-        </button>
-
         <button className="sidebar-close" onClick={onClose} aria-label="Close menu">
           <X size={19} />
         </button>
       </div>
-
-      <button type="button" className="sidebar-capture" onClick={onQuickCapture}>
-        <Plus size={16} />
-        <span>Quick capture</span>
-        <kbd>C</kbd>
-      </button>
 
       <nav className="sidebar-nav">
         {visibleGroups.map((group) => {

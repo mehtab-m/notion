@@ -168,7 +168,6 @@ function AppShell() {
         <Sidebar
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
-          onQuickCapture={openCapture}
         />
         {sidebarOpen && (
           <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />
