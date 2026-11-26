@@ -89,6 +89,88 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+/* ── PATCH /:id — partial update used by the goal workspace ────────────
+   PUT replaces the whole goal (and defaults missing milestones to []),
+   which is right for the edit dialog but would wipe sub-goals when the
+   page only wants to add a follow-up. PATCH touches just what it is sent. */
+const JSON_LISTS = ['milestones', 'followUps', 'checkIns', 'resources', 'obstacles'];
+const STATUSES = ['not-started', 'in-progress', 'completed', 'abandoned'];
+
+function metricProgress(g) {
+  const { metricStart, metricTarget, metricCurrent } = g;
+  if (metricTarget == null || metricCurrent == null) return null;
+  const start = metricStart ?? 0;
+  if (metricTarget === start) return metricCurrent >= metricTarget ? 100 : 0;
+  const pct = ((metricCurrent - start) / (metricTarget - start)) * 100;
+  return Math.max(0, Math.min(100, Math.round(pct)));
+}
+
+router.patch('/:id', async (req, res) => {
+  try {
+    const existing = await prisma.goal.findFirst({
+      where: notTrashed(req, { _id: req.params.id }),
+    });
+    if (!existing) return res.status(404).json({ error: 'Goal not found' });
+
+    const b = req.body || {};
+    const data = {};
+    for (const key of JSON_LISTS) {
+      if (b[key] !== undefined) {
+        if (!Array.isArray(b[key])) return res.status(400).json({ error: `${key} must be a list` });
+        data[key] = JSON.parse(JSON.stringify(b[key])).slice(0, 300);
+      }
+    }
+    for (const key of ['title', 'description', 'why', 'category', 'icon', 'metricLabel', 'metricUnit']) {
+      if (b[key] !== undefined) data[key] = String(b[key] ?? '').slice(0, key === 'description' || key === 'why' ? 5000 : 200);
+    }
+    if (data.title !== undefined && !data.title.trim()) return res.status(400).json({ error: 'Title is required' });
+    if (b.status !== undefined) {
+      if (!STATUSES.includes(b.status)) return res.status(400).json({ error: 'Invalid status' });
+      data.status = b.status;
+    }
+    if (b.horizon !== undefined && ['sprint', 'season', 'year', 'lifetime'].includes(b.horizon)) data.horizon = b.horizon;
+    if (b.targetDate !== undefined) {
+      const d = b.targetDate ? new Date(b.targetDate) : null;
+      data.targetDate = d && !Number.isNaN(d.getTime()) ? d : null;
+    }
+    for (const key of ['metricStart', 'metricTarget', 'metricCurrent']) {
+      if (b[key] !== undefined) {
+        const n = b[key] === '' || b[key] == null ? null : Number(b[key]);
+        data[key] = Number.isFinite(n) ? n : null;
+      }
+    }
+
+    const merged = { ...existing, ...data };
+    const milestones = Array.isArray(merged.milestones) ? merged.milestones : [];
+    const { total, progress: msProgress } = flattenMilestoneProgress(milestones);
+    const mProgress = metricProgress(merged);
+    let progress = total > 0 ? msProgress : (mProgress ?? existing.progress);
+    if (total > 0 && mProgress != null) progress = Math.round((msProgress + mProgress) / 2);
+    if (data.status === 'completed') progress = Math.max(progress, 100);
+
+    let status = data.status || existing.status;
+    if (!data.status) {
+      if (progress >= 100 && status !== 'abandoned') status = 'completed';
+      else if (progress > 0 && status === 'not-started') status = 'in-progress';
+      else if (progress < 100 && status === 'completed') status = 'in-progress';
+    }
+
+    const updated = await prisma.goal.update({
+      where: { id: existing.id },
+      data: {
+        ...data,
+        progress,
+        status,
+        achievements: unlockAchievements({ ...merged, status }, milestones, progress),
+        momentum: bumpMomentum(existing.momentum),
+      },
+    });
+    res.json(serialize(updated));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   try {
     const existing = await prisma.goal.findFirst({

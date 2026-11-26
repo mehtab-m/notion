@@ -78,6 +78,15 @@ function prepareGoalData(body) {
   if (!data.milestones) data.milestones = [];
   if (!Array.isArray(data.achievements)) delete data.achievements;
   if (data.why == null) data.why = '';
+  for (const key of ['followUps', 'checkIns', 'resources', 'obstacles']) {
+    if (data[key] !== undefined && !Array.isArray(data[key])) delete data[key];
+  }
+  for (const key of ['metricStart', 'metricTarget', 'metricCurrent']) {
+    if (data[key] !== undefined) {
+      const n = data[key] === '' || data[key] == null ? null : Number(data[key]);
+      data[key] = Number.isFinite(n) ? n : null;
+    }
+  }
   if (data.horizon && !['sprint', 'season', 'year', 'lifetime'].includes(data.horizon)) {
     data.horizon = 'season';
   }

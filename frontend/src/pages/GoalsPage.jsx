@@ -1,12 +1,97 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Trash2, Target, X, Check, Sparkles, Flame, ChevronDown, ChevronRight, Pencil } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { useSearchParams } from 'react-router-dom';
+import { Plus, Trash2, Target, X, Search, Bell, Wand2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { format, differenceInCalendarDays } from 'date-fns';
-import useApi from '../hooks/useApi';
-import { getGoals, createGoal, updateGoal, deleteGoal, toggleMilestone, toggleSubgoal } from '../utils/api';
+import { differenceInCalendarDays, startOfDay, addDays } from 'date-fns';
+import { getGoals, createGoal, updateGoal, deleteGoal } from '../utils/api';
 import ConfirmDialog from '../components/ConfirmDialog';
+import GoalWorkspace from '../components/Goals/GoalWorkspace';
+import { ChartCard, ChartGrid, ConcentricRings, DonutChart, TapeDiagram } from '../components/Charts/ChartKit';
 import './GoalsPage.css';
 import useFocusTrap from '../hooks/useFocusTrap';
+
+/* Starter plans: picking one pre-fills sub-goals, steps, follow-ups and a
+   target so a goal like "Study in Germany" starts as a usable plan. */
+const iso = (days) => startOfDay(addDays(new Date(), days)).toISOString().slice(0, 10);
+const TEMPLATES = [
+  {
+    id: 'study-abroad', label: 'Study abroad', icon: '🌍', category: 'learning', horizon: 'year',
+    title: 'Study in Germany', why: 'A world-class degree and a new life abroad.',
+    milestones: [
+      ['Shortlist universities & programmes', ['Search DAAD database', 'Compare 5 programmes', 'Check admission requirements']],
+      ['Language certificate', ['Pick test (IELTS / TestDaF)', 'Book exam date', 'Daily practice 45 min']],
+      ['Documents ready', ['Transcripts & degree attested', 'CV (Europass)', 'Motivation letter', '2 recommendation letters']],
+      ['Apply (uni-assist / direct)', ['Submit applications', 'Pay fees']],
+      ['Finances & blocked account', ['Open blocked account', 'Health insurance']],
+      ['Student visa', ['Book embassy appointment', 'Prepare visa file']],
+      ['Housing & travel', ['Apply for student dorm', 'Book flight']],
+    ],
+    followUps: [['Email admissions office about intake deadlines', 7], ['Book language test', 14]],
+    obstacles: [['Visa appointment slots are booked out', 'Check the portal every Monday morning and join the waitlist']],
+    metric: { metricLabel: 'Blocked account', metricUnit: '€', metricStart: 0, metricTarget: 11904 },
+  },
+  {
+    id: 'fitness', label: 'Get fit', icon: '💪', category: 'health', horizon: 'season',
+    title: 'Run a 10K', why: 'Feel strong and energetic every day.',
+    milestones: [
+      ['Build a base', ['Run 3× a week for 2 weeks', 'Buy proper running shoes']],
+      ['Run 5K without stopping', []],
+      ['Run 8K', []],
+      ['Race day 10K', ['Register for a race', 'Taper week']],
+    ],
+    followUps: [["Plan this week's 3 runs", 1]],
+    obstacles: [['It rains', 'Do a 30-minute indoor session instead']],
+    metric: { metricLabel: 'Longest run', metricUnit: 'km', metricStart: 0, metricTarget: 10 },
+  },
+  {
+    id: 'career', label: 'Career move', icon: '🚀', category: 'work', horizon: 'season',
+    title: 'Land a new role', why: 'Grow faster and do work I am proud of.',
+    milestones: [
+      ['Define target roles & companies', ['List 20 companies']],
+      ['Portfolio & CV refreshed', ['Update CV', 'Update LinkedIn', 'Ship 1 portfolio project']],
+      ['Applications', ['Apply to 5 roles / week']],
+      ['Interview prep', ['Practice 10 mock interviews']],
+      ['Offer & negotiation', []],
+    ],
+    followUps: [['Message 3 people for referrals', 3]],
+    obstacles: [],
+    metric: { metricLabel: 'Applications sent', metricUnit: '', metricStart: 0, metricTarget: 40 },
+  },
+  {
+    id: 'save', label: 'Save money', icon: '💰', category: 'finance', horizon: 'year',
+    title: 'Build an emergency fund', why: 'Sleep well knowing I can handle surprises.',
+    milestones: [
+      ['Track spending for a month', []],
+      ['Set up automatic transfer', []],
+      ['Reach 1 month of expenses', []],
+      ['Reach 3 months of expenses', []],
+    ],
+    followUps: [['Review subscriptions and cancel unused ones', 5]],
+    obstacles: [['Unexpected big purchase', 'Pause, wait 48 hours, then decide']],
+    metric: { metricLabel: 'Saved', metricUnit: '', metricStart: 0, metricTarget: 3000 },
+  },
+];
+
+function buildFromTemplate(t) {
+  return {
+    form: {
+      title: t.title, description: '', why: t.why, category: t.category,
+      status: 'not-started', targetDate: '', horizon: t.horizon, icon: t.icon,
+    },
+    milestones: t.milestones.map(([text, steps]) => ({
+      id: crypto.randomUUID(),
+      text,
+      done: false,
+      children: steps.map((st) => ({ id: crypto.randomUUID(), text: st, done: false })),
+    })),
+    extra: {
+      followUps: t.followUps.map(([text, days]) => ({ id: crypto.randomUUID(), text, dueDate: iso(days), done: false })),
+      obstacles: t.obstacles.map(([obstacle, plan]) => ({ id: crypto.randomUUID(), obstacle, plan })),
+      ...t.metric,
+    },
+  };
+}
 
 const CATEGORIES = ['personal', 'work', 'health', 'finance', 'learning', 'other'];
 const STATUSES = ['not-started', 'in-progress', 'completed', 'abandoned'];
@@ -41,7 +126,15 @@ function GoalModal({ goal, onClose, onSaved }) {
     status: 'not-started', targetDate: '', horizon: 'season', icon: '🎯',
   });
   const [milestones, setMilestones] = useState([]);
+  const [extra, setExtra] = useState({});
   const [msInput, setMsInput] = useState('');
+
+  const applyTemplate = (t) => {
+    const built = buildFromTemplate(t);
+    setForm(built.form);
+    setMilestones(built.milestones);
+    setExtra(built.extra);
+  };
   const [sgDraft, setSgDraft] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -91,20 +184,22 @@ function GoalModal({ goal, onClose, onSaved }) {
     e.preventDefault();
     if (!form.title.trim()) { toast.error('Title required'); return; }
     setLoading(true);
+    let saved = null;
     try {
       const payload = {
+        ...(isEdit ? {} : extra),
         ...form,
         milestones,
         targetDate: form.targetDate || undefined,
       };
       if (isEdit) {
-        await updateGoal(goal._id, payload);
-        toast.success('Constellation updated');
+        saved = await updateGoal(goal._id, payload);
+        toast.success('Goal updated');
       } else {
-        await createGoal(payload);
-        toast.success('North-star goal launched');
+        saved = await createGoal(payload);
+        toast.success('Goal created — now plan it out');
       }
-      onSaved();
+      onSaved(saved);
       onClose();
     } catch {
       toast.error('Failed to save goal');
@@ -113,7 +208,7 @@ function GoalModal({ goal, onClose, onSaved }) {
     }
   };
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div
         ref={cardRef}
@@ -123,9 +218,19 @@ function GoalModal({ goal, onClose, onSaved }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
-          <h2>{isEdit ? 'Edit constellation' : 'New north-star goal'}</h2>
+          <h2>{isEdit ? 'Edit goal' : 'New goal'}</h2>
           <button className="modal-close" onClick={onClose} type="button"><X size={18} /></button>
         </div>
+        {!isEdit && (
+          <div className="goal-templates">
+            <span><Wand2 size={13} /> Start from a plan:</span>
+            {TEMPLATES.map((t) => (
+              <button key={t.id} type="button" className="goal-template-btn" onClick={() => applyTemplate(t)}>
+                {t.icon} {t.label}
+              </button>
+            ))}
+          </div>
+        )}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Icon</label>
@@ -197,12 +302,12 @@ function GoalModal({ goal, onClose, onSaved }) {
           </div>
 
           <div className="form-group">
-            <label>Milestones & nested subgoals</label>
+            <label>Sub-goals &amp; steps <span className="goal-label-hint">(follow-ups, journal and targets live on the goal page)</span></label>
             <div className="task-add-row">
               <input
                 value={msInput}
                 onChange={(e) => setMsInput(e.target.value)}
-                placeholder="Add a milestone (key result)…"
+                placeholder="Add a sub-goal…"
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addMilestone(); } }}
               />
               <button type="button" className="btn btn-secondary btn-sm" onClick={addMilestone}><Plus size={13} /></button>
@@ -252,7 +357,7 @@ function GoalModal({ goal, onClose, onSaved }) {
                     <input
                       value={sgDraft[ms.id] || ''}
                       onChange={(e) => setSgDraft((d) => ({ ...d, [ms.id]: e.target.value }))}
-                      placeholder="Add nested subgoal…"
+                      placeholder="Add a step…"
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSubgoal(ms.id); } }}
                     />
                     <button type="button" className="btn btn-secondary btn-sm" onClick={() => addSubgoal(ms.id)}><Plus size={12} /></button>
@@ -270,252 +375,218 @@ function GoalModal({ goal, onClose, onSaved }) {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
-function GoalCard({ goal, expanded, onToggleExpand, onEdit, onDelete, onToggleMs, onToggleSg }) {
-  const color = catColors[goal.category] || 'var(--text-muted)';
-  const milestones = goal.milestones || [];
-  const achievements = goal.achievements || [];
-  const daysLeft = goal.targetDate
-    ? differenceInCalendarDays(new Date(goal.targetDate), new Date())
-    : null;
 
-  return (
-    <article className={`goal-constellation ${expanded ? 'open' : ''}`} style={{ '--goal-color': color }}>
-      <button type="button" className="goal-constellation-top" onClick={onToggleExpand}>
-        <span className="goal-icon-orb">{goal.icon || '🎯'}</span>
-        <div className="goal-constellation-meta">
-          <div className="goal-badges">
-            <span className="goal-cat-badge">{goal.category}</span>
-            <span className="goal-horizon">{goal.horizon || 'season'}</span>
-            {typeof daysLeft === 'number' && (
-              <span className={`goal-countdown ${daysLeft < 0 ? 'late' : ''}`}>
-                {daysLeft < 0 ? `${Math.abs(daysLeft)}d late` : `${daysLeft}d left`}
-              </span>
-            )}
-          </div>
-          <h3>{goal.title}</h3>
-          {goal.why && <p className="goal-why">“{goal.why}”</p>}
-        </div>
-        <div className="goal-ring" title={`${goal.progress}%`}>
-          <svg viewBox="0 0 36 36">
-            <path
-              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              fill="none"
-              stroke="var(--border)"
-              strokeWidth="3"
-            />
-            <path
-              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              fill="none"
-              stroke={color}
-              strokeWidth="3"
-              strokeDasharray={`${goal.progress || 0}, 100`}
-              strokeLinecap="round"
-            />
-          </svg>
-          <span>{goal.progress || 0}%</span>
-        </div>
-        {expanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-      </button>
-
-      <div className="goal-momentum-bar">
-        <Flame size={12} />
-        <div className="progress-bar">
-          <div className="progress-bar-fill" style={{ width: `${goal.momentum || 0}%`, background: color }} />
-        </div>
-        <span>Momentum {goal.momentum || 0}</span>
-      </div>
-
-      {achievements.length > 0 && (
-        <div className="goal-achievements">
-          <Sparkles size={13} />
-          {achievements.slice(-4).map((a) => (
-            <span key={a.id || a.key} className="goal-ach-pill" title={a.unlockedAt ? format(new Date(a.unlockedAt), 'MMM d') : ''}>
-              {a.title}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {expanded && (
-        <div className="goal-constellation-body">
-          {goal.description && <p className="goal-desc">{goal.description}</p>}
-          <div className="goal-path">
-            {milestones.length === 0 && (
-              <p className="goal-empty-ms">No milestones yet — edit to add key results & nested wins.</p>
-            )}
-            {milestones.map((ms, idx) => (
-              <div key={ms.id} className={`goal-path-node ${ms.done ? 'done' : ''}`}>
-                <div className="goal-path-rail">
-                  <button
-                    type="button"
-                    className={`goal-ms-check ${ms.done ? 'done' : ''}`}
-                    onClick={() => onToggleMs(goal._id, ms.id)}
-                  >
-                    {ms.done ? <Check size={11} /> : idx + 1}
-                  </button>
-                  {idx < milestones.length - 1 && <span className="goal-path-line" />}
-                </div>
-                <div className="goal-path-content">
-                  <strong className={ms.done ? 'done' : ''}>{ms.text}</strong>
-                  {(ms.children || []).length > 0 && (
-                    <ul className="goal-subgoal-list">
-                      {ms.children.map((sg) => (
-                        <li key={sg.id} className={sg.done ? 'done' : ''}>
-                          <button
-                            type="button"
-                            className={`goal-ms-check tiny ${sg.done ? 'done' : ''}`}
-                            onClick={() => onToggleSg(goal._id, ms.id, sg.id)}
-                          >
-                            {sg.done ? <Check size={9} /> : ''}
-                          </button>
-                          <span>{sg.text}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="goal-card-actions-row">
-            <button type="button" className="btn btn-secondary btn-sm" onClick={onEdit}>
-              <Pencil size={12} /> Edit
-            </button>
-            <button type="button" className="btn btn-danger btn-sm" onClick={onDelete}>
-              <Trash2 size={12} /> Delete
-            </button>
-          </div>
-        </div>
-      )}
-    </article>
-  );
+function goalAlerts(goal) {
+  const today = startOfDay(new Date());
+  const overdue = (goal.followUps || []).filter((f) => !f.done && f.dueDate && new Date(f.dueDate) < today).length
+    + (goal.milestones || []).filter((m) => !m.done && m.dueDate && new Date(m.dueDate) < today).length;
+  return overdue;
 }
 
 export default function GoalsPage() {
-  const { data: goals, loading, refetch } = useApi(getGoals);
+  const [goals, setGoals] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editGoal, setEditGoal] = useState(null);
   const [catFilter, setCatFilter] = useState('all');
+  const [query, setQuery] = useState('');
   const [deleteId, setDeleteId] = useState(null);
-  const [expanded, setExpanded] = useState({});
+  const [selectedId, setSelectedId] = useState(null);
+  const [searchParams] = useSearchParams();
+
+  const load = useCallback(async () => {
+    try {
+      const list = await getGoals();
+      setGoals(list);
+      return list;
+    } catch {
+      toast.error('Could not load goals');
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!goals?.length) return;
+    const wanted = searchParams.get('goal');
+    if (wanted && goals.some((g) => g._id === wanted)) { setSelectedId(wanted); return; }
+    setSelectedId((cur) => (cur && goals.some((g) => g._id === cur) ? cur : goals[0]._id));
+  }, [goals, searchParams]);
 
   const handleDelete = async (id) => {
     try {
       await deleteGoal(id);
-      toast.success('Goal removed');
-      refetch();
+      toast.success('Goal moved to trash');
+      setGoals((prev) => prev.filter((g) => g._id !== id));
+      setSelectedId(null);
     } catch {
       toast.error('Failed to delete');
     }
   };
 
-  const handleToggleMilestone = useCallback(async (goalId, msId) => {
-    try {
-      await toggleMilestone(goalId, msId);
-      refetch({ silent: true });
-    } catch {
-      toast.error('Failed to update milestone');
-    }
-  }, [refetch]);
-
-  const handleToggleSubgoal = useCallback(async (goalId, msId, sgId) => {
-    try {
-      await toggleSubgoal(goalId, msId, sgId);
-      refetch({ silent: true });
-    } catch {
-      toast.error('Failed to update subgoal');
-    }
-  }, [refetch]);
+  const replaceGoal = useCallback((updated) => {
+    setGoals((prev) => prev.map((g) => (g._id === updated._id ? updated : g)));
+  }, []);
 
   const handleClose = useCallback(() => { setModalOpen(false); setEditGoal(null); }, []);
+  const handleSaved = async (saved) => {
+    await load();
+    if (saved?._id) setSelectedId(saved._id);
+  };
 
-  const filtered = (goals || []).filter((g) => catFilter === 'all' || g.category === catFilter);
+  const list = goals || [];
+  const filtered = list.filter((g) => (catFilter === 'all' || g.category === catFilter)
+    && (!query || g.title.toLowerCase().includes(query.toLowerCase())));
+  const selected = list.find((g) => g._id === selectedId) || null;
 
   const summary = useMemo(() => {
-    const list = goals || [];
     const active = list.filter((g) => g.status === 'in-progress').length;
     const done = list.filter((g) => g.status === 'completed').length;
-    const avg = list.length
-      ? Math.round(list.reduce((s, g) => s + (g.progress || 0), 0) / list.length)
-      : 0;
-    const ach = list.reduce((n, g) => n + ((g.achievements || []).length), 0);
-    return { active, done, avg, ach };
-  }, [goals]);
+    const avg = list.length ? Math.round(list.reduce((s, g) => s + (g.progress || 0), 0) / list.length) : 0;
+    const follow = list.reduce((n, g) => n + (g.followUps || []).filter((f) => !f.done).length, 0);
+    const overdue = list.reduce((n, g) => n + goalAlerts(g), 0);
+    return { active, done, avg, follow, overdue };
+  }, [list]);
 
-  useEffect(() => {
-    if (!goals?.length) return;
-    setExpanded((prev) => {
-      if (Object.keys(prev).length) return prev;
-      return { [goals[0]._id]: true };
-    });
-  }, [goals]);
+  const rings = useMemo(() => list.filter((g) => g.status !== 'abandoned').slice(0, 6)
+    .map((g) => ({ name: `${g.icon || ''} ${g.title.length > 16 ? `${g.title.slice(0, 16)}…` : g.title}`, value: g.progress || 0 })), [list]);
+  const byCat = useMemo(() => {
+    const m = {};
+    list.forEach((g) => { m[g.category] = (m[g.category] || 0) + 1; });
+    return Object.entries(m).map(([name, value]) => ({ name, value }));
+  }, [list]);
+  const statusTape = useMemo(() => [{
+    label: 'Status',
+    segments: ['not-started', 'in-progress', 'completed', 'abandoned'].map((s) => ({
+      name: s.replace('-', ' '), value: list.filter((g) => g.status === s).length,
+    })),
+  }, {
+    label: 'Follow-ups',
+    segments: [
+      { name: 'overdue', value: summary.overdue, color: 'var(--accent-red, #EF4444)' },
+      { name: 'open', value: Math.max(0, summary.follow - summary.overdue), color: 'var(--chart-2)' },
+      { name: 'done', value: list.reduce((n, g) => n + (g.followUps || []).filter((f) => f.done).length, 0), color: 'var(--accent-green, #10B981)' },
+    ],
+  }], [list, summary]);
 
   return (
     <div className="goals-lab">
       <div className="page-header">
         <div>
-          <h1>Goal Constellation</h1>
-          <p className="goals-lede">North-star aims · nested subgoals · micro-achievements · momentum</p>
+          <h1>Goals</h1>
+          <p className="goals-lede">Break big goals into sub-goals, follow-ups and a journal — so every goal has a next step.</p>
         </div>
-        <button
-          className="btn btn-primary"
-          onClick={() => { setEditGoal(null); setModalOpen(true); }}
-        >
+        <button className="btn btn-primary" onClick={() => { setEditGoal(null); setModalOpen(true); }}>
           <Plus size={16} /> New goal
         </button>
       </div>
 
       <div className="goals-summary">
-        <div><strong>{summary.active}</strong><span>In orbit</span></div>
+        <div><strong>{summary.active}</strong><span>In progress</span></div>
         <div><strong>{summary.done}</strong><span>Completed</span></div>
         <div><strong>{summary.avg}%</strong><span>Avg progress</span></div>
-        <div><strong>{summary.ach}</strong><span>Achievements</span></div>
+        <div className={summary.overdue ? 'is-alert' : ''}><strong>{summary.follow}</strong><span>{summary.overdue ? `${summary.overdue} overdue` : 'Open follow-ups'}</span></div>
       </div>
 
-      <div className="filter-bar">
-        <button className={`filter-btn ${catFilter === 'all' ? 'active' : ''}`} onClick={() => setCatFilter('all')}>All</button>
-        {CATEGORIES.map((c) => (
-          <button key={c} className={`filter-btn ${catFilter === c ? 'active' : ''}`} onClick={() => setCatFilter(c)}>
-            {c.charAt(0).toUpperCase() + c.slice(1)}
-          </button>
-        ))}
-      </div>
+      {list.length > 0 && (
+        <ChartGrid cols={3}>
+          <ChartCard title="Goal rings" subtitle="Progress of each goal">
+            <ConcentricRings data={rings} height={220} />
+          </ChartCard>
+          <ChartCard title="By category" subtitle="Where your goals live">
+            <DonutChart data={byCat} height={220} centerLabel="goals" />
+          </ChartCard>
+          <ChartCard title="Pipeline" subtitle="Status and follow-ups">
+            <TapeDiagram rows={statusTape} />
+          </ChartCard>
+        </ChartGrid>
+      )}
 
       {loading ? (
         <div className="spinner-container"><div className="spinner" /></div>
-      ) : filtered.length === 0 ? (
+      ) : list.length === 0 ? (
         <div className="empty-state">
           <Target size={48} strokeWidth={1} />
-          <h3>No constellations yet</h3>
-          <p>Launch a north-star goal, nest subgoals, and collect achievements as you move.</p>
+          <h3>No goals yet</h3>
+          <p>Create one — or start from a plan like “Study abroad” to get sub-goals and follow-ups pre-filled.</p>
+          <button className="btn btn-primary" style={{ marginTop: 14 }} onClick={() => { setEditGoal(null); setModalOpen(true); }}>
+            <Plus size={14} /> New goal
+          </button>
         </div>
       ) : (
-        <div className="goals-constellation-list">
-          {filtered.map((goal) => (
-            <GoalCard
-              key={goal._id}
-              goal={goal}
-              expanded={!!expanded[goal._id]}
-              onToggleExpand={() => setExpanded((p) => ({ ...p, [goal._id]: !p[goal._id] }))}
-              onEdit={() => { setEditGoal(goal); setModalOpen(true); }}
-              onDelete={() => setDeleteId(goal._id)}
-              onToggleMs={handleToggleMilestone}
-              onToggleSg={handleToggleSubgoal}
-            />
-          ))}
+        <div className="goals-split">
+          <aside className="goals-rail">
+            <div className="goals-rail-search">
+              <Search size={14} />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find a goal…" />
+            </div>
+            <div className="goals-rail-cats">
+              <button className={catFilter === 'all' ? 'active' : ''} onClick={() => setCatFilter('all')}>All</button>
+              {CATEGORIES.map((c) => (
+                <button key={c} className={catFilter === c ? 'active' : ''} onClick={() => setCatFilter(c)}>{c}</button>
+              ))}
+            </div>
+            <ul className="goals-rail-list">
+              {filtered.map((g) => {
+                const alerts = goalAlerts(g);
+                const days = g.targetDate ? differenceInCalendarDays(new Date(g.targetDate), new Date()) : null;
+                return (
+                  <li key={g._id}>
+                    <button
+                      type="button"
+                      className={`goals-rail-item ${g._id === selectedId ? 'active' : ''} st-${g.status}`}
+                      style={{ '--goal-color': catColors[g.category] || 'var(--accent)' }}
+                      onClick={() => setSelectedId(g._id)}
+                    >
+                      <span className="goals-rail-icon">{g.icon || '🎯'}</span>
+                      <span className="goals-rail-copy">
+                        <strong>{g.title}</strong>
+                        <em>
+                          {(g.milestones || []).filter((m) => m.done).length}/{(g.milestones || []).length} sub-goals
+                          {days != null && ` · ${days < 0 ? `${-days}d late` : `${days}d left`}`}
+                        </em>
+                        <span className="goals-rail-bar"><i style={{ width: `${g.progress || 0}%` }} /></span>
+                      </span>
+                      {alerts > 0 && <span className="goals-rail-alert" title={`${alerts} overdue`}><Bell size={11} /> {alerts}</span>}
+                      <span className="goals-rail-pct">{g.progress || 0}%</span>
+                    </button>
+                  </li>
+                );
+              })}
+              {filtered.length === 0 && <li className="goals-rail-empty">No goals match.</li>}
+            </ul>
+          </aside>
+
+          <div className="goals-detail">
+            {selected ? (
+              <GoalWorkspace
+                key={selected._id}
+                goal={selected}
+                onChange={replaceGoal}
+                onEdit={() => { setEditGoal(selected); setModalOpen(true); }}
+                onDelete={() => setDeleteId(selected._id)}
+              />
+            ) : (
+              <div className="empty-state"><Target size={40} strokeWidth={1} /><h3>Pick a goal</h3></div>
+            )}
+          </div>
         </div>
       )}
 
-      {modalOpen && <GoalModal goal={editGoal} onClose={handleClose} onSaved={refetch} />}
+      {modalOpen && <GoalModal goal={editGoal} onClose={handleClose} onSaved={handleSaved} />}
 
       <ConfirmDialog
         open={!!deleteId}
-        title="Delete this constellation?"
-        message="The goal, milestones, subgoals, and achievements will be removed."
+        title="Delete this goal?"
+        message="The goal and its sub-goals, follow-ups and journal go to the trash."
         confirmLabel="Delete"
         danger
         onConfirm={() => {

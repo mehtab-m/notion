@@ -168,6 +168,7 @@ export const toggleHabitDate = (id, date) =>
 export const getGoals = () => api.get('/goals').then((r) => r.data);
 export const createGoal = (data) => api.post('/goals', data).then((r) => r.data);
 export const updateGoal = (id, data) => api.put(`/goals/${id}`, data).then((r) => r.data);
+export const patchGoal = (id, data) => api.patch(`/goals/${id}`, data).then((r) => r.data);
 export const deleteGoal = (id) => api.delete(`/goals/${id}`).then((r) => r.data);
 export const toggleMilestone = (goalId, msId) =>
   api.post(`/goals/${goalId}/milestones/${msId}/toggle`).then((r) => r.data);

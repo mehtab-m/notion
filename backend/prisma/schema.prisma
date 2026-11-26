@@ -400,6 +400,20 @@ model Goal {
   milestones   Json      @default("[]")
   /// [{id,key,title,unlockedAt}]
   achievements Json      @default("[]")
+  /// Next actions with a date: [{id,text,dueDate,done,doneAt}]
+  followUps    Json      @default("[]")
+  /// Progress journal: [{id,text,date,confidence(1-5)}]
+  checkIns     Json      @default("[]")
+  /// Links & documents: [{id,title,url}]
+  resources    Json      @default("[]")
+  /// If-then plans: [{id,obstacle,plan}]
+  obstacles    Json      @default("[]")
+  /// Optional measurable target, e.g. "IELTS score" 6.5 → 7.5
+  metricLabel   String   @default("")
+  metricUnit    String   @default("")
+  metricStart   Float?
+  metricTarget  Float?
+  metricCurrent Float?
   userId       String
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt    DateTime  @default(now())
