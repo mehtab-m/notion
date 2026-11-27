@@ -183,9 +183,29 @@ function projectFields(body, { partial = false } = {}) {
   return data;
 }
 
+/* Turn Prisma's long internal errors into one sentence a person can act on. */
+function friendlyError(err) {
+  const msg = String(err?.message || '');
+  if (err?.code === 'P2022' || /column .* does not exist/i.test(msg)) {
+    return 'The database is missing new project fields. Run "npm run db:push" in backend/ and restart the server.';
+  }
+  if (/Unknown arg(ument)?/i.test(msg)) {
+    return 'The server is running an old database client. Restart the backend (npm run dev) and try again.';
+  }
+  if (err?.code === 'P2003') return 'Your account was not found. Please log out and log in again.';
+  if (/Invalid .*invocation/i.test(msg)) return 'Some project details could not be saved. Check the dates and budget and try again.';
+  return msg || 'Could not create the project';
+}
+
 router.post('/', async (req, res) => {
   try {
     const data = projectFields(req.body);
+    if (data.startDate && data.dueDate && data.dueDate < data.startDate) {
+      return res.status(400).json({ error: 'The end date is before the start date.', field: 'dueDate' });
+    }
+    if (data.budget != null && data.budget < 0) {
+      return res.status(400).json({ error: 'Budget cannot be negative.', field: 'budget' });
+    }
     const saved = await prisma.project.create({
       data: {
         ...data,
@@ -196,7 +216,9 @@ router.post('/', async (req, res) => {
     });
     res.status(201).json(serialize(saved));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error('[projects:create]', err);
+    const field = /name is required/i.test(err.message) ? 'title' : undefined;
+    res.status(400).json({ error: friendlyError(err), field });
   }
 });
 
