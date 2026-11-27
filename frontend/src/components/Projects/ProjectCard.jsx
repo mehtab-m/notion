@@ -9,6 +9,8 @@ const statusColors = {
   completed: 'var(--accent-green)',
   'on-hold': 'var(--accent-yellow)',
   planned: '#8b5cf6',
+  maintenance: '#0ea5e9',
+  archived: 'var(--text-muted)',
 };
 
 const statusLabel = {
@@ -16,6 +18,8 @@ const statusLabel = {
   completed: 'Done',
   'on-hold': 'Paused',
   planned: 'Planned',
+  maintenance: 'Maintenance',
+  archived: 'Archived',
 };
 
 /** A project shown as a folder: tab on top, name on the front, open on click. */

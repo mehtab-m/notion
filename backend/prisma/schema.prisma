@@ -168,14 +168,205 @@ model Project {
   role        String           @default("")
   startDate   DateTime?
   budget      Float?
+  /// Developer workspace: live app link, docs link, free-form notes
+  projectUrl       String        @default("")
+  documentationUrl String        @default("")
+  notes            String        @default("")
+  archivedAt       DateTime?
   userId      String
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   members     ProjectMember[]
   messages    ProjectMessage[]
+  repositories ProjectRepository[]
+  technologies ProjectTechnology[]
+  environments ProjectEnvironment[]
+  services     ProjectService[]
+  documents    ProjectDocument[]
+  commands     ProjectCommand[]
+  workSessions WorkSession[]
+  activities   ProjectActivity[]
 
   @@index([userId])
+}
+
+/// Code repository linked to a project (metadata only — never inspected).
+model ProjectRepository {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name            String
+  /// github | gitlab | bitbucket | azure_devops | self_hosted | other
+  provider        String   @default("github")
+  remoteUrl       String   @default("")
+  /// frontend | backend | mobile | infrastructure | docs | monorepo | other
+  purpose         String   @default("other")
+  defaultBranch   String   @default("main")
+  primaryLanguage String   @default("")
+  localPath       String   @default("")
+  readmeUrl       String   @default("")
+  notes           String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([projectId])
+}
+
+/// Tech stack entry (React 18, Postgres 16 …).
+model ProjectTechnology {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  repositoryId String?
+  name         String
+  /// frontend | backend | database | mobile | infrastructure | styling | testing | tooling | other
+  category     String   @default("other")
+  version      String   @default("")
+  notes        String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([projectId])
+}
+
+/// Where the project runs. Non-secret metadata only.
+model ProjectEnvironment {
+  id                 String    @id @default(cuid())
+  projectId          String
+  project            Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name               String
+  /// local | development | staging | production | custom
+  environmentType    String    @default("development")
+  /// active | inactive | needs_review | archived
+  status             String    @default("active")
+  machineLabel       String    @default("")
+  applicationUrl     String    @default("")
+  apiUrl             String    @default("")
+  deploymentProvider String    @default("")
+  serverHostname     String    @default("")
+  operatingSystem    String    @default("")
+  deploymentBranch   String    @default("")
+  deploymentMethod   String    @default("")
+  /// {"node":"20.11","pnpm":"9"} — names + versions only
+  runtimeVersions    Json      @default("{}")
+  /// [{id,name,isRequired,status:'unknown|configured|missing|not_applicable',secretRef,notes}] — never values
+  variables          Json      @default("[]")
+  notes              String    @default("")
+  lastReviewedAt     DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([projectId])
+}
+
+/// External service a project depends on (Postgres, Stripe, Cloudinary …).
+model ProjectService {
+  id               String   @id @default(cuid())
+  projectId        String
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name             String
+  /// database | cache | hosting | storage | auth | payments | email | monitoring | search | queue | analytics | external_api | dns | other
+  category         String   @default("other")
+  provider         String   @default("")
+  purpose          String   @default("")
+  dashboardUrl     String   @default("")
+  documentationUrl String   @default("")
+  /// [{id,environmentId,resourceName,region,endpoint,status}]
+  instances        Json     @default("[]")
+  notes            String   @default("")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([projectId])
+}
+
+/// Markdown knowledge: setup guides, runbooks, ADRs, troubleshooting.
+model ProjectDocument {
+  id            String    @id @default(cuid())
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  repositoryId  String?
+  environmentId String?
+  title         String
+  /// architecture | requirements | setup | api | database | deployment | troubleshooting | adr | notes | general
+  category      String    @default("general")
+  summary       String    @default("")
+  content       String    @default("")
+  /// Task ids (from Project.tasks) this doc is linked to
+  taskIds       String[]  @default([])
+  archivedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([projectId])
+}
+
+/// Saved shell command (never executed by the app).
+model ProjectCommand {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  repositoryId    String?
+  environmentId   String?
+  title           String
+  commandText     String
+  description     String   @default("")
+  /// powershell | bash | zsh | cmd | other
+  shell           String   @default("bash")
+  /// windows | macos | linux | cross_platform
+  operatingSystem String   @default("cross_platform")
+  /// install | development | test | build | database | deployment | maintenance | other
+  category        String   @default("other")
+  prerequisites   String   @default("")
+  isDestructive   Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([projectId])
+}
+
+/// Focused work on a project task. Time = sum of segments (pause/resume safe).
+model WorkSession {
+  id           String    @id @default(cuid())
+  userId       String
+  projectId    String
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskId       String?
+  taskTitle    String    @default("")
+  repositoryId String?
+  branchName   String    @default("")
+  notes        String    @default("")
+  /// active | paused | completed
+  status       String    @default("active")
+  /// [{start, end|null}] ISO strings
+  segments     Json      @default("[]")
+  /// {completedSummary,currentState,remainingWork,nextAction,blockers,technicalNotes,links:[{label,url}]}
+  handoff      Json?
+  startedAt    DateTime  @default(now())
+  endedAt      DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([userId, status])
+  @@index([projectId, startedAt])
+}
+
+/// Audit trail of what changed inside a project.
+model ProjectActivity {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String?
+  userName  String   @default("")
+  /// e.g. task.created, task.status_changed, repository.added, session.completed
+  type      String
+  summary   String
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([userId, createdAt])
 }
 
 model ProjectMember {

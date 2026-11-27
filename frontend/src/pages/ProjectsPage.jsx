@@ -9,9 +9,10 @@ import {
 } from '../utils/api';
 import ProjectCard from '../components/Projects/ProjectCard';
 import ProjectModal, { ACCOUNT_TYPES } from '../components/Projects/ProjectModal';
+import MyWorkPanel from '../components/Projects/Workspace/MyWorkPanel';
 import './ProjectsPage.css';
 
-const STATUS_FILTERS = ['all', 'active', 'planned', 'on-hold', 'completed'];
+const STATUS_FILTERS = ['all', 'active', 'planned', 'on-hold', 'maintenance', 'completed', 'archived'];
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
@@ -62,7 +63,7 @@ export default function ProjectsPage() {
   };
 
   const filtered = (projects || []).filter(
-    (p) => (statusFilter === 'all' || p.status === statusFilter)
+    (p) => (statusFilter === 'all' ? p.status !== 'archived' : p.status === statusFilter)
       && (accountFilter === 'all' || (p.accountType || 'personal') === accountFilter)
   );
   const accountCounts = (projects || []).reduce((acc, p) => {
@@ -105,6 +106,8 @@ export default function ProjectsPage() {
         </div>
       )}
 
+      {(projects || []).length > 0 && <MyWorkPanel />}
+
       <div className="filter-bar">
         {STATUS_FILTERS.map((s) => (
           <button
@@ -112,7 +115,7 @@ export default function ProjectsPage() {
             className={`filter-btn ${statusFilter === s ? 'active' : ''}`}
             onClick={() => setStatusFilter(s)}
           >
-            {s.charAt(0).toUpperCase() + s.slice(1)}
+            {(s.charAt(0).toUpperCase() + s.slice(1)).replace('-', ' ')}
           </button>
         ))}
       </div>

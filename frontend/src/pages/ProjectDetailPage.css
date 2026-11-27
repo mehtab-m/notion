@@ -117,8 +117,9 @@
 
 /* ── Navigation tabs ──────────────────────────────────── */
 .pd-nav {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: thin;
   gap: 6px;
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -146,7 +147,8 @@
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
-  min-width: 0;
+  flex: 1 0 auto;
+  min-width: 72px;
 }
 
 .pd-nav-item span:not(.pd-nav-count) {
@@ -730,7 +732,6 @@
   }
 
   .pd-nav {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 4px;
     padding: 4px;
     border-radius: 10px;

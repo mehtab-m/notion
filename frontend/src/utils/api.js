@@ -99,6 +99,33 @@ export const updateProjectTableColumn = (projectId, tableId, colId, data) =>
   api.put(`/projects/${projectId}/tables/${tableId}/columns/${colId}`, data).then((r) => r.data);
 export const deleteProjectTableColumn = (projectId, tableId, colId) =>
   api.delete(`/projects/${projectId}/tables/${tableId}/columns/${colId}`).then((r) => r.data);
+export const moveProjectTask = (projectId, taskId, data) =>
+  api.post(`/projects/${projectId}/tasks/${taskId}/move`, data).then((r) => r.data);
+
+// ── Project workspace (repos, stack, environments, services, docs, commands, sessions) ──
+export const getMyWork = () => api.get('/projects/workspace/my-work').then((r) => r.data);
+export const getProjectWorkspace = (projectId) => api.get(`/projects/${projectId}/workspace`).then((r) => r.data);
+export const getProjectActivity = (projectId) => api.get(`/projects/${projectId}/activity`).then((r) => r.data);
+/** kind: repositories | technologies | environments | services | documents | commands */
+export const createProjectItem = (projectId, kind, data) =>
+  api.post(`/projects/${projectId}/${kind}`, data).then((r) => r.data);
+export const updateProjectItem = (projectId, kind, itemId, data) =>
+  api.put(`/projects/${projectId}/${kind}/${itemId}`, data).then((r) => r.data);
+export const deleteProjectItem = (projectId, kind, itemId) =>
+  api.delete(`/projects/${projectId}/${kind}/${itemId}`).then((r) => r.data);
+export const getActiveWorkSession = () => api.get('/projects/sessions/active').then((r) => r.data);
+export const startWorkSession = (projectId, data) =>
+  api.post(`/projects/${projectId}/sessions`, data).then((r) => r.data);
+export const updateWorkSession = (projectId, sid, data) =>
+  api.put(`/projects/${projectId}/sessions/${sid}`, data).then((r) => r.data);
+export const pauseWorkSession = (projectId, sid) =>
+  api.post(`/projects/${projectId}/sessions/${sid}/pause`).then((r) => r.data);
+export const resumeWorkSession = (projectId, sid) =>
+  api.post(`/projects/${projectId}/sessions/${sid}/resume`).then((r) => r.data);
+export const completeWorkSession = (projectId, sid, data) =>
+  api.post(`/projects/${projectId}/sessions/${sid}/complete`, data).then((r) => r.data);
+export const deleteWorkSession = (projectId, sid) =>
+  api.delete(`/projects/${projectId}/sessions/${sid}`).then((r) => r.data);
 
 // ── Books ────────────────────────────────────────────────
 export const getBooks = () => api.get('/books').then((r) => r.data);

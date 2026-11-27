@@ -3,6 +3,8 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Calendar, Plus, Trash2, MessageCircle,
   Users, CheckSquare, Database, User, MessageSquare, Mail,
+  LayoutDashboard, Columns, Timer, GitBranch, Server, Cloud, FileText, Terminal, Activity,
+  ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -14,11 +16,23 @@ import {
   addProjectTable, deleteProjectTable,
   addProjectTableRow, updateProjectTableRow, deleteProjectTableRow,
   addProjectTableColumn, updateProjectTableColumn, deleteProjectTableColumn,
-  getProjectMessages, sendProjectMessage,
+  getProjectMessages, sendProjectMessage, getProjectWorkspace,
 } from '../utils/api';
 import TableBoard from '../components/Tables/TableBoard';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ResourcePanel from '../components/Projects/Workspace/ResourcePanel';
+import DocsPanel from '../components/Projects/Workspace/DocsPanel';
+import SessionPanel from '../components/Projects/Workspace/SessionPanel';
+import { TaskBoard, TaskDetails, StatusPill, PriorityFlag, DueChip } from '../components/Projects/Workspace/Tasks';
+import { OverviewPanel, ActivityPanel } from '../components/Projects/Workspace/Overview';
+import { TASK_PRIORITIES, taskStatusOf } from '../components/Projects/Workspace/config';
+import '../components/Projects/Workspace/Workspace.css';
 import './ProjectDetailPage.css';
+
+const EMPTY_WORKSPACE = {
+  repositories: [], technologies: [], environments: [], services: [],
+  documents: [], commands: [], sessions: [], activity: [],
+};
 
 const TABLE_TEMPLATES = [
   {
@@ -223,9 +237,10 @@ function AssigneeSelect({ team, value, onChange, disabled }) {
   );
 }
 
-function TaskItem({ task, team, projectId, onUpdate }) {
+function TaskItem({ task, team, projectId, onUpdate, workspace, expanded, onToggleExpand, onStartSession }) {
   const [showDiscussion, setShowDiscussion] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const status = taskStatusOf(task);
 
   const handleToggle = async () => {
     try {
@@ -249,12 +264,21 @@ function TaskItem({ task, team, projectId, onUpdate }) {
   };
 
   return (
-    <div className={`pd-task-card ${task.done ? 'done' : ''}`}>
+    <div className={`pd-task-card ${task.done ? 'done' : ''}`} id={`task-${task.id}`}>
       <div className="pd-task-row">
         <label className="pd-task-check">
-          <input type="checkbox" checked={task.done} onChange={handleToggle} />
+          <input type="checkbox" checked={!!task.done} onChange={handleToggle} />
         </label>
-        <span className="pd-task-text">{task.text}</span>
+        <button type="button" className="ws-expand ws-task-title" onClick={onToggleExpand}>
+          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          <span className="pd-task-text">{task.text}</span>
+        </button>
+        <div className="ws-chips">
+          {status !== 'done' && status !== 'ready' && <StatusPill status={status} />}
+          <PriorityFlag priority={task.priority} />
+          <DueChip dueAt={task.dueAt} done={task.done} />
+          {(task.labels || []).map((l) => <span key={l} className="ws-chip">{l}</span>)}
+        </div>
         <div className="pd-task-actions">
           <AssigneeSelect team={team} value={task.assignee} onChange={handleAssignee} />
           <button
@@ -271,6 +295,13 @@ function TaskItem({ task, team, projectId, onUpdate }) {
           </button>
         </div>
       </div>
+      {!expanded && task.nextAction && status !== 'done' && (
+        <p className="ws-task-next">→ {task.nextAction}</p>
+      )}
+      {expanded && (
+        <TaskDetails task={task} projectId={projectId} workspace={workspace} onUpdate={onUpdate}
+          onStartSession={onStartSession} docs={workspace?.documents || []} />
+      )}
       {showDiscussion && (
         <TaskComments projectId={projectId} taskId={task.id} />
       )}
@@ -298,9 +329,16 @@ export default function ProjectDetailPage() {
   const { user } = useAuth();
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState(searchParams.get('invite') === 'pending' ? 'team' : 'tasks');
+  const [tab, setTab] = useState(
+    searchParams.get('invite') === 'pending' ? 'team' : (searchParams.get('tab') || 'overview'),
+  );
   const [taskInput, setTaskInput] = useState('');
   const [taskAssignee, setTaskAssignee] = useState('');
+  const [taskPriority, setTaskPriority] = useState('medium');
+  const [taskFilter, setTaskFilter] = useState('open');
+  const [expandedTask, setExpandedTask] = useState(null);
+  const [sessionTask, setSessionTask] = useState('');
+  const [workspace, setWorkspace] = useState(EMPTY_WORKSPACE);
   const [inviteEmail, setInviteEmail] = useState('');
   const [tableInput, setTableInput] = useState('');
   const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
@@ -323,6 +361,39 @@ export default function ProjectDetailPage() {
 
   useEffect(() => { fetchProject(); }, [fetchProject]);
 
+  const fetchWorkspace = useCallback(async () => {
+    try {
+      setWorkspace({ ...EMPTY_WORKSPACE, ...(await getProjectWorkspace(id)) });
+    } catch (err) {
+      if (err.response?.status >= 500) toast.error(err.response?.data?.error || 'Could not load the project workspace');
+    }
+  }, [id]);
+
+  useEffect(() => { fetchWorkspace(); }, [fetchWorkspace]);
+  // Activity is written server-side on every change — refresh it when it is on screen.
+  useEffect(() => { if (tab === 'overview' || tab === 'activity') fetchWorkspace(); }, [tab, fetchWorkspace]);
+
+  const onWorkspaceChange = useCallback((kind, items) => {
+    setWorkspace((prev) => ({ ...prev, [kind]: items }));
+  }, []);
+
+  const goTab = (next) => {
+    setTab(next);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const openTask = (taskId) => {
+    setTaskFilter('all');
+    setExpandedTask(taskId);
+    setTab('tasks');
+    setTimeout(() => document.getElementById(`task-${taskId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 120);
+  };
+
+  const startSessionFor = (taskId) => {
+    setSessionTask(taskId);
+    goTab('sessions');
+  };
+
   const team = project?.team || [];
   const members = project?.members || [];
   const isOwner = project?.isOwner !== false;
@@ -332,18 +403,19 @@ export default function ProjectDetailPage() {
     try {
       const updated = await updateProject(id, patch);
       setProject(updated);
-    } catch {
-      toast.error('Failed to save');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save');
     }
   };
 
   const handleAddTask = async () => {
     if (!taskInput.trim()) return;
     try {
-      const updated = await addProjectTask(id, { text: taskInput.trim(), assignee: taskAssignee });
+      const updated = await addProjectTask(id, { text: taskInput.trim(), assignee: taskAssignee, priority: taskPriority });
       setProject(updated);
       setTaskInput('');
       setTaskAssignee('');
+      setTaskPriority('medium');
       toast.success('Task added');
     } catch { toast.error('Failed'); }
   };
@@ -424,12 +496,32 @@ export default function ProjectDetailPage() {
   const dueDate = project.dueDate ? new Date(project.dueDate) : null;
   const overdue = dueDate && isPast(dueDate) && !isToday(dueDate) && project.status !== 'completed';
   const taskCount = (project.tasks || []).length;
+  const allTasks = (project.tasks || []).filter((t) => !t.archivedAt);
+  const openCount = allTasks.filter((t) => taskStatusOf(t) !== 'done').length;
+  const filteredTasks = allTasks.filter((t) => {
+    const s = taskStatusOf(t);
+    if (taskFilter === 'open') return s !== 'done';
+    if (taskFilter === 'done') return s === 'done';
+    if (taskFilter === 'all') return true;
+    return s === taskFilter;
+  });
+  const canEdit = isOwner || members.some((m) => m.email === user?.email && m.status === 'accepted');
+  const activeSession = (workspace.sessions || []).some((s) => s.status === 'active');
 
   const tabs = [
-    { id: 'tasks', icon: CheckSquare, label: 'Tasks', count: taskCount },
+    { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
+    { id: 'tasks', icon: CheckSquare, label: 'Tasks', count: openCount },
+    { id: 'board', icon: Columns, label: 'Board' },
+    { id: 'sessions', icon: Timer, label: activeSession ? 'Session •' : 'Sessions' },
+    { id: 'repos', icon: GitBranch, label: 'Repos', count: workspace.repositories.length },
+    { id: 'envs', icon: Server, label: 'Envs', count: workspace.environments.length },
+    { id: 'services', icon: Cloud, label: 'Services', count: workspace.services.length },
+    { id: 'docs', icon: FileText, label: 'Docs', count: workspace.documents.filter((d) => !d.archivedAt).length },
+    { id: 'commands', icon: Terminal, label: 'Commands', count: workspace.commands.length },
     { id: 'tables', icon: Database, label: 'Tables', count: (project.dataTables || []).length },
     { id: 'team', icon: Users, label: 'Team', count: members.length },
     { id: 'chat', icon: MessageSquare, label: 'Chat' },
+    { id: 'activity', icon: Activity, label: 'Activity' },
   ];
 
   return (
@@ -494,7 +586,9 @@ export default function ProjectDetailPage() {
             <option value="active">Active</option>
             <option value="planned">Planned</option>
             <option value="on-hold">On Hold</option>
+            <option value="maintenance">Maintenance</option>
             <option value="completed">Completed</option>
+            <option value="archived">Archived</option>
           </select>
           {taskCount > 0 && (
             <span className="pd-chip pd-chip-progress">{project.progress}% complete</span>
@@ -518,6 +612,19 @@ export default function ProjectDetailPage() {
       </nav>
 
       <main className="pd-content">
+        {tab === 'overview' && (
+          <OverviewPanel
+            project={project}
+            projectId={id}
+            workspace={workspace}
+            canEdit={canEdit}
+            saveField={saveField}
+            onChanged={onWorkspaceChange}
+            goTab={goTab}
+            openTask={openTask}
+          />
+        )}
+
         {tab === 'tasks' && (
           <section className="pd-section">
             <div className="pd-panel-title">
@@ -531,25 +638,90 @@ export default function ProjectDetailPage() {
                 placeholder="Add a new task..."
                 onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
               />
+              <select className="assignee-select" value={taskPriority} onChange={(e) => setTaskPriority(e.target.value)} aria-label="Priority">
+                {TASK_PRIORITIES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+              </select>
               <AssigneeSelect team={team} value={taskAssignee} onChange={setTaskAssignee} />
               <button type="button" className="btn btn-primary btn-sm" onClick={handleAddTask}>
                 <Plus size={14} /> Add
               </button>
             </div>
+            {taskCount > 0 && (
+              <div className="pd-table-presets">
+                {[
+                  ['open', 'Open'], ['in_progress', 'In progress'], ['blocked', 'Blocked'],
+                  ['review', 'Review'], ['inbox', 'Inbox'], ['done', 'Done'], ['all', 'All'],
+                ].map(([fid, label]) => (
+                  <button key={fid} type="button" className={`filter-btn ${taskFilter === fid ? 'active' : ''}`} onClick={() => setTaskFilter(fid)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
             {taskCount === 0 ? (
               <div className="pd-empty">
                 <CheckSquare size={36} strokeWidth={1} />
                 <p>No tasks yet</p>
               </div>
+            ) : filteredTasks.length === 0 ? (
+              <div className="pd-empty"><p>No tasks in this view</p></div>
             ) : (
               <div className="pd-task-list">
-                {(project.tasks || []).map((task) => (
-                  <TaskItem key={task.id} task={task} team={team} projectId={id} onUpdate={setProject} />
+                {filteredTasks.map((task) => (
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    team={team}
+                    projectId={id}
+                    onUpdate={setProject}
+                    workspace={workspace}
+                    expanded={expandedTask === task.id}
+                    onToggleExpand={() => setExpandedTask((cur) => (cur === task.id ? null : task.id))}
+                    onStartSession={startSessionFor}
+                  />
                 ))}
               </div>
             )}
           </section>
         )}
+
+        {tab === 'board' && (
+          <section className="pd-section">
+            <div className="pd-panel-title">
+              <Columns size={16} />
+              <h3>Board</h3>
+            </div>
+            <TaskBoard tasks={project.tasks || []} projectId={id} team={team} onUpdate={setProject} onOpenTask={openTask} />
+          </section>
+        )}
+
+        {tab === 'sessions' && (
+          <SessionPanel
+            projectId={id}
+            project={project}
+            workspace={workspace}
+            preselectTaskId={sessionTask}
+            onChanged={onWorkspaceChange}
+            onProjectRefresh={refreshProject}
+          />
+        )}
+
+        {tab === 'repos' && (
+          <ResourcePanel projectId={id} kind="repositories" workspace={workspace} canEdit={canEdit} onChanged={onWorkspaceChange} icon={GitBranch} />
+        )}
+        {tab === 'envs' && (
+          <ResourcePanel projectId={id} kind="environments" workspace={workspace} canEdit={canEdit} onChanged={onWorkspaceChange} icon={Server} />
+        )}
+        {tab === 'services' && (
+          <ResourcePanel projectId={id} kind="services" workspace={workspace} canEdit={canEdit} onChanged={onWorkspaceChange} icon={Cloud} />
+        )}
+        {tab === 'commands' && (
+          <ResourcePanel projectId={id} kind="commands" workspace={workspace} canEdit={canEdit} onChanged={onWorkspaceChange} icon={Terminal} />
+        )}
+        {tab === 'docs' && (
+          <DocsPanel projectId={id} workspace={workspace} tasks={allTasks} canEdit={canEdit} onChanged={onWorkspaceChange} />
+        )}
+        {tab === 'activity' && <ActivityPanel workspace={workspace} />}
 
         {tab === 'tables' && (
           <section className="pd-section">

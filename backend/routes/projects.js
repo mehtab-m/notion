@@ -8,8 +8,71 @@ const { serialize, serializeTablePart } = require('../utils/serialize');
 const { findAccessibleProject, findEditableProject, findOwnedProject, acceptedAssignees, accessibleProjectsWhere } = require('../utils/projectAccess');
 const { sendProjectInviteEmail } = require('../utils/email');
 const { developerMiddleware } = require('../middleware/auth');
+const { logProjectActivity, TASK_STATUSES, TASK_PRIORITIES, taskStatus } = require('../utils/projectActivity');
+const { assertNoSecrets } = require('../utils/secretGuard');
 
 router.use(developerMiddleware);
+
+/* Workflow fields a task may carry beyond text/done/assignee/subtasks. */
+function applyTaskFields(task, body, user, projectId, log) {
+  const b = body || {};
+  const str = (v, max) => String(v ?? '').trim().slice(0, max);
+  if (b.text !== undefined) task.text = str(b.text, 300) || task.text;
+  if (b.assignee !== undefined) task.assignee = b.assignee || '';
+  if (b.description !== undefined) task.description = str(b.description, 50000);
+  if (b.nextAction !== undefined) task.nextAction = str(b.nextAction, 1000);
+  if (b.priority !== undefined) {
+    const p = TASK_PRIORITIES.includes(b.priority) ? b.priority : 'medium';
+    if (p !== (task.priority || 'medium')) log.push(['task.priority_changed', `Changed priority of ${task.text} to ${p}`, { from: task.priority || 'medium', to: p }]);
+    task.priority = p;
+  }
+  if (b.dueAt !== undefined) task.dueAt = b.dueAt ? (parseDate(b.dueAt)?.toISOString() ?? null) : null;
+  if (b.repositoryId !== undefined) task.repositoryId = b.repositoryId || null;
+  if (b.externalUrl !== undefined) task.externalUrl = str(b.externalUrl, 1000);
+  if (b.labels !== undefined) {
+    task.labels = (Array.isArray(b.labels) ? b.labels : String(b.labels).split(','))
+      .map((l) => str(l, 40)).filter(Boolean).slice(0, 12);
+  }
+  if (b.links !== undefined) {
+    task.links = (Array.isArray(b.links) ? b.links : [])
+      .map((l) => ({ id: l.id || uuidv4(), label: str(l.label, 120), url: str(l.url, 1000) }))
+      .filter((l) => l.url).slice(0, 20);
+  }
+  if (b.archived !== undefined) task.archivedAt = b.archived ? new Date().toISOString() : null;
+
+  // Status and done stay in sync: done ⇔ status 'done'.
+  let next;
+  if (b.status !== undefined && TASK_STATUSES.includes(b.status)) next = b.status;
+  else if (b.done !== undefined) next = b.done ? 'done' : (taskStatus(task) === 'done' ? 'ready' : taskStatus(task));
+  if (b.blockerDetails !== undefined) task.blockerDetails = str(b.blockerDetails, 2000);
+  if (next) {
+    const from = taskStatus(task);
+    if (next === 'blocked' && !String(task.blockerDetails || '').trim()) {
+      const err = new Error('Describe what is blocking this task');
+      err.field = 'blockerDetails';
+      throw err;
+    }
+    task.status = next;
+    task.done = next === 'done';
+    if (next === 'done' && from !== 'done') task.completedAt = new Date().toISOString();
+    if (next !== 'done') task.completedAt = null;
+    if (next !== 'blocked') task.blockerDetails = '';
+    if (from !== next) {
+      if (next === 'done') log.push(['task.completed', `Completed ${task.text}`, { from }]);
+      else if (from === 'done') log.push(['task.reopened', `Reopened ${task.text}`, { to: next }]);
+      else log.push(['task.status_changed', `Moved ${task.text} to ${next.replace('_', ' ')}`, { from, to: next }]);
+    }
+  }
+  if (!task.status) task.status = taskStatus(task);
+  if (!task.priority) task.priority = 'medium';
+  return task;
+}
+
+async function flushTaskLog(projectId, user, taskId, log) {
+  for (const [type, summary, meta] of log) {
+    await logProjectActivity(projectId, user, type, summary, { taskId, ...meta });
+  }
+}
 
 function calcProgress(tasks) {
   const items = [];
@@ -147,7 +210,7 @@ router.get('/', async (req, res) => {
 
 const ACCOUNT_TYPES = ['company', 'personal', 'freelance', 'client', 'study', 'open-source'];
 const PROJECT_TYPES = ['software', 'design', 'marketing', 'research', 'content', 'operations', 'event', 'other'];
-const STATUSES = ['active', 'planned', 'on-hold', 'completed'];
+const STATUSES = ['active', 'planned', 'on-hold', 'maintenance', 'completed', 'archived'];
 const PRIORITIES = ['low', 'medium', 'high'];
 
 /* Whitelist what a client may set on a project. The old handler spread the
@@ -180,8 +243,17 @@ function projectFields(body, { partial = false } = {}) {
     data.tags = (Array.isArray(b.tags) ? b.tags : String(b.tags).split(','))
       .map((t) => String(t).trim()).filter(Boolean).slice(0, 20);
   }
+  if (b.projectUrl !== undefined) data.projectUrl = str(b.projectUrl, 1000);
+  if (b.documentationUrl !== undefined) data.documentationUrl = str(b.documentationUrl, 1000);
+  if (b.notes !== undefined) data.notes = str(b.notes, 5000);
+  if (data.status) data.archivedAt = data.status === 'archived' ? new Date() : null;
   return data;
 }
+
+const PROJECT_EDITABLE = [
+  'title', 'description', 'status', 'priority', 'accountType', 'projectType', 'organization', 'role',
+  'color', 'dueDate', 'startDate', 'budget', 'tags', 'projectUrl', 'documentationUrl', 'notes',
+];
 
 /* Turn Prisma's long internal errors into one sentence a person can act on. */
 function friendlyError(err) {
@@ -214,6 +286,7 @@ router.post('/', async (req, res) => {
         userId: req.user.id,
       },
     });
+    await logProjectActivity(saved.id, req.user, 'project.created', `Created project ${saved.title}`);
     res.status(201).json(serialize(saved));
   } catch (err) {
     console.error('[projects:create]', err);
@@ -236,18 +309,30 @@ router.put('/:id', async (req, res) => {
   try {
     const existing = await loadProject(req, req.params.id, { requireEdit: true });
     if (!existing) return res.status(404).json({ error: 'Project not found' });
-    const patch = cleanBody(req.body, ['members', 'user', 'isOwner', 'messages']);
-    for (const key of ['dueDate', 'startDate']) {
-      if (key in patch) patch[key] = parseDate(patch[key]) ?? null;
+    const patch = cleanBody(req.body, [
+      'members', 'user', 'isOwner', 'messages', 'emailDelivered', 'archivedAt',
+      'repositories', 'technologies', 'environments', 'services', 'documents', 'commands', 'workSessions', 'activities',
+    ]);
+    const known = {};
+    for (const key of PROJECT_EDITABLE) {
+      if (key in patch) { known[key] = patch[key]; delete patch[key]; }
     }
-    if ('budget' in patch) {
-      const n = patch.budget === '' || patch.budget == null ? null : Number(patch.budget);
-      patch.budget = Number.isFinite(n) ? n : null;
-    }
+    Object.assign(patch, projectFields(known, { partial: true }));
+    assertNoSecrets({ projectUrl: patch.projectUrl, documentationUrl: patch.documentationUrl, notes: patch.notes });
     const full = await saveProject(existing, patch, req.user);
+
+    const changed = PROJECT_EDITABLE.filter((k) => k in patch
+      && JSON.stringify(patch[k] instanceof Date ? patch[k].toISOString() : patch[k])
+        !== JSON.stringify(existing[k] instanceof Date ? existing[k].toISOString() : existing[k]));
+    if (changed.length) {
+      const statusMove = changed.includes('status') ? ` (${existing.status} → ${patch.status})` : '';
+      await logProjectActivity(existing.id, req.user,
+        patch.status === 'archived' && existing.status !== 'archived' ? 'project.archived' : 'project.updated',
+        `Updated ${changed.join(', ')}${statusMove}`, { changed });
+    }
     replyProject(res, full, req.user.id);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ error: err.message, field: err.field });
   }
 });
 
@@ -389,17 +474,47 @@ router.post('/:id/tasks', async (req, res) => {
     const text = (req.body.text || '').trim();
     if (!text) return res.status(400).json({ error: 'Task text is required' });
     const tasks = getTasks(project);
-    tasks.push({
+    const task = {
       id: uuidv4(),
       text,
       done: false,
       assignee: req.body.assignee || '',
       subtasks: [],
-    });
+      status: 'ready',
+      priority: 'medium',
+      createdAt: new Date().toISOString(),
+    };
+    const { text: _t, done: _d, ...rest } = req.body || {};
+    if (!rest.status) rest.status = req.body.done ? 'done' : 'ready';
+    applyTaskFields(task, rest, req.user, project.id, []);
+    tasks.push(task);
     const full = await saveProject(project, { tasks, progress: calcProgress(tasks) }, req.user);
+    await logProjectActivity(project.id, req.user, 'task.created', `Created task ${task.text}`, { taskId: task.id, status: task.status, priority: task.priority });
     replyProject(res, full, req.user.id, 201);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ error: err.message, field: err.field });
+  }
+});
+
+/* Board drag-and-drop: move a task to a status and/or position. */
+router.post('/:id/tasks/:taskId/move', async (req, res) => {
+  try {
+    const project = await loadProject(req, req.params.id, { requireEdit: true });
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const tasks = getTasks(project);
+    const idx = tasks.findIndex((t) => t.id === req.params.taskId);
+    if (idx === -1) return res.status(404).json({ error: 'Task not found' });
+    const [task] = tasks.splice(idx, 1);
+    const log = [];
+    applyTaskFields(task, { status: req.body.status, blockerDetails: req.body.blockerDetails }, req.user, project.id, log);
+    const beforeId = req.body.beforeId;
+    const at = beforeId ? tasks.findIndex((t) => t.id === beforeId) : -1;
+    if (at >= 0) tasks.splice(at, 0, task); else tasks.push(task);
+    const full = await saveProject(project, { tasks, progress: calcProgress(tasks) }, req.user);
+    await flushTaskLog(project.id, req.user, task.id, log);
+    replyProject(res, full, req.user.id);
+  } catch (err) {
+    res.status(400).json({ error: err.message, field: err.field });
   }
 });
 
@@ -410,13 +525,15 @@ router.put('/:id/tasks/:taskId', async (req, res) => {
     const tasks = getTasks(project);
     const task = tasks.find((t) => t.id === req.params.taskId);
     if (!task) return res.status(404).json({ error: 'Task not found' });
-    if (req.body.text !== undefined) task.text = req.body.text;
-    if (req.body.assignee !== undefined) task.assignee = req.body.assignee;
-    if (req.body.done !== undefined) task.done = req.body.done;
+    const log = [];
+    const before = JSON.stringify(task);
+    applyTaskFields(task, req.body, req.user, project.id, log);
     const full = await saveProject(project, { tasks, progress: calcProgress(tasks) }, req.user);
+    if (!log.length && before !== JSON.stringify(task)) log.push(['task.updated', `Updated ${task.text}`, {}]);
+    await flushTaskLog(project.id, req.user, task.id, log);
     replyProject(res, full, req.user.id);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ error: err.message, field: err.field });
   }
 });
 
@@ -427,8 +544,10 @@ router.post('/:id/tasks/:taskId/toggle', async (req, res) => {
     const tasks = getTasks(project);
     const task = tasks.find((t) => t.id === req.params.taskId);
     if (!task) return res.status(404).json({ error: 'Task not found' });
-    task.done = !task.done;
+    const log = [];
+    applyTaskFields(task, { done: !task.done }, req.user, project.id, log);
     const full = await saveProject(project, { tasks, progress: calcProgress(tasks) }, req.user);
+    await flushTaskLog(project.id, req.user, task.id, log);
     replyProject(res, full, req.user.id);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -439,8 +558,10 @@ router.delete('/:id/tasks/:taskId', async (req, res) => {
   try {
     const project = await loadProject(req, req.params.id, { requireEdit: true });
     if (!project) return res.status(404).json({ error: 'Project not found' });
+    const gone = getTasks(project).find((t) => t.id === req.params.taskId);
     const tasks = getTasks(project).filter((t) => t.id !== req.params.taskId);
     const full = await saveProject(project, { tasks, progress: calcProgress(tasks) }, req.user);
+    if (gone) await logProjectActivity(project.id, req.user, 'task.deleted', `Deleted task ${gone.text}`, { taskId: gone.id });
     replyProject(res, full, req.user.id);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -674,5 +795,8 @@ router.delete('/:id/tables/:tableId/columns/:colId', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Developer workspace: repositories, stack, environments, services, docs, commands, sessions, activity.
+router.use(require('./projectWorkspace'));
 
 module.exports = router;
