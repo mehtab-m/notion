@@ -43,7 +43,6 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
 /* Overlays are not needed for first paint either. */
 const StickyNotesOverlay = lazy(() => import('./components/StickyNotes/StickyNotesOverlay'));
-const MoneyWidget = lazy(() => import('./components/Money/MoneyWidget'));
 const DeveloperOnboarding = lazy(() => import('./components/DeveloperOnboarding'));
 const PremiumWelcome = lazy(() => import('./components/PremiumWelcome'));
 
@@ -241,7 +240,6 @@ function AppShell() {
         <ErrorBoundary resetKey={location.pathname}>
           <Suspense fallback={null}>
             <StickyNotesOverlay />
-            <MoneyWidget />
             {needsDeveloperChoice && <DeveloperOnboarding />}
             <PremiumWelcome />
           </Suspense>

@@ -27,6 +27,8 @@ export default function BookModal({ book, onClose, onSaved }) {
   const cardRef = useFocusTrap(true, { onEscape: onClose, autoFocus: false });
   const [form, setForm] = useState(defaultForm);
   const [imageFile, setImageFile] = useState(null);
+  const [pdfFile, setPdfFile] = useState(null);
+  const [removePdf, setRemovePdf] = useState(false);
   const [hoverRating, setHoverRating] = useState(0);
   const [loading, setLoading] = useState(false);
   const isEdit = Boolean(book);
@@ -49,6 +51,8 @@ export default function BookModal({ book, onClose, onSaved }) {
       setForm(defaultForm);
     }
     setImageFile(null);
+    setPdfFile(null);
+    setRemovePdf(false);
   }, [book]);
 
   useEffect(() => {
@@ -82,6 +86,8 @@ export default function BookModal({ book, onClose, onSaved }) {
       } else if (form.coverImageUrl.trim()) {
         fd.append('coverImageUrl', form.coverImageUrl.trim());
       }
+      if (pdfFile) fd.append('pdfFile', pdfFile);
+      else if (removePdf) fd.append('removePdf', 'true');
       if (isEdit) {
         await updateBook(book._id, fd);
         toast.success('Book updated!');
@@ -208,6 +214,24 @@ export default function BookModal({ book, onClose, onSaved }) {
               >
                 Clear file
               </button>
+            )}
+          </div>
+          <div className="form-group">
+            <label>Book PDF (read it right here)</label>
+            {isEdit && book.pdfFile && !pdfFile && !removePdf && (
+              <p className="form-hint">
+                A PDF is attached.{' '}
+                <button type="button" className="clear-rating" onClick={() => setRemovePdf(true)}>Remove it</button>
+              </p>
+            )}
+            <input
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={(e) => { setPdfFile(e.target.files[0] || null); setRemovePdf(false); }}
+              className="file-input"
+            />
+            {pdfFile && (
+              <p className="form-hint">{pdfFile.name} · {(pdfFile.size / 1048576).toFixed(1)} MB</p>
             )}
           </div>
           <div className="form-actions">

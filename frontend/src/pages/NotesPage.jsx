@@ -269,115 +269,128 @@ export default function NotesPage() {
     }, 800);
   }, [activeNote]);
 
-  const filteredNotebooks = notebooks.filter((n) =>
-    n.title.toLowerCase().includes(search.toLowerCase()) ||
-    getNotebookPages(n._id).some((p) => p.title.toLowerCase().includes(search.toLowerCase()))
-  );
+  /* The notebook you are "inside": the open notebook itself, or the one
+     the open page belongs to. Null on the landing shelf. */
+  const currentNotebook = !activeNote
+    ? null
+    : activeNote.isNotebook
+      ? activeNote
+      : notebooks.find((nb) => String(nb._id) === String(activeNote.notebookId)) || null;
 
   if (loading) return <div className="spinner-container"><div className="spinner" /></div>;
 
-  return (
-    <div className="notes-layout">
-      <button className="notes-sidebar-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>
-        {sidebarOpen ? '✕' : '☰'} Pages
-      </button>
-
-      <div className={`notes-sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <div className="notes-sidebar-header">
-          <div className="notes-search">
-            <Search size={14} />
-            <input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
+  /* Landing view: nothing but the shelf of notebooks. */
+  if (!activeNote) {
+    return (
+      <div className="notes-shelf">
+        <div className="nb-gallery-head">
+          <div>
+            <h2>Your notebooks</h2>
+            <p>{notebooks.length} notebook{notebooks.length === 1 ? '' : 's'} — tap one to open it.</p>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={handleNewNotebook} title="New notebook">
-            <Plus size={14} />
+          <button className="btn btn-primary" onClick={handleNewNotebook}>
+            <Plus size={14} /> New notebook
           </button>
         </div>
-
-        <ul className="notes-tree">
-          {filteredNotebooks.length === 0 && (
-            <li className="notes-list-empty">No notebooks yet</li>
-          )}
-          {filteredNotebooks.map((nb) => (
-            <TreeItem
-              key={nb._id}
-              item={nb}
-              depth={0}
-              activeId={activeNote?._id}
-              expanded={expanded}
-              onToggle={(id) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))}
-              onSelect={(item) => { setActiveNote(item); setSidebarOpen(false); }}
-              children={getNotebookPages(nb._id)}
-            />
-          ))}
-          {legacyNotes.length > 0 && (
-            <>
-              <li className="notes-tree-section">Legacy Notes</li>
-              {legacyNotes.map((note) => (
-                <li
-                  key={note._id}
-                  className={`notes-tree-item ${activeNote?._id === note._id ? 'active' : ''}`}
-                  style={{ paddingLeft: 12 }}
-                  onClick={() => { setActiveNote(note); setSidebarOpen(false); }}
-                >
-                  <span className="tree-spacer" />
-                  <FileText size={13} />
-                  <span className="tree-label">{note.title || 'Untitled'}</span>
-                </li>
-              ))}
-            </>
-          )}
-        </ul>
-      </div>
-
-      <div className="notes-editor">
-        {!activeNote ? (
-          <div className="nb-gallery">
-            <div className="nb-gallery-head">
-              <div>
-                <h2>Your notebooks</h2>
-                <p>{notebooks.length} notebook{notebooks.length === 1 ? '' : 's'} · {pages.length} page{pages.length === 1 ? '' : 's'} — pick one to open it.</p>
-              </div>
-              <button className="btn btn-primary" onClick={handleNewNotebook}>
-                <Plus size={14} /> New notebook
-              </button>
-            </div>
-            {filteredNotebooks.length === 0 ? (
-              <div className="empty-state">
-                <Book size={48} strokeWidth={1} />
-                <h3>{search ? 'No notebook matches that' : 'No notebooks yet'}</h3>
-                <p>Create a notebook, then add pages inside it.</p>
-              </div>
-            ) : (
-              <div className="nb-grid">
-                {filteredNotebooks.map((nb, i) => {
-                  const nbPages = getNotebookPages(nb._id);
-                  return (
-                    <button
-                      key={nb._id}
-                      type="button"
-                      className="nb-card"
-                      style={{ '--nb-color': nb.color || `var(--chart-${(i % 5) + 1})` }}
-                      onClick={() => openNotebook(nb)}
-                    >
-                      <span className="nb-card-spine" />
-                      <span className="nb-card-body">
-                        <Book size={20} />
-                        <strong>{nb.title || 'Untitled notebook'}</strong>
-                        <em>{nbPages.length} page{nbPages.length === 1 ? '' : 's'}</em>
-                        {nbPages.length > 0 && (
-                          <span className="nb-card-pages">
-                            {nbPages.slice(0, 3).map((p) => <span key={p._id}>{p.title || 'Untitled'}</span>)}
-                          </span>
-                        )}
-                        <small>Updated {new Date(nb.updatedAt || nb.createdAt).toLocaleDateString()}</small>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+        {notebooks.length === 0 ? (
+          <div className="empty-state">
+            <Book size={48} strokeWidth={1} />
+            <h3>No notebooks yet</h3>
+            <p>Create a notebook, then add pages inside it.</p>
           </div>
         ) : (
+          <div className="nb-grid">
+            {notebooks.map((nb, i) => {
+              const nbPages = getNotebookPages(nb._id);
+              return (
+                <button
+                  key={nb._id}
+                  type="button"
+                  className="nb-card"
+                  style={{ '--nb-color': nb.color || `var(--chart-${(i % 5) + 1})` }}
+                  onClick={() => openNotebook(nb)}
+                >
+                  <span className="nb-card-spine" />
+                  <span className="nb-card-body">
+                    <Book size={22} />
+                    <strong>{nb.title || 'Untitled notebook'}</strong>
+                    <em>{nbPages.length} page{nbPages.length === 1 ? '' : 's'}</em>
+                    <small>Updated {formatDistanceToNow(new Date(nb.updatedAt || nb.createdAt), { addSuffix: true })}</small>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {legacyNotes.length > 0 && (
+          <>
+            <h3 className="notes-shelf-sub">Loose notes</h3>
+            <div className="notebook-page-list">
+              {legacyNotes.map((note) => (
+                <button key={note._id} className="notebook-page-btn" onClick={() => setActiveNote(note)}>
+                  <FileText size={14} /> {note.title || 'Untitled'}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        <ConfirmDialog
+          open={!!deleteNoteId}
+          title="Delete note?"
+          message="This note and any child pages will be permanently removed."
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => { const id = deleteNoteId; setDeleteNoteId(null); handleDelete(id); }}
+          onCancel={() => setDeleteNoteId(null)}
+        />
+      </div>
+    );
+  }
+
+  const nbPagesList = currentNotebook ? getNotebookPages(currentNotebook._id) : [];
+
+  return (
+    <div className={`notes-layout ${currentNotebook ? '' : 'no-sidebar'}`}>
+      {currentNotebook && (
+        <button className="notes-sidebar-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>
+          {sidebarOpen ? '✕' : '☰'} Pages
+        </button>
+      )}
+
+      {currentNotebook && (
+        <div className={`notes-sidebar ${sidebarOpen ? 'open' : ''}`}>
+          <div className="notes-sidebar-header">
+            <button
+              type="button"
+              className={`notes-nb-title ${activeNote._id === currentNotebook._id ? 'active' : ''}`}
+              onClick={() => { setActiveNote(currentNotebook); setSidebarOpen(false); }}
+            >
+              <Book size={14} />
+              <span>{currentNotebook.title || 'Untitled notebook'}</span>
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={() => handleNewPage(currentNotebook)} title="New page">
+              <Plus size={14} />
+            </button>
+          </div>
+          <ul className="notes-tree">
+            {nbPagesList.length === 0 && <li className="notes-list-empty">No pages yet</li>}
+            {nbPagesList.map((p) => (
+              <li
+                key={p._id}
+                className={`notes-tree-item ${activeNote._id === p._id ? 'active' : ''}`}
+                onClick={() => { setActiveNote(p); setSidebarOpen(false); }}
+              >
+                <FileText size={13} />
+                <span className="tree-label">{p.title || 'Untitled'}</span>
+                {(p.tags || []).includes('learning-line') && <span className="learning-badge">💡</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="notes-editor">
+        {(
           <>
             <div className="notes-editor-toolbar">
               <button className="btn btn-secondary btn-sm" onClick={() => setActiveNote(null)} title="Back to all notebooks">

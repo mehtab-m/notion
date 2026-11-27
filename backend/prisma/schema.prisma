@@ -259,6 +259,8 @@ model Book {
   genre       String?
   notes       String?
   coverImage  String?
+  /// Uploaded PDF of the book (/uploads/...), read in-app
+  pdfFile     String?
   notebookId  String?
   startedAt   DateTime?
   finishedAt  DateTime?

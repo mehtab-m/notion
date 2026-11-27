@@ -5,6 +5,7 @@ import useApi from '../hooks/useApi';
 import { getBooks, deleteBook, incrementBookPage, addLearningLine } from '../utils/api';
 import BookCard from '../components/Books/BookCard';
 import BookModal from '../components/Books/BookModal';
+import BookReader from '../components/Books/BookReader';
 
 const STATUS_FILTERS = ['all', 'reading', 'want-to-read', 'completed', 'paused'];
 
@@ -13,6 +14,8 @@ export default function BooksPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editBook, setEditBook] = useState(null);
+  const [readingId, setReadingId] = useState(null);
+  const readingBook = (books || []).find((b) => b._id === readingId) || null;
 
   const handleDelete = async (id) => {
     try {
@@ -64,9 +67,9 @@ export default function BooksPage() {
   );
 
   return (
-    <div>
+    <div className="books-page">
       <div className="page-header">
-        <h1>Books</h1>
+        <h1>Bookshelf</h1>
         <button className="btn btn-primary" onClick={handleNew}>
           <Plus size={16} /> Add Book
         </button>
@@ -93,11 +96,12 @@ export default function BooksPage() {
           <p>{statusFilter === 'all' ? 'Start tracking your reading.' : `No books with status "${statusFilter}".`}</p>
         </div>
       ) : (
-        <div className="card-grid">
+        <div className="book-shelf">
           {filtered.map((book) => (
             <BookCard
               key={book._id}
               book={book}
+              onOpen={(b) => setReadingId(b._id)}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onArchived={refetch}
@@ -106,6 +110,10 @@ export default function BooksPage() {
             />
           ))}
         </div>
+      )}
+
+      {readingBook && (
+        <BookReader book={readingBook} onClose={() => setReadingId(null)} onEdit={handleEdit} />
       )}
 
       {modalOpen && (

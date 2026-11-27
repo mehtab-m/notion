@@ -8,8 +8,29 @@ const { cleanBody, num } = require('../utils/body');
 const { serialize } = require('../utils/serialize');
 const { resolveImageField } = require('../utils/mediaUrl');
 
-function bookData(body, file) {
+/* Cover image and the book's PDF arrive in the same multipart request. */
+const bookUpload = upload.fields([
+  { name: 'coverImage', maxCount: 1 },
+  { name: 'pdfFile', maxCount: 1 },
+]);
+
+function bookData(body, files = {}) {
+  const file = files.coverImage?.[0];
+  const pdf = files.pdfFile?.[0];
   const data = cleanBody(body);
+  if (pdf) {
+    if (pdf.mimetype !== 'application/pdf' && !/\.pdf$/i.test(pdf.originalname)) {
+      const err = new Error('Book file must be a PDF');
+      err.status = 400;
+      throw err;
+    }
+    data.pdfFile = '/uploads/' + pdf.filename;
+  } else if (data.removePdf === 'true') {
+    data.pdfFile = null;
+  } else {
+    delete data.pdfFile;
+  }
+  delete data.removePdf;
   const image = resolveImageField(data, file, {
     fileField: 'coverImage',
     urlFields: ['coverImageUrl', 'coverImage'],
@@ -40,10 +61,10 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', upload.single('coverImage'), async (req, res) => {
+router.post('/', bookUpload, async (req, res) => {
   try {
     const saved = await prisma.book.create({
-      data: { ...bookData(req.body, req.file), userId: req.user.id },
+      data: { ...bookData(req.body, req.files), userId: req.user.id },
     });
 
     const notebook = await prisma.note.create({
@@ -165,13 +186,13 @@ router.post('/:id/learning-line', async (req, res) => {
   }
 });
 
-router.put('/:id', upload.single('coverImage'), async (req, res) => {
+router.put('/:id', bookUpload, async (req, res) => {
   try {
     const existing = await prisma.book.findFirst({
       where: notTrashed(req, { _id: req.params.id }),
     });
     if (!existing) return res.status(404).json({ error: 'Book not found' });
-    const data = bookData(req.body, req.file);
+    const data = bookData(req.body, req.files);
     const updated = await prisma.book.update({
       where: { id: existing.id },
       data,

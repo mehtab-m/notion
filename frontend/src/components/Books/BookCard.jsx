@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { Pencil, Trash2, BookOpen, Star, ChevronUp, Lightbulb } from 'lucide-react';
+import { Pencil, Trash2, Star, ChevronUp, Lightbulb, BookOpenText } from 'lucide-react';
 import { getApiBase } from '../../utils/api';
 import ItemActions from '../ItemActions';
 import './BookCard.css';
 
 const BACKEND = getApiBase();
 
-const statusClass = {
-  reading: 'badge-reading',
-  completed: 'badge-completed',
-  'want-to-read': 'badge-want-to-read',
-  paused: 'badge-paused',
+const STATUS_LABEL = {
+  reading: 'Reading',
+  completed: 'Finished',
+  'want-to-read': 'To read',
+  paused: 'Paused',
 };
+
+const COVER_COLORS = ['#7c3aed', '#0ea5e9', '#16a34a', '#e11d48', '#f59e0b', '#0f766e', '#9333ea', '#2563eb'];
 
 export function resolveCoverUrl(coverImage) {
   if (!coverImage) return null;
@@ -19,14 +21,21 @@ export function resolveCoverUrl(coverImage) {
   return `${BACKEND}${coverImage.startsWith('/') ? '' : '/'}${coverImage}`;
 }
 
-export default function BookCard({ book, onEdit, onDelete, onIncrementPage, onLearningLine, onArchived }) {
+/** Stable colour per book so plain covers don't all look the same. */
+function coverColor(book) {
+  const key = String(book._id || book.title || '');
+  let h = 0;
+  for (let i = 0; i < key.length; i += 1) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return COVER_COLORS[h % COVER_COLORS.length];
+}
+
+export default function BookCard({ book, onOpen, onEdit, onDelete, onIncrementPage, onLearningLine, onArchived }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [learningOpen, setLearningOpen] = useState(false);
   const [learningText, setLearningText] = useState('');
   const [savingLine, setSavingLine] = useState(false);
 
   const progress = book.totalPages > 0 ? Math.round((book.currentPage / book.totalPages) * 100) : 0;
-  const showProgress = book.totalPages > 0 || book.currentPage > 0;
   const canIncrement = book.status !== 'completed';
   const coverSrc = resolveCoverUrl(book.coverImage);
 
@@ -43,92 +52,83 @@ export default function BookCard({ book, onEdit, onDelete, onIncrementPage, onLe
   };
 
   return (
-    <div className="book-card">
-      <div className="book-card-cover">
-        {coverSrc ? (
-          <img src={coverSrc} alt={book.title} />
-        ) : (
-          <div className="book-cover-placeholder">
-            <BookOpen size={28} color="var(--accent-green)" />
-          </div>
-        )}
-        <div className="book-card-actions">
-          <ItemActions
-            type="book"
-            id={book._id}
-            favorite={book.favorite}
-            onArchived={onArchived}
-            variant="card"
-            size={13}
-          />
-          <button className="card-action-btn" onClick={() => setLearningOpen(true)} title="Add learning line">
-            <Lightbulb size={13} />
-          </button>
-          <button className="card-action-btn" onClick={() => onEdit(book)} title="Edit">
-            <Pencil size={13} />
-          </button>
-          {!confirmDelete ? (
-            <button className="card-action-btn danger" onClick={() => setConfirmDelete(true)} title="Delete">
-              <Trash2 size={13} />
-            </button>
+    <div className="book-item">
+      <div
+        className="book-3d"
+        style={{ '--cover': coverColor(book) }}
+        role="button"
+        tabIndex={0}
+        onClick={() => onOpen(book)}
+        onKeyDown={(e) => e.key === 'Enter' && onOpen(book)}
+        title={book.pdfFile ? 'Open and read' : 'Open book'}
+      >
+        <span className="book-3d-pages" aria-hidden />
+        <div className="book-3d-cover">
+          {coverSrc ? (
+            <img src={coverSrc} alt={book.title} />
           ) : (
-            <div className="confirm-delete">
-              <button className="btn btn-danger btn-sm" onClick={() => onDelete(book._id)}>Yes</button>
-              <button className="btn btn-secondary btn-sm" onClick={() => setConfirmDelete(false)}>No</button>
+            <div className="book-3d-plain">
+              <strong>{book.title}</strong>
+              <span>{book.author}</span>
             </div>
           )}
+          <span className="book-3d-spine" aria-hidden />
+          <span className="book-3d-status">{STATUS_LABEL[book.status] || book.status}</span>
+          {book.pdfFile && (
+            <span className="book-3d-pdf"><BookOpenText size={12} /> Read</span>
+          )}
+          {book.totalPages > 0 && (
+            <span className="book-3d-progress"><span style={{ width: `${progress}%` }} /></span>
+          )}
+
+          <div className="book-card-actions" onClick={(e) => e.stopPropagation()}>
+            <ItemActions type="book" id={book._id} favorite={book.favorite} onArchived={onArchived} variant="card" size={13} />
+            <button className="card-action-btn" onClick={() => setLearningOpen(true)} title="Add learning line">
+              <Lightbulb size={13} />
+            </button>
+            <button className="card-action-btn" onClick={() => onEdit(book)} title="Edit">
+              <Pencil size={13} />
+            </button>
+            {!confirmDelete ? (
+              <button className="card-action-btn danger" onClick={() => setConfirmDelete(true)} title="Delete">
+                <Trash2 size={13} />
+              </button>
+            ) : (
+              <div className="confirm-delete">
+                <button className="btn btn-danger btn-sm" onClick={() => onDelete(book._id)}>Yes</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => setConfirmDelete(false)}>No</button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="book-card-body">
-        <span className={`badge ${statusClass[book.status] || ''}`}>{book.status.replace('-', ' ')}</span>
+      <div className="book-item-info">
         <h3 className="book-card-title">{book.title}</h3>
         <p className="book-card-author">{book.author}</p>
-
-        {book.rating > 0 && (
-          <div className="book-card-stars">
-            {[1, 2, 3, 4, 5].map((s) => (
-              <Star
-                key={s}
-                size={13}
-                fill={s <= book.rating ? 'var(--accent-yellow)' : 'none'}
-                color={s <= book.rating ? 'var(--accent-yellow)' : 'var(--text-muted)'}
-              />
-            ))}
-          </div>
-        )}
-
-        {showProgress && (
-          <div className="book-progress">
-            {book.totalPages > 0 && (
-              <div className="progress-bar">
-                <div className="progress-bar-fill" style={{ width: `${progress}%`, background: 'var(--accent-green)' }} />
-              </div>
-            )}
-            <div className="book-progress-row">
-              <span className="book-progress-label">
-                {book.totalPages > 0 ? `${progress}% · ` : ''}p.{book.currentPage}{book.totalPages > 0 ? `/${book.totalPages}` : ''}
-              </span>
-              {canIncrement && (
-                <button
-                  className="book-page-btn"
-                  onClick={() => onIncrementPage(book._id)}
-                  title="Mark page read"
-                >
-                  <ChevronUp size={14} /> +1 page
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {!showProgress && canIncrement && (
-          <button className="book-page-btn book-page-btn--solo" onClick={() => onIncrementPage(book._id)}>
-            <ChevronUp size={14} /> +1 page read
-          </button>
-        )}
-
-        {book.genre && <span className="book-genre">{book.genre}</span>}
+        <div className="book-item-row">
+          {book.rating > 0 ? (
+            <span className="book-card-stars">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <Star
+                  key={s}
+                  size={11}
+                  fill={s <= book.rating ? 'var(--accent-yellow)' : 'none'}
+                  color={s <= book.rating ? 'var(--accent-yellow)' : 'var(--text-muted)'}
+                />
+              ))}
+            </span>
+          ) : (
+            <span className="book-progress-label">
+              {book.totalPages > 0 ? `${progress}% read` : book.currentPage > 0 ? `p.${book.currentPage}` : ''}
+            </span>
+          )}
+          {canIncrement && (
+            <button className="book-page-btn" onClick={() => onIncrementPage(book._id)} title="Mark one page read">
+              <ChevronUp size={12} /> 1 page
+            </button>
+          )}
+        </div>
       </div>
 
       {learningOpen && (

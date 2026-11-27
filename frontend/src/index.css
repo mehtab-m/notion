@@ -199,11 +199,9 @@ body,
      Below --content-max it is a plain pad; above it, the extra width
      is split evenly so the two never disagree about where the page
      starts. */
-  --content-max: 1440px;
-  --gutter: max(
-    var(--content-pad),
-    calc((100% - var(--content-max)) / 2 + var(--content-pad))
-  );
+  /* Pages run edge to edge: flush with the sidebar, the top bar and
+     the right edge. Only the top bar keeps a small inner pad. */
+  --gutter: 16px;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -221,8 +219,17 @@ body,
   flex: 1;
   width: 100%;
   min-width: 0;
-  padding: var(--content-pad) var(--gutter) calc(var(--content-pad) + 12px);
+  /* A little breathing room from the sidebar and top bar. */
+  --page-gap: 14px;
+  padding: var(--page-gap) var(--page-gap) calc(var(--page-gap) + 8px);
   overflow-x: clip;
+}
+/* Pages used to cap and centre themselves (max-width + margin auto),
+   which left empty bands either side. Every page now fills the shell. */
+main.app-content > * {
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 /* A soft wash of the accent behind the whole workspace — enough
@@ -1239,7 +1246,7 @@ kbd, .kbd {
     padding-bottom: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom, 0px));
   }
 
-  .app-content { padding: 16px 14px 22px; }
+  .app-content { --page-gap: 10px; }
 
   .app-layout::before { background: none; }
 
@@ -1275,7 +1282,7 @@ kbd, .kbd {
 }
 
 @media (max-width: 560px) {
-  .app-content { padding: 14px 12px 20px; }
+  .app-content { --page-gap: 10px; }
 
   .card-grid { grid-template-columns: 1fr; }
 
@@ -1287,8 +1294,6 @@ kbd, .kbd {
     overflow-x: auto;
     flex-wrap: nowrap;
     padding-bottom: 6px;
-    margin-left: -12px;
-    margin-right: -12px;
     padding-left: 12px;
     padding-right: 12px;
     -webkit-overflow-scrolling: touch;
@@ -1346,7 +1351,7 @@ kbd, .kbd {
 }
 
 @media (max-width: 360px) {
-  .app-content { padding: 12px 10px 18px; }
+  .app-content { --page-gap: 8px; }
   .stat-grid { grid-template-columns: 1fr; }
 }
 

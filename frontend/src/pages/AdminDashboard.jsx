@@ -160,12 +160,12 @@ function Radar({ active, total }) {
       <svg viewBox="0 0 220 220">
         <defs>
           <radialGradient id="mcRadarBg" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgba(34,211,238,.18)" />
-            <stop offset="100%" stopColor="rgba(34,211,238,0)" />
+            <stop offset="0%" style={{ stopColor: 'var(--accent)', stopOpacity: 0.18 }} />
+            <stop offset="100%" style={{ stopColor: 'var(--accent)', stopOpacity: 0 }} />
           </radialGradient>
           <linearGradient id="mcSweep" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="rgba(34,211,238,0)" />
-            <stop offset="100%" stopColor="rgba(34,211,238,.55)" />
+            <stop offset="0%" style={{ stopColor: 'var(--accent)', stopOpacity: 0 }} />
+            <stop offset="100%" style={{ stopColor: 'var(--accent)', stopOpacity: 0.55 }} />
           </linearGradient>
         </defs>
         <circle cx="110" cy="110" r="104" fill="url(#mcRadarBg)" />
@@ -273,7 +273,7 @@ export default function AdminDashboard() {
       x: Math.max(0, Math.round((now - new Date(u.createdAt).getTime()) / 86400000)),
       y: u.weekActivityCount || 0,
       z: Math.max(1, Object.values(u.content || {}).reduce((s, n) => s + (n || 0), 0)),
-      color: u.plan === 'platinum' ? '#E879F9' : u.plan === 'premium' ? '#FBBF24' : u.isActive ? '#22D3EE' : '#64748B',
+      color: u.plan === 'platinum' ? 'var(--chart-5)' : u.plan === 'premium' ? 'var(--accent-yellow)' : u.isActive ? 'var(--accent)' : 'var(--text-muted)',
     }));
     const paid = (u) => u.plan === 'premium' || u.plan === 'platinum';
     const dev = users.filter((u) => u.isDeveloper === true);
@@ -294,21 +294,21 @@ export default function AdminDashboard() {
       { name: 'Free', value: -(act.filter((u) => !paid(u)).length) },
     ];
     const plans = [
-      { name: 'Common', value: overview.commonUsers || 0, color: '#64748B' },
-      { name: 'Premium', value: overview.premiumUsers || 0, color: '#FBBF24' },
-      { name: 'Platinum', value: overview.platinumUsers || 0, color: '#E879F9' },
+      { name: 'Common', value: overview.commonUsers || 0, color: 'var(--text-muted)' },
+      { name: 'Premium', value: overview.premiumUsers || 0, color: 'var(--accent-yellow)' },
+      { name: 'Platinum', value: overview.platinumUsers || 0, color: 'var(--chart-5)' },
     ].filter((p) => p.value > 0);
     const tree = Object.entries(contentTotals).filter(([, v]) => v > 0).map(([name, value]) => ({ name, value }));
     const signups = (signupsByDay || []).map((d) => ({ date: d.day, signups: d.count }));
     const tape = [
       { label: 'Developer choice', segments: [
-        { name: 'developer', value: overview.developers, color: '#22D3EE' },
-        { name: 'non-dev', value: overview.nonDevelopers, color: '#A78BFA' },
-        { name: 'undecided', value: overview.undecidedDeveloper, color: '#475569' },
+        { name: 'developer', value: overview.developers, color: 'var(--accent)' },
+        { name: 'non-dev', value: overview.nonDevelopers, color: 'var(--chart-2)' },
+        { name: 'undecided', value: overview.undecidedDeveloper, color: 'var(--text-muted)' },
       ] },
       { label: 'Weekly events', segments: [
-        { name: 'logins', value: overview.weeklyLogins || 0, color: '#34D399' },
-        { name: 'app uses', value: overview.weeklyAppUses || 0, color: '#F472B6' },
+        { name: 'logins', value: overview.weeklyLogins || 0, color: 'var(--accent-green)' },
+        { name: 'app uses', value: overview.weeklyAppUses || 0, color: 'var(--chart-5)' },
       ] },
     ];
     return { galaxy, venn, funnel, plans, tree, signups, tape };
@@ -409,7 +409,7 @@ export default function AdminDashboard() {
         <section className="mc-panel">
           <header><Signal size={14} /> Signups · 30d</header>
           {derived.signups.length ? (
-            <AreaTrend data={derived.signups} series={[{ key: 'signups', name: 'Signups', color: '#22D3EE' }]} height={240}
+            <AreaTrend data={derived.signups} series={[{ key: 'signups', name: 'Signups', color: 'var(--accent)' }]} height={240}
               xFormatter={(v) => { try { return format(parseISO(v), 'd MMM'); } catch { return v; } }} />
           ) : <div className="kit-empty">No signups in this window.</div>}
         </section>

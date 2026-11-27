@@ -1,3 +1,56 @@
+/* ── Plain-language dashboard widgets ─────────────────── */
+.dw-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: 16px;
+  margin: 8px 0 24px;
+}
+.dw {
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tone) 9%, var(--bg-card)), var(--bg-card) 60%);
+  box-shadow: var(--shadow-sm, none);
+}
+.dw-head { display: flex; gap: 12px; align-items: flex-start; }
+.dw-icon {
+  flex: none; width: 34px; height: 34px; border-radius: 10px;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--tone) 18%, transparent);
+  color: var(--tone);
+}
+.dw-head h3 { margin: 0; font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.dw-head p { margin: 3px 0 0; font-size: 13px; color: var(--text-secondary); line-height: 1.4; }
+.dw-empty { margin: 0; font-size: 13px; color: var(--text-muted); padding: 10px 12px; border-radius: 10px; background: var(--bg-hover); }
+
+.dw-row { display: flex; flex-direction: column; gap: 6px; }
+.dw-row-top { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+.dw-row-label { color: var(--text-primary); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dw-row-right { color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dw-bar { height: 10px; border-radius: 999px; background: var(--bg-hover); overflow: hidden; }
+.dw-bar span { display: block; height: 100%; border-radius: inherit; transition: width .6s ease; }
+
+.dw-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; height: 150px; }
+.dw-day { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+.dw-day-val { font-size: 11px; color: var(--text-muted); height: 14px; font-variant-numeric: tabular-nums; }
+.dw-day-bar { flex: 1; width: 100%; max-width: 34px; display: flex; align-items: flex-end; border-radius: 8px; background: var(--bg-hover); overflow: hidden; }
+.dw-day-bar i { display: block; width: 100%; border-radius: 8px; background: linear-gradient(180deg, var(--tone), color-mix(in srgb, var(--tone) 60%, transparent)); transition: height .6s ease; }
+.dw-day-name { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+
+.dw-habits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.dw-habits li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: 12px; background: var(--bg-hover);
+}
+.dw-habit-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.dw-habit-name { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dw-habit-streak { font-size: 12px; font-weight: 700; color: var(--text-secondary); white-space: nowrap; }
+
+.dw-big { display: flex; align-items: baseline; gap: 10px; }
+.dw-big strong { font-size: 36px; font-weight: 800; line-height: 1; color: var(--tone); letter-spacing: -.02em; }
+.dw-big span { font-size: 13px; color: var(--text-secondary); }
+
 .dashboard-charts.featured-grid {
   display: flex;
   flex-direction: column;

@@ -1,125 +1,172 @@
 import React, { useMemo } from 'react';
 import { format, parseISO } from 'date-fns';
-import { BookOpen, Target, Flame, Inbox, Timer, Radar as RadarIcon, Tv, FolderKanban } from 'lucide-react';
-import {
-  ChartCard, ChartGrid, DonutChart, ConcentricRings, BubbleChart, AreaTrend,
-  TapeDiagram, RadarWeb, TreemapChart, Gauge,
-} from '../Charts/ChartKit';
+import { BookOpen, Target, Flame, Inbox, Timer, FolderKanban } from 'lucide-react';
+import './DashboardCharts.css';
 
-const pretty = (s) => String(s).replace(/-/g, ' ');
-const short = (s, n = 14) => (s.length > n ? `${s.slice(0, n)}…` : s);
-const toSlices = (obj) => Object.entries(obj || {})
-  .filter(([, v]) => v > 0)
-  .map(([name, value]) => ({ name: pretty(name), value }));
+/*
+ * Plain-language dashboard. Every widget answers one everyday question
+ * ("how far along am I?", "did I keep my streak?") with a progress bar,
+ * a number and a sentence — no bubbles, radars or treemaps to decode.
+ */
+
+const pct = (n) => Math.max(0, Math.min(100, Math.round(n || 0)));
+
+function Widget({ icon: Icon, title, hint, tone = 'var(--accent)', children, empty, emptyText }) {
+  return (
+    <section className="dw" style={{ '--tone': tone }}>
+      <header className="dw-head">
+        <span className="dw-icon"><Icon size={16} /></span>
+        <div>
+          <h3>{title}</h3>
+          {hint && <p>{hint}</p>}
+        </div>
+      </header>
+      {empty ? <p className="dw-empty">{emptyText}</p> : children}
+    </section>
+  );
+}
+
+function BarRow({ label, value, right, color }) {
+  return (
+    <div className="dw-row">
+      <div className="dw-row-top">
+        <span className="dw-row-label">{label}</span>
+        <span className="dw-row-right">{right ?? `${pct(value)}%`}</span>
+      </div>
+      <div className="dw-bar"><span style={{ width: `${pct(value)}%`, background: color }} /></div>
+    </div>
+  );
+}
 
 export default function DashboardCharts({ stats }) {
   const {
     bookProgress = [], goalProgress = [], habitStats = [], projectProgress = [],
-    booksByStatus = {}, goalsByStatus = {}, showsByStatus = {},
-    inboxByStatus = {}, inboxByPriority = {}, focusDaily = [],
+    inboxByStatus = {}, focusDaily = [],
   } = stats || {};
 
-  const bookPie = useMemo(() => toSlices(booksByStatus), [booksByStatus]);
-  const showPie = useMemo(() => toSlices(showsByStatus), [showsByStatus]);
-
-  const goalRings = useMemo(() => goalProgress
+  const goals = useMemo(() => goalProgress
     .filter((g) => g.status !== 'abandoned')
-    .slice(0, 6)
-    .map((g) => ({ name: short(g.title), value: g.progress || 0 })), [goalProgress]);
+    .sort((a, b) => (b.progress || 0) - (a.progress || 0))
+    .slice(0, 5), [goalProgress]);
 
-  const habitBubbles = useMemo(() => habitStats.map((h) => ({
-    name: h.name,
-    x: h.streak || 0,
-    y: h.completedCount || 0,
-    z: Math.max(1, (h.streak || 0) + (h.completedCount || 0)),
-    color: h.color || undefined,
-  })), [habitStats]);
+  const habits = useMemo(() => [...habitStats]
+    .sort((a, b) => (b.streak || 0) - (a.streak || 0))
+    .slice(0, 6), [habitStats]);
+  const topStreak = habits[0]?.streak || 0;
 
-  const tapeRows = useMemo(() => [
-    { label: 'Goals', segments: toSlices(goalsByStatus) },
-    { label: 'Inbox', segments: toSlices(inboxByStatus) },
-    { label: 'Open inbox by priority', segments: [
-      { name: 'high', value: inboxByPriority.high || 0, color: 'var(--accent-red, #EF4444)' },
-      { name: 'medium', value: inboxByPriority.medium || 0, color: 'var(--accent-yellow, #F59E0B)' },
-      { name: 'low', value: inboxByPriority.low || 0, color: 'var(--accent-green, #10B981)' },
-    ] },
-  ], [goalsByStatus, inboxByStatus, inboxByPriority]);
+  const reading = useMemo(() => bookProgress
+    .filter((b) => (b.currentPage || 0) > 0 && (b.progress || 0) < 100)
+    .slice(0, 4), [bookProgress]);
 
-  const readingTree = useMemo(() => bookProgress
-    .filter((b) => (b.currentPage || 0) > 0)
-    .map((b) => ({ name: b.title, value: b.currentPage })), [bookProgress]);
+  const projects = useMemo(() => projectProgress
+    .filter((p) => p.status !== 'completed')
+    .slice(0, 4), [projectProgress]);
 
-  const radar = useMemo(() => {
-    const avg = (arr, k) => (arr.length ? Math.round(arr.reduce((s, x) => s + (x[k] || 0), 0) / arr.length) : 0);
-    const topStreak = habitStats.reduce((m, h) => Math.max(m, h.streak || 0), 0);
-    const focusMin = focusDaily.reduce((s, d) => s + d.focus, 0);
-    const runMin = focusDaily.reduce((s, d) => s + d.run, 0);
-    return [
-      { metric: 'Reading', score: avg(bookProgress, 'progress') },
-      { metric: 'Goals', score: avg(goalProgress, 'progress') },
-      { metric: 'Streaks', score: Math.min(100, topStreak * 7) },
-      { metric: 'Focus', score: Math.min(100, Math.round(focusMin / 6)) },
-      { metric: 'Fitness', score: Math.min(100, Math.round(runMin / 3)) },
-      { metric: 'Projects', score: avg(projectProgress, 'progress') },
-    ];
-  }, [bookProgress, goalProgress, habitStats, focusDaily, projectProgress]);
+  const days = focusDaily.slice(-7);
+  const weekFocus = days.reduce((s, d) => s + (d.focus || 0) + (d.run || 0), 0);
+  const maxDay = Math.max(1, ...days.map((d) => (d.focus || 0) + (d.run || 0)));
+  const bestDay = days.reduce((best, d) => (((d.focus || 0) + (d.run || 0)) > ((best?.focus || 0) + (best?.run || 0)) ? d : best), null);
 
-  const inboxTotal = (inboxByStatus.open || 0) + (inboxByStatus.done || 0);
-  const inboxRate = inboxTotal ? Math.round(((inboxByStatus.done || 0) / inboxTotal) * 100) : 0;
-  const hasFocus = focusDaily.some((d) => d.focus || d.run);
+  const open = inboxByStatus.open || 0;
+  const done = inboxByStatus.done || 0;
+  const inboxRate = open + done ? Math.round((done / (open + done)) * 100) : 0;
 
   if (!stats) return null;
 
+  const dayLabel = (d) => { try { return format(parseISO(d.date), 'EEE'); } catch { return ''; } };
+
   return (
-    <div className="dashboard-charts-kit">
-      <ChartGrid cols={3}>
-        <ChartCard title="Library mix" subtitle="Books by status" icon={BookOpen} empty={!bookPie.length} emptyText="Add a book to see your library mix.">
-          <DonutChart data={bookPie} centerLabel="books" />
-        </ChartCard>
-        <ChartCard title="Watchlist" subtitle="Shows by status" icon={Tv} empty={!showPie.length} emptyText="Add a show to fill this pie.">
-          <DonutChart data={showPie} full />
-        </ChartCard>
-        <ChartCard title="Inbox cleared" subtitle="Done vs everything captured" icon={Inbox}>
-          <Gauge value={inboxRate} label={`${inboxByStatus.open || 0} still open`} height={200} color="var(--chart-4)" />
-        </ChartCard>
-      </ChartGrid>
+    <div className="dw-grid">
+      <Widget
+        icon={Timer}
+        title="This week's focus"
+        hint={weekFocus
+          ? `${weekFocus} minutes in the last 7 days${bestDay ? ` · best day ${dayLabel(bestDay)}` : ''}`
+          : 'Start a focus block to fill this in.'}
+        tone="var(--chart-1)"
+        empty={!weekFocus}
+        emptyText="No focus time yet this week. One 25-minute block is a great start."
+      >
+        <div className="dw-week">
+          {days.map((d) => {
+            const total = (d.focus || 0) + (d.run || 0);
+            return (
+              <div key={d.date} className="dw-day" title={`${total} min`}>
+                <span className="dw-day-val">{total || ''}</span>
+                <span className="dw-day-bar"><i style={{ height: `${Math.max(4, (total / maxDay) * 100)}%`, opacity: total ? 1 : 0.25 }} /></span>
+                <span className="dw-day-name">{dayLabel(d)}</span>
+              </div>
+            );
+          })}
+        </div>
+      </Widget>
 
-      <ChartGrid cols={2}>
-        <ChartCard title="Goal orbits" subtitle="Each ring is one goal's progress" icon={Target} empty={!goalRings.length} emptyText="Set a goal and it becomes a ring here.">
-          <ConcentricRings data={goalRings} />
-        </ChartCard>
-        <ChartCard title="Habit bubbles" subtitle="Streak → total check-ins, size = effort" icon={Flame} empty={!habitBubbles.length} emptyText="Track a habit to see its bubble.">
-          <BubbleChart data={habitBubbles} xLabel="Current streak" yLabel="Check-ins" zLabel="Effort" />
-        </ChartCard>
-      </ChartGrid>
+      <Widget
+        icon={Flame}
+        title="Habit streaks"
+        hint={topStreak ? `Your best streak right now is ${topStreak} day${topStreak === 1 ? '' : 's'}.` : 'Check a habit off today to start a streak.'}
+        tone="var(--accent-yellow, #f59e0b)"
+        empty={!habits.length}
+        emptyText="Add a habit and its streak shows up here."
+      >
+        <ul className="dw-habits">
+          {habits.map((h) => (
+            <li key={h._id || h.name}>
+              <span className="dw-habit-dot" style={{ background: h.color || 'var(--accent)' }} />
+              <span className="dw-habit-name">{h.name}</span>
+              <span className="dw-habit-streak">🔥 {h.streak || 0} day{(h.streak || 0) === 1 ? '' : 's'}</span>
+            </li>
+          ))}
+        </ul>
+      </Widget>
 
-      <ChartGrid cols={1}>
-        <ChartCard title="Focus & running" subtitle="Minutes per day, last 14 days" icon={Timer} empty={!hasFocus} emptyText="Start a focus block or log a run to fill this area.">
-          <AreaTrend
-            data={focusDaily}
-            series={[{ key: 'focus', name: 'Focus' }, { key: 'run', name: 'Running', color: 'var(--chart-4)' }]}
-            stacked
-            unit=" min"
-            xFormatter={(v) => (v ? format(parseISO(v), 'd MMM') : '')}
+      <Widget
+        icon={Target}
+        title="Goals"
+        hint="How far along each goal is."
+        tone="var(--chart-2)"
+        empty={!goals.length}
+        emptyText="Set a goal and you'll see its progress here."
+      >
+        {goals.map((g) => <BarRow key={g._id || g.title}label={g.title} value={g.progress} color="var(--chart-2)" />)}
+      </Widget>
+
+      <Widget
+        icon={Inbox}
+        title="Inbox"
+        hint={open ? `${open} thing${open === 1 ? '' : 's'} still waiting to be sorted.` : 'Inbox zero — nice.'}
+        tone="var(--accent-green, #10b981)"
+      >
+        <div className="dw-big">
+          <strong>{inboxRate}%</strong>
+          <span>of everything you captured is done</span>
+        </div>
+        <BarRow label="Cleared" value={inboxRate} right={`${done} done · ${open} open`} color="var(--accent-green, #10b981)" />
+      </Widget>
+
+      <Widget
+        icon={BookOpen}
+        title="Currently reading"
+        hint="Where you are in each book."
+        tone="var(--chart-3)"
+        empty={!reading.length}
+        emptyText="Start a book and your progress shows here."
+      >
+        {reading.map((b) => (
+          <BarRow
+            key={b._id || b.title}
+            label={b.title}
+            value={b.progress}
+            right={b.totalPages ? `p.${b.currentPage} of ${b.totalPages}` : `p.${b.currentPage}`}
+            color="var(--chart-3)"
           />
-        </ChartCard>
-      </ChartGrid>
+        ))}
+      </Widget>
 
-      <ChartGrid cols={2}>
-        <ChartCard title="Where things stand" subtitle="Tape diagram of every pipeline" icon={FolderKanban}>
-          <TapeDiagram rows={tapeRows} />
-        </ChartCard>
-        <ChartCard title="Life radar" subtitle="Composite signal across modules" icon={RadarIcon}>
-          <RadarWeb data={radar} />
-        </ChartCard>
-      </ChartGrid>
-
-      {readingTree.length > 0 && (
-        <ChartGrid cols={1}>
-          <ChartCard title="Pages read" subtitle="Treemap — bigger tile, more pages" icon={BookOpen}>
-            <TreemapChart data={readingTree} />
-          </ChartCard>
-        </ChartGrid>
+      {projects.length > 0 && (
+        <Widget icon={FolderKanban} title="Projects" hint="Open projects and how close they are." tone="var(--chart-4)">
+          {projects.map((p) => <BarRow key={p._id || p.title}label={p.title} value={p.progress} color="var(--chart-4)" />)}
+        </Widget>
       )}
     </div>
   );

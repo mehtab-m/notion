@@ -1,15 +1,31 @@
+/* Flush against the app sidebar and top bar — no outer frame. */
 .notes-layout {
   display: grid;
   grid-template-columns: 260px 1fr;
-  height: calc(100vh - 60px - 48px);
+  height: calc(100dvh - var(--navbar-h) - 2 * var(--page-gap, 0px));
   gap: 0;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
   overflow: hidden;
   position: relative;
 }
+.notes-layout.no-sidebar { grid-template-columns: 1fr; }
+
+.notes-shelf { padding: 6px 4px 16px; }
+.notes-shelf-sub {
+  margin: 28px 0 10px; font-size: 13px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted);
+}
+
+.notes-nb-title {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
+  background: none; border: none; padding: 6px 8px; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 700; color: var(--text-primary); cursor: pointer; text-align: left;
+}
+.notes-nb-title span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notes-nb-title:hover { background: var(--bg-hover); }
+.notes-nb-title.active { color: var(--accent); }
 
 .notes-sidebar-toggle {
   display: none;
@@ -419,8 +435,9 @@
   .notes-layout {
     grid-template-columns: 1fr;
     height: auto;
-    min-height: calc(100vh - 60px - 48px);
+    min-height: calc(100dvh - var(--navbar-h) - var(--mobile-nav-h, 0px));
   }
+  .notes-shelf { padding: 16px; }
 
   .notes-sidebar-toggle { display: block; }
 
@@ -455,7 +472,8 @@
 }
 .nb-gallery-head h2 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
 .nb-gallery-head p { margin: 4px 0 0; color: var(--text-muted); font-size: 13px; }
-.nb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+.nb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 22px; }
+.notes-shelf .nb-card { aspect-ratio: 3 / 4; min-height: 0; }
 .nb-card {
   position: relative; display: flex; min-height: 210px; padding: 0; text-align: left;
   border-radius: 6px 16px 16px 6px; border: 1px solid var(--border); overflow: hidden; cursor: pointer;

@@ -2,7 +2,7 @@
    Recap card, headline tiles, then the charts. Every colour
    comes from the theme so the charts follow the palette.  */
 
-.analytics-page { max-width: 1240px; margin: 0 auto; }
+.analytics-page { width: 100%; }
 .analytics-block { margin-bottom: var(--sp-4); }
 
 .analytics-two {
@@ -430,7 +430,80 @@
 .ins-section-title svg { color: var(--accent); }
 .ins-leaderboard { margin-top: 14px; }
 
+.ins-hero p strong { font-weight: 800; }
+.ins-hero-scores {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.ins-hero-scores > div {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 18px; border-radius: 18px;
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2);
+  backdrop-filter: blur(6px);
+}
+.ins-hero-scores strong { font-size: 38px; font-weight: 900; line-height: 1; letter-spacing: -.02em; }
+.ins-hero-scores span { font-size: 13px; opacity: .85; }
+
+/* This week */
+.ins-week {
+  padding: 20px 22px; margin-bottom: 8px;
+  border-radius: 20px; border: 1px solid var(--border);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 8%, var(--bg-card)), var(--bg-card) 55%);
+  display: flex; flex-direction: column; gap: 16px;
+}
+.ins-week-head h2 { margin: 10px 0 2px; font-size: 20px; font-weight: 800; color: var(--text-primary); }
+.ins-week-head p { margin: 0; font-size: 12.5px; }
+.ins-week-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.ins-week-stat {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 14px; border-radius: 14px; background: var(--bg-hover);
+}
+.ins-week-stat strong { font-size: 24px; font-weight: 800; color: var(--text-primary); line-height: 1.1; }
+.ins-week-stat span { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.ins-week-stat em { display: inline-flex; align-items: center; gap: 4px; font-style: normal; font-size: 12px; color: var(--text-muted); }
+.ins-week-stat em.up { color: var(--accent-green); }
+.ins-week-stat em.down { color: var(--accent-red); }
+.ins-week-bars { --tone: var(--accent); height: 130px; }
+.ins-caption { margin: -6px 0 0; font-size: 12px; color: var(--text-muted); }
+
+/* Habit calendar */
+.hcal { display: flex; flex-direction: column; gap: 6px; }
+.hcal-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.hcal-head span { text-align: center; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.hcal-cell {
+  position: relative; aspect-ratio: 1; min-height: 34px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  border-radius: 10px; background: var(--bg-hover); color: var(--text-muted);
+  overflow: hidden;
+}
+.hcal-cell em { font-style: normal; font-size: 12px; font-weight: 700; position: relative; }
+.hcal-cell small { font-size: 9.5px; font-weight: 700; position: relative; }
+.hcal-cell svg { position: relative; }
+.hcal-cell.is-pad { background: transparent; }
+.hcal-cell.is-all { background: var(--accent-green); color: #fff; }
+.hcal-cell.is-some { color: var(--text-primary); }
+.hcal-cell.is-some::before {          /* fills from the bottom by share done */
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: var(--fill);
+  background: color-mix(in srgb, var(--accent-green) 35%, transparent);
+}
+.hcal-cell.is-missed { background: color-mix(in srgb, var(--accent-red) 10%, var(--bg-hover)); }
+.hcal-cell.is-today { outline: 2px solid var(--accent); outline-offset: 1px; }
+.hcal-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; font-size: 12px; color: var(--text-secondary); }
+.hcal-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.hcal-legend i { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+.hcal-legend i.is-all { background: var(--accent-green); }
+.hcal-legend i.is-some { background: color-mix(in srgb, var(--accent-green) 35%, var(--bg-hover)); }
+.hcal-legend i.is-missed { background: color-mix(in srgb, var(--accent-red) 18%, var(--bg-hover)); }
+
+/* Focus per week — horizontal bars, label on the left */
+.ins-hbars { display: flex; flex-direction: column; gap: 8px; }
+.ins-hbar { display: grid; grid-template-columns: 56px 1fr 48px; align-items: center; gap: 10px; font-size: 12px; }
+.ins-hbar-label { color: var(--text-secondary); font-weight: 600; }
+.ins-hbar-track { height: 12px; border-radius: 999px; background: var(--bg-hover); overflow: hidden; }
+.ins-hbar-track i { display: block; height: 100%; border-radius: inherit; background: var(--tone); transition: width .6s ease; }
+.ins-hbar-val { text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
 @media (max-width: 900px) {
   .ins-hero { grid-template-columns: 1fr; padding: 22px; }
   .ins-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ins-week-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
